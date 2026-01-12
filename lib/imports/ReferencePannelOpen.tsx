@@ -2106,8 +2106,6 @@ function ConversationSection() {
 function Content() {
   return (
     <div className="basis-0 content-stretch flex flex-col gap-[24px] grow h-full items-start min-h-px min-w-px relative shrink-0" data-name="content">
-      <Dashboard />
-      <ConversationSection />
     </div>
   );
 }
