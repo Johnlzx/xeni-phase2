@@ -27,6 +27,17 @@ import {
   Grid3X3,
   AlignJustify,
   Download,
+  ArrowRightLeft,
+  ArrowUpDown,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Clock,
+  FileStack as FilesIcon,
+  Eye,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Undo2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,6 +57,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 import { Input } from "@/components/ui/input";
 import {
@@ -54,12 +75,28 @@ import {
   useIsLoadingDocuments,
 } from "@/store/case-detail-store";
 import { DocumentFile, DocumentGroup } from "@/types/case-detail";
+import { AnalysisStatusIndicator } from "./AnalysisStatusIndicator";
 
 const ItemTypes = {
   PAGE: "page",
 };
 
 type ViewMode = "card" | "list";
+
+// Sort options for categories
+type SortOption = "name-asc" | "name-desc" | "modified" | "created" | "status";
+
+const SORT_OPTIONS: {
+  value: SortOption;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { value: "name-asc", label: "Name (A-Z)", icon: <ArrowDownAZ size={14} /> },
+  { value: "name-desc", label: "Name (Z-A)", icon: <ArrowUpAZ size={14} /> },
+  { value: "modified", label: "Last Modified", icon: <Clock size={14} /> },
+  { value: "created", label: "Date Created", icon: <Clock size={14} /> },
+  { value: "status", label: "Status", icon: <FilesIcon size={14} /> },
+];
 
 // ============================================================================
 // PAGE COLOR SYSTEM - Distinct colors to differentiate pages
@@ -274,6 +311,244 @@ const ViewModeToggle = ({
 };
 
 // ============================================================================
+// PAGE PREVIEW MODAL - Full-size preview with zoom and actions
+// ============================================================================
+const PagePreviewModal = ({
+  page,
+  pageIndex,
+  groupId,
+  allGroups,
+  onClose,
+}: {
+  page: DocumentFile;
+  pageIndex: number;
+  groupId: string;
+  allGroups: DocumentGroup[];
+  onClose: () => void;
+}) => {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const markFileForDeletion = useCaseDetailStore(
+    (state) => state.markFileForDeletion,
+  );
+
+  const pageColor = getPageColor(page.id);
+  const otherGroups = allGroups.filter((g) => g.id !== groupId);
+  const currentGroup = allGroups.find((g) => g.id === groupId);
+  const unclassifiedGroup = allGroups.find((g) => g.id === "unclassified");
+
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
+  const handleRotate = () => setRotation((r) => (r + 90) % 360);
+  const handleReset = () => {
+    setZoom(1);
+    setRotation(0);
+  };
+
+  const handleDelete = () => {
+    markFileForDeletion(page.id, groupId);
+    onClose();
+  };
+
+  const handleMoveTo = (targetGroupId: string) => {
+    moveFileToGroup(page.id, targetGroupId);
+    onClose();
+  };
+
+  const handleUnclassify = () => {
+    if (unclassifiedGroup) {
+      moveFileToGroup(page.id, unclassifiedGroup.id);
+      onClose();
+    }
+  };
+
+  // Close on escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "+" || e.key === "=") handleZoomIn();
+      if (e.key === "-") handleZoomOut();
+      if (e.key === "r") handleRotate();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal Content */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative z-10 flex flex-col max-w-[90vw] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 bg-gradient-to-r from-stone-50 to-white">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${pageColor.accent}`} />
+            <div>
+              <h3 className="text-sm font-semibold text-stone-800">
+                Page {pageIndex + 1}
+              </h3>
+              <p className="text-xs text-stone-500">
+                {currentGroup?.title || "Document"}
+              </p>
+            </div>
+          </div>
+
+          {/* Zoom & Rotate Controls */}
+          <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-1">
+            <button
+              onClick={handleZoomOut}
+              className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
+              title="Zoom out (-)"
+            >
+              <ZoomOut size={16} />
+            </button>
+            <span className="px-2 text-xs font-medium text-stone-600 min-w-[3rem] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={handleZoomIn}
+              className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
+              title="Zoom in (+)"
+            >
+              <ZoomIn size={16} />
+            </button>
+            <div className="w-px h-5 bg-stone-300 mx-1" />
+            <button
+              onClick={handleRotate}
+              className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
+              title="Rotate (R)"
+            >
+              <RotateCw size={16} />
+            </button>
+            <button
+              onClick={handleReset}
+              className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
+              title="Reset"
+            >
+              <Undo2 size={16} />
+            </button>
+          </div>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Image Preview Area */}
+        <div className="flex-1 overflow-auto bg-stone-100 p-8 flex items-center justify-center min-h-[60vh]">
+          <motion.div
+            animate={{
+              scale: zoom,
+              rotate: rotation,
+            }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="relative"
+          >
+            <div
+              className={`bg-white rounded-xl shadow-2xl border-2 ${pageColor.border} overflow-hidden`}
+              style={{ width: "500px", maxWidth: "70vw" }}
+            >
+              <div className={`h-2 ${pageColor.accent}`} />
+              <div
+                className={`aspect-[3/4] bg-gradient-to-br ${pageColor.bg} relative`}
+              >
+                <img
+                  src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=800&h=1000&fit=crop&sat=-100&bri=${10 + pageIndex * 3}`}
+                  alt={`Page ${pageIndex + 1}`}
+                  className="object-cover w-full h-full opacity-70 mix-blend-multiply"
+                  draggable={false}
+                />
+                <div
+                  className={`absolute bottom-4 left-4 ${pageColor.label} text-lg font-bold px-4 py-2 rounded-lg shadow-md`}
+                >
+                  Page {pageIndex + 1}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Action Bar */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-stone-200 bg-white">
+          {/* Left: Move Actions */}
+          <div className="flex items-center gap-2">
+            {/* Move to Category Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium rounded-lg transition-colors">
+                  <ArrowRightLeft size={14} />
+                  Move to
+                  <ChevronDown size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuLabel>Move to Category</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {otherGroups
+                  .filter((g) => g.id !== "unclassified")
+                  .map((targetGroup) => (
+                    <DropdownMenuItem
+                      key={targetGroup.id}
+                      onClick={() => handleMoveTo(targetGroup.id)}
+                    >
+                      <FolderOpen size={14} className="mr-2 text-stone-400" />
+                      {targetGroup.title}
+                    </DropdownMenuItem>
+                  ))}
+                {otherGroups.filter((g) => g.id !== "unclassified").length ===
+                  0 && (
+                  <div className="px-3 py-2 text-sm text-stone-400 italic">
+                    No other categories
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Unclassify Button */}
+            {groupId !== "unclassified" && unclassifiedGroup && (
+              <button
+                onClick={handleUnclassify}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-medium rounded-lg transition-colors border border-amber-200"
+              >
+                <Inbox size={14} />
+                Unclassify
+              </button>
+            )}
+          </div>
+
+          {/* Right: Delete Action */}
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition-colors border border-red-200"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ============================================================================
 // PAGE THUMBNAIL - Draggable card with smooth reordering
 // ============================================================================
 const PageThumbnail = ({
@@ -305,6 +580,15 @@ const PageThumbnail = ({
     (state) => state.reorderFileInGroup,
   );
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const markFileForDeletion = useCaseDetailStore(
+    (state) => state.markFileForDeletion,
+  );
+
+  // Preview modal state
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Get other groups for "Move to" submenu (exclude current group)
+  const otherGroups = allGroups.filter((g) => g.id !== groupId);
 
   const [{ isDragging }, drag, preview] = useDrag({
     type: ItemTypes.PAGE,
@@ -403,12 +687,12 @@ const PageThumbnail = ({
   // When this item is being dragged, show placeholder
   const showPlaceholder = isDragging;
 
-  return (
+  const thumbnailContent = (
     <div
       ref={isRemoved ? undefined : ref}
       onClick={isRemoved ? undefined : onSelect || onPreview}
       className={`
-        relative select-none transition-transform duration-200 ease-out
+        group relative select-none transition-transform duration-200 ease-out
         ${isRemoved ? "opacity-50 pointer-events-none" : "cursor-grab active:cursor-grabbing"}
         ${showPlaceholder ? "opacity-40" : "opacity-100"}
       `}
@@ -488,17 +772,108 @@ const PageThumbnail = ({
             </div>
           )}
 
-          {/* Drag indicator on hover */}
-          {!isRemoved && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/10 rounded-xl">
-              <div className="bg-white/90 rounded-lg p-2 shadow-lg">
-                <GripVertical size={20} className="text-stone-600" />
-              </div>
-            </div>
+          {/* Preview button - top left corner (only show when not NEW/DEL badge) */}
+          {!isRemoved && !isNew && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPreview(true);
+              }}
+              className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/95 hover:bg-white rounded-lg shadow-md border border-stone-200/50 hover:border-stone-300"
+            >
+              <Eye size={12} className="text-stone-600" />
+            </button>
+          )}
+          {/* Preview button when has NEW badge - position adjusted */}
+          {!isRemoved && isNew && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPreview(true);
+              }}
+              className="absolute top-7 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/95 hover:bg-white rounded-lg shadow-md border border-stone-200/50 hover:border-stone-300"
+            >
+              <Eye size={12} className="text-stone-600" />
+            </button>
           )}
         </div>
       </div>
     </div>
+  );
+
+  // If removed, don't show context menu
+  if (isRemoved) {
+    return thumbnailContent;
+  }
+
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{thumbnailContent}</ContextMenuTrigger>
+        <ContextMenuContent className="w-48 bg-white/95 backdrop-blur-sm border border-stone-200 shadow-xl rounded-lg overflow-hidden">
+          {/* Preview option */}
+          <ContextMenuItem
+            onClick={() => setShowPreview(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 cursor-pointer"
+          >
+            <Eye size={14} className="text-stone-500" />
+            <span>Preview</span>
+          </ContextMenuItem>
+
+          <ContextMenuSeparator className="bg-stone-100" />
+
+          {/* Move to submenu */}
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="flex items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 cursor-pointer">
+              <ArrowRightLeft size={14} className="text-stone-500" />
+              <span>Move to</span>
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-48 bg-white/95 backdrop-blur-sm border border-stone-200 shadow-xl rounded-lg overflow-hidden">
+              {otherGroups.length > 0 ? (
+                otherGroups.map((targetGroup) => (
+                  <ContextMenuItem
+                    key={targetGroup.id}
+                    onClick={() => moveFileToGroup(page.id, targetGroup.id)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-[#0E4268]/5 hover:text-[#0E4268] cursor-pointer"
+                  >
+                    <FolderOpen size={14} className="text-stone-400" />
+                    <span className="truncate">{targetGroup.title}</span>
+                  </ContextMenuItem>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-sm text-stone-400 italic">
+                  No other categories
+                </div>
+              )}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+
+          <ContextMenuSeparator className="bg-stone-100" />
+
+          {/* Delete option */}
+          <ContextMenuItem
+            onClick={() => markFileForDeletion(page.id, groupId)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
+          >
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      {/* Preview Modal */}
+      <AnimatePresence>
+        {showPreview && (
+          <PagePreviewModal
+            page={page}
+            pageIndex={pageIndex}
+            groupId={groupId}
+            allGroups={allGroups}
+            onClose={() => setShowPreview(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
@@ -801,7 +1176,9 @@ const CategoryPreviewModal = ({
     );
   };
 
-  const isPending = group.status === "pending" && group.files.length > 1;
+  // Filter out removed files for display
+  const activeFiles = group.files.filter((f) => !f.isRemoved);
+  const isPending = group.status === "pending" && activeFiles.length > 1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1045,7 +1422,9 @@ const SidebarCategoryItem = ({
 
   drop(ref);
 
-  const totalPages = group.files.length;
+  // Filter out removed files for display
+  const activeFiles = group.files.filter((f) => !f.isRemoved);
+  const totalPages = activeFiles.length;
   const isPending = group.status === "pending" && totalPages > 1;
 
   return (
@@ -1249,7 +1628,9 @@ const CategoryPreviewPanel = ({
     );
   };
 
-  const isPending = group.status === "pending" && group.files.length > 1;
+  // Filter out removed files for display
+  const activeFiles = group.files.filter((f) => !f.isRemoved);
+  const isPending = group.status === "pending" && activeFiles.length > 1;
 
   return (
     <div className="h-full flex flex-col bg-stone-50/30">
@@ -1264,7 +1645,7 @@ const CategoryPreviewPanel = ({
               {group.mergedFileName || `${group.title}.pdf`}
             </h2>
             <p className="text-xs text-stone-500">
-              {group.files.length} pages
+              {activeFiles.length} pages
               {isPending && (
                 <span className="ml-2 text-amber-600 font-medium">
                   • Pending Review
@@ -1325,7 +1706,7 @@ const CategoryPreviewPanel = ({
 
       {/* Pages */}
       <div className="flex-1 overflow-hidden">
-        {group.files.length === 0 ? (
+        {activeFiles.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-stone-400 p-5">
             <Upload size={32} className="mb-3 opacity-50" />
             <p className="text-sm">No pages in this category</p>
@@ -1336,19 +1717,15 @@ const CategoryPreviewPanel = ({
         ) : viewMode === "grid" ? (
           <div className="h-full overflow-auto p-4">
             <div className="flex flex-wrap gap-8 content-start">
-              {group.files.map((page, idx) => (
+              {activeFiles.map((page, idx) => (
                 <PageThumbnail
                   key={page.id}
                   page={page}
                   pageIndex={idx}
                   groupId={group.id}
                   allGroups={allGroups}
-                  isSelected={
-                    selectedPages.includes(page.id) && !page.isRemoved
-                  }
-                  onSelect={() =>
-                    !page.isRemoved && togglePageSelection(page.id)
-                  }
+                  isSelected={selectedPages.includes(page.id)}
+                  onSelect={() => togglePageSelection(page.id)}
                 />
               ))}
             </div>
@@ -1358,7 +1735,7 @@ const CategoryPreviewPanel = ({
             {/* Left Thumbnail Navigation */}
             <div className="w-20 shrink-0 bg-stone-100/50 border-r border-stone-200 overflow-y-auto py-3 px-2">
               <div className="flex flex-col gap-2">
-                {group.files.map((page, idx) => {
+                {activeFiles.map((page, idx) => {
                   const color = getPageColor(page.id);
                   const isActive = activePageIndex === idx;
                   return (
@@ -1406,7 +1783,7 @@ const CategoryPreviewPanel = ({
               className="flex-1 overflow-y-auto p-5"
             >
               <div className="flex flex-col gap-6 items-center max-w-2xl mx-auto">
-                {group.files.map((page, idx) => {
+                {activeFiles.map((page, idx) => {
                   const color = getPageColor(page.id);
                   return (
                     <div
@@ -1431,7 +1808,7 @@ const CategoryPreviewPanel = ({
                           <div
                             className={`absolute bottom-4 left-4 ${color.label} text-sm font-bold px-3 py-1 rounded-lg shadow-sm`}
                           >
-                            Page {idx + 1} of {group.files.length}
+                            Page {idx + 1} of {activeFiles.length}
                           </div>
                           <div
                             className={`absolute top-4 right-4 w-3 h-3 rounded-full ${color.accent}`}
@@ -1814,9 +2191,42 @@ const ListViewContent = ({
 }) => {
   const classifiedGroups = groups.filter((g) => g.id !== "unclassified");
 
+  // Sort state
+  const [sortOption, setSortOption] = useState<SortOption>("name-asc");
+
+  // Sort function
+  const sortedGroups = React.useMemo(() => {
+    const sorted = [...classifiedGroups];
+    switch (sortOption) {
+      case "name-asc":
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case "name-desc":
+        return sorted.sort((a, b) => b.title.localeCompare(a.title));
+      case "modified":
+        // Sort by last modified (hasChanges first, then by id as proxy for time)
+        return sorted.sort((a, b) => {
+          if (a.hasChanges && !b.hasChanges) return -1;
+          if (!a.hasChanges && b.hasChanges) return 1;
+          return b.id.localeCompare(a.id); // Newer IDs first
+        });
+      case "created":
+        // Sort by creation order (using id as proxy)
+        return sorted.sort((a, b) => a.id.localeCompare(b.id));
+      case "status":
+        // Pending first, then reviewed
+        return sorted.sort((a, b) => {
+          if (a.status === "pending" && b.status === "reviewed") return -1;
+          if (a.status === "reviewed" && b.status === "pending") return 1;
+          return a.title.localeCompare(b.title);
+        });
+      default:
+        return sorted;
+    }
+  }, [classifiedGroups, sortOption]);
+
   // Auto-select first category to show preview by default
   const [selectedGroup, setSelectedGroup] = useState<DocumentGroup | null>(
-    () => classifiedGroups[0] || null,
+    () => sortedGroups[0] || null,
   );
 
   // Update selection when groups change (e.g., first load or group deleted)
@@ -1831,13 +2241,13 @@ const ListViewContent = ({
         setSelectedGroup(stillExists);
       } else {
         // Group was deleted, select first available
-        setSelectedGroup(classifiedGroups[0] || null);
+        setSelectedGroup(sortedGroups[0] || null);
       }
-    } else if (classifiedGroups.length > 0) {
+    } else if (sortedGroups.length > 0) {
       // No selection but groups exist, select first
-      setSelectedGroup(classifiedGroups[0]);
+      setSelectedGroup(sortedGroups[0]);
     }
-  }, [groups]);
+  }, [groups, sortOption]);
 
   return (
     <div className="h-full flex">
@@ -1852,6 +2262,33 @@ const ListViewContent = ({
             </span>
           </div>
           <div className="flex items-center gap-1">
+            {/* Sort Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors">
+                  <ArrowUpDown size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {SORT_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => setSortOption(option.value)}
+                    className={
+                      sortOption === option.value ? "bg-stone-100" : ""
+                    }
+                  >
+                    <span className="mr-2 text-stone-500">{option.icon}</span>
+                    {option.label}
+                    {sortOption === option.value && (
+                      <Check size={12} className="ml-auto text-[#0E4268]" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               onClick={onUpload}
               className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
@@ -1886,9 +2323,14 @@ const ListViewContent = ({
           </div>
         </div>
 
+        {/* Analysis Status Indicator */}
+        <div className="shrink-0 p-3 border-b border-stone-100">
+          <AnalysisStatusIndicator />
+        </div>
+
         {/* Categories List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {classifiedGroups.map((group) => (
+          {sortedGroups.map((group) => (
             <SidebarCategoryItem
               key={group.id}
               group={group}
@@ -1898,7 +2340,7 @@ const ListViewContent = ({
             />
           ))}
 
-          {classifiedGroups.length === 0 && (
+          {sortedGroups.length === 0 && (
             <div className="py-12 text-center">
               <FolderOpen size={32} className="mx-auto mb-3 text-stone-300" />
               <p className="text-sm text-stone-500">No categories yet</p>

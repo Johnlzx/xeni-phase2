@@ -88,6 +88,9 @@ export interface DocumentFile {
   type: "pdf" | "doc";
   isNew?: boolean;
   isRemoved?: boolean;
+  // Analysis tracking
+  isAnalyzed?: boolean;
+  analyzedAt?: string;
 }
 
 // Document Group
@@ -132,6 +135,8 @@ export interface CaseDetailState {
   // Document Analysis State
   isAnalyzingDocuments: boolean;
   analysisProgress: number; // 0-100
+  lastAnalysisAt: string | null; // ISO timestamp of last analysis
+  analyzedFileIds: string[]; // IDs of files included in last analysis
 }
 
 // Case Detail Store Actions
@@ -171,6 +176,7 @@ export interface CaseDetailActions {
     fromIndex: number,
     toIndex: number,
   ) => void;
+  markFileForDeletion: (fileId: string, groupId: string) => void;
   confirmGroupReview: (groupId: string) => void;
   uploadDocuments: () => Promise<void>;
 
@@ -180,6 +186,9 @@ export interface CaseDetailActions {
 
   // Demo: Review all documents and analyze
   reviewAllDocumentsAndAnalyze: () => Promise<void>;
+
+  // Analysis
+  runDocumentAnalysis: () => Promise<void>;
 
   // Reset
   reset: () => void;

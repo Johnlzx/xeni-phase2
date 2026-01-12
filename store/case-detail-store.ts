@@ -723,6 +723,8 @@ const initialState: CaseDetailState = {
   demoStage: 0,
   isAnalyzingDocuments: false,
   analysisProgress: 0,
+  lastAnalysisAt: null,
+  analyzedFileIds: [],
 };
 
 // Helper to sync file previews from document groups
@@ -1161,6 +1163,33 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      markFileForDeletion: (fileId: string, groupId: string) => {
+        set(
+          (state) => {
+            const newGroups = state.documentGroups.map((group) => {
+              if (group.id !== groupId) return group;
+
+              return {
+                ...group,
+                status: "pending" as const,
+                hasChanges: true,
+                files: group.files.map((f) =>
+                  f.id === fileId ? { ...f, isRemoved: true, isNew: false } : f,
+                ),
+              };
+            });
+
+            const previews = syncFilePreviewsFromGroups(newGroups);
+            return {
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "markFileForDeletion",
+        );
+      },
+
       confirmGroupReview: (groupId: string) => {
         set(
           (state) => ({
@@ -1252,7 +1281,12 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           address: "42 Kensington Gardens, London W8 4PX",
         };
 
-        // Step 4: Update client profile
+        // Step 4: Update client profile and record analyzed files
+        const currentState = get();
+        const analyzedFileIds = currentState.documentGroups
+          .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
+          .flatMap((g) => g.files.filter((f) => !f.isRemoved).map((f) => f.id));
+
         set(
           (state) => {
             const newProfile = {
@@ -1265,6 +1299,21 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               clientProfile: newProfile,
               isAnalyzingDocuments: false,
               analysisProgress: 100,
+              lastAnalysisAt: new Date().toISOString(),
+              analyzedFileIds,
+              // Mark all analyzed files
+              documentGroups: state.documentGroups.map((g) => ({
+                ...g,
+                files: g.files.map((f) =>
+                  analyzedFileIds.includes(f.id)
+                    ? {
+                        ...f,
+                        isAnalyzed: true,
+                        analyzedAt: new Date().toISOString(),
+                      }
+                    : f,
+                ),
+              })),
             };
           },
           false,
@@ -1273,6 +1322,62 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         // Evolve checklist based on new data
         get().evolveChecklist();
+      },
+
+      // Run document analysis on ready (reviewed) documents only
+      runDocumentAnalysis: async () => {
+        const state = get();
+
+        // Get all ready files (from reviewed groups, excluding unclassified and removed)
+        const readyFiles = state.documentGroups
+          .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
+          .flatMap((g) => g.files.filter((f) => !f.isRemoved));
+
+        if (readyFiles.length === 0) {
+          return; // Nothing to analyze
+        }
+
+        set(
+          { isAnalyzingDocuments: true, analysisProgress: 0 },
+          false,
+          "startAnalysis",
+        );
+
+        // Simulate analysis
+        const totalSteps = 4;
+        for (let i = 1; i <= totalSteps; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          set(
+            { analysisProgress: Math.round((i / totalSteps) * 100) },
+            false,
+            `analyzing:step${i}`,
+          );
+        }
+
+        const analyzedFileIds = readyFiles.map((f) => f.id);
+
+        set(
+          (state) => ({
+            isAnalyzingDocuments: false,
+            analysisProgress: 100,
+            lastAnalysisAt: new Date().toISOString(),
+            analyzedFileIds,
+            documentGroups: state.documentGroups.map((g) => ({
+              ...g,
+              files: g.files.map((f) =>
+                analyzedFileIds.includes(f.id)
+                  ? {
+                      ...f,
+                      isAnalyzed: true,
+                      analyzedAt: new Date().toISOString(),
+                    }
+                  : f,
+              ),
+            })),
+          }),
+          false,
+          "analysisComplete",
+        );
       },
 
       // Reset
