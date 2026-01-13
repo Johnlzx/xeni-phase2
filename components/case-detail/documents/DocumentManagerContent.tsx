@@ -917,6 +917,7 @@ const CategoryCard = ({
   const confirmGroupReview = useCaseDetailStore(
     (state) => state.confirmGroupReview,
   );
+  const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
 
   const [{ isOver }, drop] = useDrop(
     () => ({
@@ -938,6 +939,13 @@ const CategoryCard = ({
   const totalPages = group.files.length;
   const canDelete = group.files.length === 0;
   const isPending = group.status === "pending" && totalPages > 1;
+
+  const handleUpload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Simulate uploading 1-3 pages
+    const pageCount = Math.floor(Math.random() * 3) + 1;
+    uploadToGroup(group.id, pageCount);
+  };
 
   const handleRenameSubmit = () => {
     if (newTitle.trim()) {
@@ -1021,6 +1029,14 @@ const CategoryCard = ({
                 </span>
               ) : null}
 
+              <button
+                onClick={handleUpload}
+                className="p-1 text-stone-400 hover:text-[#0E4268] hover:bg-[#0E4268]/10 rounded transition-colors"
+                aria-label="Upload to category"
+              >
+                <Upload size={14} />
+              </button>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="p-1 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded transition-colors">
@@ -1028,6 +1044,9 @@ const CategoryCard = ({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={handleUpload}>
+                    <Upload size={12} className="mr-2" /> Upload
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
                       setNewTitle(group.title);
@@ -1422,6 +1441,7 @@ const SidebarCategoryItem = ({
   allGroups: DocumentGroup[];
 }) => {
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
   const ref = useRef<HTMLDivElement>(null);
 
   const [{ isOver }, drop] = useDrop(
@@ -1438,6 +1458,13 @@ const SidebarCategoryItem = ({
   );
 
   drop(ref);
+
+  const handleUpload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Simulate uploading 1-3 pages
+    const pageCount = Math.floor(Math.random() * 3) + 1;
+    uploadToGroup(group.id, pageCount);
+  };
 
   // Filter out removed files for display
   const activeFiles = group.files.filter((f) => !f.isRemoved);
@@ -1484,6 +1511,15 @@ const SidebarCategoryItem = ({
           )}
         </p>
       </div>
+
+      {/* Upload button - visible on hover */}
+      <button
+        onClick={handleUpload}
+        className="p-1.5 text-stone-400 hover:text-[#0E4268] hover:bg-[#0E4268]/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+        aria-label="Upload to category"
+      >
+        <Upload size={14} />
+      </button>
 
       {isPending && (
         <div className="size-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />

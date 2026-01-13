@@ -1229,6 +1229,44 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         get().evolveChecklist();
       },
 
+      uploadToGroup: (groupId: string, fileCount: number = 1) => {
+        set(
+          (state) => {
+            const newGroups = state.documentGroups.map((g) => {
+              if (g.id === groupId) {
+                const newFiles: DocumentFile[] = [];
+                for (let i = 0; i < fileCount; i++) {
+                  const fileId = `file_${Date.now()}_${i}`;
+                  newFiles.push({
+                    id: fileId,
+                    name: `Uploaded_Page_${g.files.length + i + 1}.pdf`,
+                    size: "0.5 MB",
+                    pages: 1,
+                    date: "Just now",
+                    type: "pdf",
+                    isNew: true,
+                  });
+                }
+                return {
+                  ...g,
+                  files: [...g.files, ...newFiles],
+                  status: "pending" as const,
+                  hasChanges: true,
+                };
+              }
+              return g;
+            });
+            const previews = syncFilePreviewsFromGroups(newGroups);
+            return {
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "uploadToGroup",
+        );
+      },
+
       // Demo: Review all documents and analyze to generate client profile
       reviewAllDocumentsAndAnalyze: async () => {
         const state = get();

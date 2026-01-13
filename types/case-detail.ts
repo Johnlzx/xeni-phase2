@@ -183,6 +183,7 @@ export interface CaseDetailActions {
   markFileForDeletion: (fileId: string, groupId: string) => void;
   confirmGroupReview: (groupId: string) => void;
   uploadDocuments: () => Promise<void>;
+  uploadToGroup: (groupId: string, fileCount?: number) => void;
 
   // Demo Controls
   advanceDemoStage: () => void;

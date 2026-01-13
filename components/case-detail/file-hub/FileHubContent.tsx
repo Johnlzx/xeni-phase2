@@ -332,40 +332,40 @@ const UploadArea = ({
   );
 
   return (
-    <div className="shrink-0 px-4 py-3 bg-stone-50 border-b border-stone-200">
+    <div className="shrink-0 px-4 py-4 bg-stone-50 border-b border-stone-200">
       <div className="flex items-stretch gap-4">
         {/* Drop Zone (left side - larger) */}
         <div
           ref={drop as unknown as React.LegacyRef<HTMLDivElement>}
           onClick={onUpload}
           className={cn(
-            "flex items-center gap-4 px-6 py-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors min-w-[280px]",
+            "flex items-center gap-4 px-6 py-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors min-w-[300px]",
             isOver
               ? "border-[#0E4268] bg-[#0E4268]/5"
               : "border-stone-300 hover:border-stone-400 hover:bg-white",
           )}
         >
-          <div className="size-12 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
-            <Upload size={24} className="text-stone-400" />
+          <div className="size-14 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
+            <Upload size={28} className="text-stone-400" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-stone-700">
+            <p className="text-base font-medium text-stone-700">
               Drag & Drop files here
             </p>
-            <p className="text-xs text-stone-500 mt-0.5">or click to browse</p>
+            <p className="text-sm text-stone-500 mt-1">or click to browse</p>
           </div>
         </div>
 
         {/* Unclassified Pages Container (right side) */}
         {unclassifiedFiles.length > 0 && (
-          <div className="flex-1 bg-white rounded-xl border border-stone-200 p-3 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <Inbox size={14} className="text-stone-400" />
-              <span className="text-xs font-medium text-stone-600">
+          <div className="flex-1 bg-white rounded-xl border border-stone-200 p-4 min-w-0">
+            <div className="flex items-center gap-2 mb-3">
+              <Inbox size={16} className="text-stone-400" />
+              <span className="text-sm font-medium text-stone-600">
                 Unclassified ({unclassifiedFiles.length})
               </span>
             </div>
-            <div className="flex flex-wrap gap-1.5 max-h-[68px] overflow-y-auto">
+            <div className="flex flex-wrap gap-2 max-h-[88px] overflow-y-auto">
               {unclassifiedFiles.map((file, idx) => (
                 <DraggableUnclassifiedPage
                   key={file.id}
@@ -400,6 +400,14 @@ const CategoryCard = ({
   const confirmGroupReview = useCaseDetailStore(
     (state) => state.confirmGroupReview,
   );
+  const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
+
+  const handleUpload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Simulate uploading 1-3 pages
+    const pageCount = Math.floor(Math.random() * 3) + 1;
+    uploadToGroup(group.id, pageCount);
+  };
 
   const activeFiles = group.files.filter((f) => !f.isRemoved);
   const totalPages = activeFiles.length;
@@ -474,6 +482,13 @@ const CategoryCard = ({
               Ready
             </span>
           ) : null}
+          <button
+            onClick={handleUpload}
+            className="p-1 text-stone-400 hover:text-[#0E4268] hover:bg-[#0E4268]/10 rounded transition-colors"
+            aria-label="Upload to category"
+          >
+            <Upload size={14} />
+          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -485,6 +500,10 @@ const CategoryCard = ({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={handleUpload}>
+                <Upload size={14} className="mr-2" />
+                Upload
+              </DropdownMenuItem>
               <DropdownMenuItem>Rename</DropdownMenuItem>
               <DropdownMenuItem>Download</DropdownMenuItem>
               <DropdownMenuSeparator />
