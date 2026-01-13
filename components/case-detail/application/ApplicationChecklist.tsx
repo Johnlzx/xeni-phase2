@@ -28,6 +28,7 @@ import {
   Lock,
 } from "lucide-react";
 import { VisaType } from "@/types";
+import { DocumentsReadyCard } from "./DocumentsReadyCard";
 
 // Checklist item status
 type ItemStatus = "complete" | "partial" | "pending" | "locked";
@@ -745,6 +746,9 @@ export function ApplicationChecklistView({
           </div>
         </div>
       </div>
+
+      {/* Documents info bar */}
+      <DocumentsReadyCard variant="inline" />
 
       {/* Sections */}
       <div className="flex-1 overflow-auto p-8">
