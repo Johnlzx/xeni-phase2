@@ -20,12 +20,11 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
-  Loader2,
   X,
   FolderOpen,
-  Upload,
   Files,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { VisaType } from "@/types";
 
 // Question types
@@ -58,13 +57,14 @@ interface AnalyzedDocument {
 
 interface QuickQuestionnaireProps {
   visaType: VisaType;
-  onComplete: (answers: Record<string, any>) => void;
+  onComplete: (answers: Record<string, unknown>) => void;
   onClose: () => void;
   onNavigateToDocuments?: () => void;
   analyzedDocuments?: AnalyzedDocument[];
+  isInline?: boolean;
 }
 
-// Questions configuration based on visa type - Written for lawyers about their clients
+// Questions configuration based on visa type
 const getQuestionsForVisa = (visaType: VisaType): Question[] => {
   const baseQuestions: Question[] = [
     {
@@ -105,7 +105,6 @@ const getQuestionsForVisa = (visaType: VisaType): Question[] => {
     },
   ];
 
-  // Add visa-specific questions - all written from lawyer's perspective
   const visaSpecificQuestions: Record<VisaType, Question[]> = {
     "skilled-worker": [
       {
@@ -352,7 +351,7 @@ const ProgressIndicator = ({
           className="h-full bg-[#0E4268] rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
         />
       </div>
       <span className="text-sm font-medium text-stone-500 tabular-nums">
@@ -384,40 +383,45 @@ const OptionButton = ({
       whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      className={`
-        w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200
-        ${
-          isSelected
-            ? "border-[#0E4268] bg-[#0E4268]/5 shadow-md"
-            : "border-stone-200 bg-white hover:border-stone-300 hover:shadow-sm"
-        }
-      `}
+      className={cn(
+        "w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all",
+        isSelected
+          ? "border-[#0E4268] bg-[#0E4268]/5 shadow-md"
+          : "border-stone-200 bg-white hover:border-stone-300 hover:shadow-sm",
+      )}
     >
       {Icon && (
         <div
-          className={`
-          w-10 h-10 rounded-lg flex items-center justify-center
-          ${isSelected ? "bg-[#0E4268] text-white" : "bg-stone-100 text-stone-500"}
-        `}
+          className={cn(
+            "size-10 rounded-lg flex items-center justify-center",
+            isSelected
+              ? "bg-[#0E4268] text-white"
+              : "bg-stone-100 text-stone-500",
+          )}
         >
           <Icon size={20} />
         </div>
       )}
       <div className="flex-1">
         <p
-          className={`font-medium ${isSelected ? "text-[#0E4268]" : "text-stone-800"}`}
+          className={cn(
+            "font-medium text-balance",
+            isSelected ? "text-[#0E4268]" : "text-stone-800",
+          )}
         >
           {option.label}
         </p>
         {option.description && (
-          <p className="text-sm text-stone-500 mt-0.5">{option.description}</p>
+          <p className="text-sm text-stone-500 mt-0.5 text-pretty">
+            {option.description}
+          </p>
         )}
       </div>
       <div
-        className={`
-        w-5 h-5 rounded-full border-2 flex items-center justify-center
-        ${isSelected ? "border-[#0E4268] bg-[#0E4268]" : "border-stone-300"}
-      `}
+        className={cn(
+          "size-5 rounded-full border-2 flex items-center justify-center",
+          isSelected ? "border-[#0E4268] bg-[#0E4268]" : "border-stone-300",
+        )}
       >
         {isSelected && <Check size={12} className="text-white" />}
       </div>
@@ -437,10 +441,11 @@ const ExtractedHint = ({
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
       className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg mb-4"
     >
       <FileText size={14} className="text-emerald-600" />
-      <span className="text-sm text-emerald-700">
+      <span className="text-sm text-emerald-700 text-pretty">
         <span className="font-medium">Extracted from {source}:</span> {value}
       </span>
       <CheckCircle2 size={14} className="text-emerald-500 ml-auto" />
@@ -467,28 +472,27 @@ const GeneratingChecklist = () => {
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        className="w-16 h-16 rounded-full border-4 border-[#0E4268]/20 border-t-[#0E4268] mb-6"
-      />
+      <div className="size-16 rounded-full border-4 border-[#0E4268]/20 border-t-[#0E4268] animate-spin mb-6" />
       <AnimatePresence mode="wait">
         <motion.p
           key={currentItem}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          className="text-lg font-medium text-stone-700"
+          transition={{ duration: 0.2 }}
+          className="text-lg font-medium text-stone-700 text-balance"
         >
           {items[currentItem]}
         </motion.p>
       </AnimatePresence>
-      <p className="text-sm text-stone-400 mt-2">This won't take long</p>
+      <p className="text-sm text-stone-400 mt-2 text-pretty">
+        This won't take long
+      </p>
     </div>
   );
 };
 
-// Mock analyzed documents - in real app would come from props or store
+// Mock analyzed documents
 const MOCK_ANALYZED_DOCUMENTS: AnalyzedDocument[] = [
   { id: "doc-1", name: "Passport_Main.pdf", type: "Passport", pages: 2 },
   {
@@ -506,24 +510,24 @@ export function QuickQuestionnaire({
   onClose,
   onNavigateToDocuments,
   analyzedDocuments = MOCK_ANALYZED_DOCUMENTS,
+  isInline = false,
 }: QuickQuestionnaireProps) {
   const questions = getQuestionsForVisa(visaType);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [isGenerating, setIsGenerating] = useState(false);
 
   const currentQuestion = questions[currentIndex];
   const isLastQuestion = currentIndex === questions.length - 1;
   const canProceed = answers[currentQuestion.id] !== undefined;
 
-  const handleAnswer = (value: any) => {
+  const handleAnswer = (value: unknown) => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
   };
 
   const handleNext = () => {
     if (isLastQuestion) {
       setIsGenerating(true);
-      // Simulate checklist generation
       setTimeout(() => {
         onComplete(answers);
       }, 4000);
@@ -538,9 +542,20 @@ export function QuickQuestionnaire({
     }
   };
 
+  // Generating state
   if (isGenerating) {
+    if (isInline) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
+            <GeneratingChecklist />
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -552,15 +567,166 @@ export function QuickQuestionnaire({
     );
   }
 
+  // Inline questionnaire content
+  const questionnaireContent = (
+    <>
+      {/* Document Analysis Info */}
+      <div className="px-6 py-3 bg-stone-50 border-b border-stone-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Files size={14} className="text-stone-500" />
+              <span className="text-xs font-medium text-stone-600">
+                {analyzedDocuments.length} documents analyzed
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {analyzedDocuments.slice(0, 3).map((doc) => (
+                <span
+                  key={doc.id}
+                  className="px-2 py-0.5 bg-white border border-stone-200 rounded text-[10px] text-stone-600 truncate max-w-[100px]"
+                  title={doc.name}
+                >
+                  {doc.type}
+                </span>
+              ))}
+              {analyzedDocuments.length > 3 && (
+                <span className="px-2 py-0.5 bg-stone-100 rounded text-[10px] text-stone-500">
+                  +{analyzedDocuments.length - 3}
+                </span>
+              )}
+            </div>
+          </div>
+          {onNavigateToDocuments && (
+            <button
+              onClick={onNavigateToDocuments}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#0E4268] hover:bg-[#0E4268]/5 rounded-lg transition-colors"
+            >
+              <FolderOpen size={14} />
+              Review / Upload
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div className="px-6 py-3 border-b border-stone-100">
+        <ProgressIndicator current={currentIndex} total={questions.length} />
+      </div>
+
+      {/* Question content */}
+      <div className="p-6">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentQuestion.id}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Extracted value hint */}
+            {currentQuestion.extractedValue && (
+              <ExtractedHint
+                value={currentQuestion.extractedValue}
+                source={currentQuestion.extractedFrom || "documents"}
+              />
+            )}
+
+            {/* Question */}
+            <h3 className="text-xl font-semibold text-stone-900 mb-2 text-balance">
+              {currentQuestion.question}
+            </h3>
+            {currentQuestion.description && (
+              <p className="text-sm text-stone-500 mb-6 text-pretty">
+                {currentQuestion.description}
+              </p>
+            )}
+
+            {/* Options */}
+            {currentQuestion.type === "single" && currentQuestion.options && (
+              <div className="space-y-3">
+                {currentQuestion.options.map((option) => (
+                  <OptionButton
+                    key={option.id}
+                    option={option}
+                    isSelected={answers[currentQuestion.id] === option.id}
+                    onClick={() => handleAnswer(option.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 py-4 bg-stone-50 border-t border-stone-100 flex items-center justify-between">
+        <button
+          onClick={handleBack}
+          disabled={currentIndex === 0}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all",
+            currentIndex === 0
+              ? "text-stone-300 cursor-not-allowed"
+              : "text-stone-600 hover:bg-stone-200",
+          )}
+        >
+          <ChevronLeft size={18} />
+          Back
+        </button>
+
+        <button
+          onClick={handleNext}
+          disabled={!canProceed}
+          className={cn(
+            "flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all",
+            canProceed
+              ? "bg-[#0E4268] text-white hover:bg-[#0a3555] shadow-lg shadow-[#0E4268]/20"
+              : "bg-stone-200 text-stone-400 cursor-not-allowed",
+          )}
+        >
+          {isLastQuestion ? (
+            <>
+              Generate Checklist
+              <Sparkles size={16} />
+            </>
+          ) : (
+            <>
+              Continue
+              <ChevronRight size={18} />
+            </>
+          )}
+        </button>
+      </div>
+    </>
+  );
+
+  // Inline mode - render as part of page
+  if (isInline) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="w-full max-w-xl bg-white rounded-2xl shadow-lg overflow-hidden"
+        >
+          {questionnaireContent}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Modal mode (legacy)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden"
       >
-        {/* Header */}
+        {/* Modal Header */}
         <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-xl bg-[#0E4268] flex items-center justify-center">
@@ -584,138 +750,7 @@ export function QuickQuestionnaire({
           </button>
         </div>
 
-        {/* Document Analysis Info */}
-        <div className="px-6 py-3 bg-stone-50 border-b border-stone-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Files size={14} className="text-stone-500" />
-                <span className="text-xs font-medium text-stone-600">
-                  {analyzedDocuments.length} documents analyzed
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                {analyzedDocuments.slice(0, 3).map((doc) => (
-                  <span
-                    key={doc.id}
-                    className="px-2 py-0.5 bg-white border border-stone-200 rounded text-[10px] text-stone-600 truncate max-w-[100px]"
-                    title={doc.name}
-                  >
-                    {doc.type}
-                  </span>
-                ))}
-                {analyzedDocuments.length > 3 && (
-                  <span className="px-2 py-0.5 bg-stone-100 rounded text-[10px] text-stone-500">
-                    +{analyzedDocuments.length - 3}
-                  </span>
-                )}
-              </div>
-            </div>
-            {onNavigateToDocuments && (
-              <button
-                onClick={onNavigateToDocuments}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#0E4268] hover:bg-[#0E4268]/5 rounded-lg transition-colors"
-              >
-                <FolderOpen size={14} />
-                Review / Upload
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Progress */}
-        <div className="px-6 py-3 border-b border-stone-100">
-          <ProgressIndicator current={currentIndex} total={questions.length} />
-        </div>
-
-        {/* Question content */}
-        <div className="p-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentQuestion.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              {/* Extracted value hint */}
-              {currentQuestion.extractedValue && (
-                <ExtractedHint
-                  value={currentQuestion.extractedValue}
-                  source={currentQuestion.extractedFrom || "documents"}
-                />
-              )}
-
-              {/* Question */}
-              <h3 className="text-xl font-semibold text-stone-900 mb-2">
-                {currentQuestion.question}
-              </h3>
-              {currentQuestion.description && (
-                <p className="text-sm text-stone-500 mb-6">
-                  {currentQuestion.description}
-                </p>
-              )}
-
-              {/* Options */}
-              {currentQuestion.type === "single" && currentQuestion.options && (
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option) => (
-                    <OptionButton
-                      key={option.id}
-                      option={option}
-                      isSelected={answers[currentQuestion.id] === option.id}
-                      onClick={() => handleAnswer(option.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 bg-stone-50 border-t border-stone-100 flex items-center justify-between">
-          <button
-            onClick={handleBack}
-            disabled={currentIndex === 0}
-            className={`
-              flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
-              ${
-                currentIndex === 0
-                  ? "text-stone-300 cursor-not-allowed"
-                  : "text-stone-600 hover:bg-stone-200"
-              }
-            `}
-          >
-            <ChevronLeft size={18} />
-            Back
-          </button>
-
-          <button
-            onClick={handleNext}
-            disabled={!canProceed}
-            className={`
-              flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all
-              ${
-                canProceed
-                  ? "bg-[#0E4268] text-white hover:bg-[#0a3555] shadow-lg shadow-[#0E4268]/20"
-                  : "bg-stone-200 text-stone-400 cursor-not-allowed"
-              }
-            `}
-          >
-            {isLastQuestion ? (
-              <>
-                Generate Checklist
-                <Sparkles size={16} />
-              </>
-            ) : (
-              <>
-                Continue
-                <ChevronRight size={18} />
-              </>
-            )}
-          </button>
-        </div>
+        {questionnaireContent}
       </motion.div>
     </div>
   );

@@ -54,14 +54,15 @@ interface ChecklistSection {
 
 interface ApplicationChecklistViewProps {
   visaType: VisaType;
-  answers: Record<string, any>;
+  answers: Record<string, unknown>;
   onStartAutoFill: () => void;
+  onBack?: () => void;
 }
 
 // Generate checklist based on visa type and answers
 const generateChecklist = (
   visaType: VisaType,
-  answers: Record<string, any>
+  answers: Record<string, unknown>,
 ): ChecklistSection[] => {
   // Base sections for all visa types
   const sections: ChecklistSection[] = [
@@ -151,7 +152,10 @@ const generateChecklist = (
           id: "previous_uk",
           label: "Previous UK Visits",
           status: answers.previous_uk_visa === "yes" ? "partial" : "complete",
-          value: answers.previous_uk_visa === "yes" ? "Yes - details needed" : "No previous visits",
+          value:
+            answers.previous_uk_visa === "yes"
+              ? "Yes - details needed"
+              : "No previous visits",
           source: "questionnaire",
           required: true,
         },
@@ -159,7 +163,10 @@ const generateChecklist = (
           id: "current_location",
           label: "Current Location",
           status: "complete",
-          value: answers.applicant_location === "uk" ? "In the UK" : "Outside the UK",
+          value:
+            answers.applicant_location === "uk"
+              ? "In the UK"
+              : "Outside the UK",
           source: "questionnaire",
           required: true,
         },
@@ -237,7 +244,10 @@ const generateChecklist = (
           id: "cos_number",
           label: "Certificate of Sponsorship",
           status: answers.cos_received === "yes" ? "complete" : "pending",
-          value: answers.cos_received === "yes" ? "CoS received" : "Awaiting from employer",
+          value:
+            answers.cos_received === "yes"
+              ? "CoS received"
+              : "Awaiting from employer",
           source: "questionnaire",
           required: true,
         },
@@ -259,7 +269,10 @@ const generateChecklist = (
           id: "salary",
           label: "Annual Salary",
           status: answers.salary_threshold === "yes" ? "complete" : "partial",
-          value: answers.salary_threshold === "yes" ? "Meets threshold" : "Needs verification",
+          value:
+            answers.salary_threshold === "yes"
+              ? "Meets threshold"
+              : "Needs verification",
           source: "questionnaire",
           required: true,
         },
@@ -267,8 +280,12 @@ const generateChecklist = (
           id: "start_date",
           label: "Employment Start Date",
           status: "partial",
-          value: answers.job_start_date === "within_month" ? "Within 1 month" :
-                 answers.job_start_date === "1_3_months" ? "1-3 months" : "3+ months",
+          value:
+            answers.job_start_date === "within_month"
+              ? "Within 1 month"
+              : answers.job_start_date === "1_3_months"
+                ? "1-3 months"
+                : "3+ months",
           source: "questionnaire",
           required: true,
         },
@@ -297,7 +314,10 @@ const generateChecklist = (
           id: "cas_number",
           label: "CAS Number",
           status: answers.cas_received === "yes" ? "complete" : "pending",
-          value: answers.cas_received === "yes" ? "CAS received" : "Awaiting from institution",
+          value:
+            answers.cas_received === "yes"
+              ? "CAS received"
+              : "Awaiting from institution",
           source: "questionnaire",
           required: true,
         },
@@ -319,9 +339,14 @@ const generateChecklist = (
           id: "course_level",
           label: "Course Level",
           status: "complete",
-          value: answers.course_level === "undergraduate" ? "Undergraduate" :
-                 answers.course_level === "postgraduate" ? "Postgraduate" :
-                 answers.course_level === "phd" ? "PhD/Doctorate" : "Other",
+          value:
+            answers.course_level === "undergraduate"
+              ? "Undergraduate"
+              : answers.course_level === "postgraduate"
+                ? "Postgraduate"
+                : answers.course_level === "phd"
+                  ? "PhD/Doctorate"
+                  : "Other",
           source: "questionnaire",
           required: true,
         },
@@ -329,8 +354,12 @@ const generateChecklist = (
           id: "course_start",
           label: "Course Start Date",
           status: "partial",
-          value: answers.course_start === "within_month" ? "Within 1 month" :
-                 answers.course_start === "1_3_months" ? "1-3 months" : "3+ months",
+          value:
+            answers.course_start === "within_month"
+              ? "Within 1 month"
+              : answers.course_start === "1_3_months"
+                ? "1-3 months"
+                : "3+ months",
           source: "questionnaire",
           required: true,
         },
@@ -365,8 +394,12 @@ const generateChecklist = (
       {
         id: "tb_test",
         label: "TB Test Certificate",
-        status: answers.applicant_location === "outside" ? "pending" : "complete",
-        value: answers.applicant_location === "outside" ? undefined : "Not required (in UK)",
+        status:
+          answers.applicant_location === "outside" ? "pending" : "complete",
+        value:
+          answers.applicant_location === "outside"
+            ? undefined
+            : "Not required (in UK)",
         required: answers.applicant_location === "outside",
       },
       {
@@ -414,7 +447,9 @@ const StatusBadge = ({ status }: { status: ItemStatus }) => {
   const { bg, text, icon: Icon, label } = config[status];
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${bg} ${text}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${bg} ${text}`}
+    >
       <Icon size={12} />
       {label}
     </span>
@@ -422,7 +457,13 @@ const StatusBadge = ({ status }: { status: ItemStatus }) => {
 };
 
 // Source badge component
-const SourceBadge = ({ source, document }: { source: string; document?: string }) => {
+const SourceBadge = ({
+  source,
+  document,
+}: {
+  source: string;
+  document?: string;
+}) => {
   if (source === "extracted") {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
@@ -468,7 +509,9 @@ const ChecklistItemRow = ({ item }: { item: ChecklistItem }) => {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className={`text-sm font-medium ${item.status === "locked" ? "text-stone-400" : "text-stone-800"}`}>
+          <p
+            className={`text-sm font-medium ${item.status === "locked" ? "text-stone-400" : "text-stone-800"}`}
+          >
             {item.label}
           </p>
           {!item.required && (
@@ -515,7 +558,9 @@ const ChecklistSectionCard = ({
   index: number;
 }) => {
   const Icon = section.icon;
-  const completedItems = section.items.filter((i) => i.status === "complete").length;
+  const completedItems = section.items.filter(
+    (i) => i.status === "complete",
+  ).length;
   const totalRequired = section.items.filter((i) => i.required).length;
 
   return (
@@ -561,7 +606,10 @@ const ChecklistSectionCard = ({
             />
           </div>
 
-          <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
+          <motion.div
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
             <ChevronRight size={20} className="text-stone-400" />
           </motion.div>
         </div>
@@ -594,9 +642,10 @@ export function ApplicationChecklistView({
   visaType,
   answers,
   onStartAutoFill,
+  onBack,
 }: ApplicationChecklistViewProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["personal"])
+    new Set(["personal"]),
   );
   const sections = generateChecklist(visaType, answers);
 
@@ -613,27 +662,44 @@ export function ApplicationChecklistView({
   };
 
   // Calculate overall progress
-  const totalItems = sections.reduce((sum, s) => sum + s.items.filter((i) => i.required).length, 0);
+  const totalItems = sections.reduce(
+    (sum, s) => sum + s.items.filter((i) => i.required).length,
+    0,
+  );
   const completedItems = sections.reduce(
-    (sum, s) => sum + s.items.filter((i) => i.required && i.status === "complete").length,
-    0
+    (sum, s) =>
+      sum + s.items.filter((i) => i.required && i.status === "complete").length,
+    0,
   );
   const overallProgress = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-stone-50 to-white">
+    <div className="h-full flex flex-col bg-stone-50">
       {/* Header */}
       <div className="px-8 py-6 border-b border-stone-200 bg-white">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Shield size={18} className="text-blue-600" />
-              <span className="text-sm font-medium text-blue-600">
-                {visaType.replace("-", " ").replace(/\b\w/g, (l) => l.toUpperCase())} Visa
+              <Shield size={18} className="text-[#0E4268]" />
+              <span className="text-sm font-medium text-[#0E4268]">
+                {visaType
+                  .replace("-", " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}{" "}
+                Visa
               </span>
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="ml-2 text-xs text-stone-500 hover:text-stone-700 underline"
+                >
+                  Change visa type
+                </button>
+              )}
             </div>
-            <h1 className="text-2xl font-bold text-stone-900">Application Checklist</h1>
-            <p className="text-sm text-stone-500 mt-1">
+            <h1 className="text-2xl font-bold text-stone-900 text-balance">
+              Application Checklist
+            </h1>
+            <p className="text-sm text-stone-500 mt-1 text-pretty">
               Complete all required fields to enable auto-fill
             </p>
           </div>
@@ -641,10 +707,12 @@ export function ApplicationChecklistView({
           {/* Overall progress */}
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-3xl font-bold text-stone-900">{overallProgress}%</p>
+              <p className="text-3xl font-bold text-stone-900 tabular-nums">
+                {overallProgress}%
+              </p>
               <p className="text-sm text-stone-500">Complete</p>
             </div>
-            <div className="w-24 h-24 relative">
+            <div className="size-24 relative">
               <svg className="w-full h-full -rotate-90">
                 <circle
                   cx="48"
@@ -698,8 +766,12 @@ export function ApplicationChecklistView({
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <p className="text-sm text-stone-600">
-              <span className="font-medium text-stone-800">{completedItems}</span> of{" "}
-              <span className="font-medium text-stone-800">{totalItems}</span> required fields completed
+              <span className="font-medium text-stone-800">
+                {completedItems}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-stone-800">{totalItems}</span>{" "}
+              required fields completed
             </p>
             <p className="text-xs text-stone-400">
               {totalItems - completedItems} fields remaining before auto-fill
@@ -713,7 +785,7 @@ export function ApplicationChecklistView({
               flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all
               ${
                 overallProgress >= 100
-                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-200 hover:shadow-xl"
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:shadow-xl"
                   : "bg-stone-100 text-stone-400 cursor-not-allowed"
               }
             `}
