@@ -1,7 +1,11 @@
 import { PassportInfo, VisaType } from "./index";
 
 // Navigation
-export type CaseDetailNavItem = "overview" | "documents" | "application";
+export type CaseDetailNavItem =
+  | "overview"
+  | "documents"
+  | "file-hub"
+  | "application";
 
 // Client Profile (progressively filled from documents)
 export interface ClientProfile {

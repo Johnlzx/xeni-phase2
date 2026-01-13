@@ -22,6 +22,9 @@ import {
   ArrowRight,
   Loader2,
   X,
+  FolderOpen,
+  Upload,
+  Files,
 } from "lucide-react";
 import { VisaType } from "@/types";
 
@@ -45,10 +48,20 @@ interface Question {
   dependsOn?: { questionId: string; value: string };
 }
 
+// Analyzed document type
+interface AnalyzedDocument {
+  id: string;
+  name: string;
+  type: string;
+  pages?: number;
+}
+
 interface QuickQuestionnaireProps {
   visaType: VisaType;
   onComplete: (answers: Record<string, any>) => void;
   onClose: () => void;
+  onNavigateToDocuments?: () => void;
+  analyzedDocuments?: AnalyzedDocument[];
 }
 
 // Questions configuration based on visa type - Written for lawyers about their clients
@@ -336,7 +349,7 @@ const ProgressIndicator = ({
     <div className="flex items-center gap-4">
       <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
         <motion.div
-          className="h-full bg-gradient-to-r from-[#0E4268] to-[#1a5a8a] rounded-full"
+          className="h-full bg-[#0E4268] rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.4, ease: "easeOut" }}
@@ -475,10 +488,24 @@ const GeneratingChecklist = () => {
   );
 };
 
+// Mock analyzed documents - in real app would come from props or store
+const MOCK_ANALYZED_DOCUMENTS: AnalyzedDocument[] = [
+  { id: "doc-1", name: "Passport_Main.pdf", type: "Passport", pages: 2 },
+  {
+    id: "doc-2",
+    name: "BankStatement_Q3.pdf",
+    type: "Bank Statement",
+    pages: 5,
+  },
+  { id: "doc-3", name: "Employment_Letter.pdf", type: "Employment", pages: 1 },
+];
+
 export function QuickQuestionnaire({
   visaType,
   onComplete,
   onClose,
+  onNavigateToDocuments,
+  analyzedDocuments = MOCK_ANALYZED_DOCUMENTS,
 }: QuickQuestionnaireProps) {
   const questions = getQuestionsForVisa(visaType);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -536,11 +563,13 @@ export function QuickQuestionnaire({
         {/* Header */}
         <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0E4268] to-[#1a5a8a] flex items-center justify-center">
+            <div className="size-10 rounded-xl bg-[#0E4268] flex items-center justify-center">
               <Sparkles size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="font-semibold text-stone-800">Case Assessment</h2>
+              <h2 className="font-semibold text-stone-800 text-balance">
+                Case Assessment
+              </h2>
               <p className="text-xs text-stone-500">
                 Quick questions about your client's situation
               </p>
@@ -549,13 +578,53 @@ export function QuickQuestionnaire({
           <button
             onClick={onClose}
             className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+            aria-label="Close questionnaire"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Progress */}
+        {/* Document Analysis Info */}
         <div className="px-6 py-3 bg-stone-50 border-b border-stone-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Files size={14} className="text-stone-500" />
+                <span className="text-xs font-medium text-stone-600">
+                  {analyzedDocuments.length} documents analyzed
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {analyzedDocuments.slice(0, 3).map((doc) => (
+                  <span
+                    key={doc.id}
+                    className="px-2 py-0.5 bg-white border border-stone-200 rounded text-[10px] text-stone-600 truncate max-w-[100px]"
+                    title={doc.name}
+                  >
+                    {doc.type}
+                  </span>
+                ))}
+                {analyzedDocuments.length > 3 && (
+                  <span className="px-2 py-0.5 bg-stone-100 rounded text-[10px] text-stone-500">
+                    +{analyzedDocuments.length - 3}
+                  </span>
+                )}
+              </div>
+            </div>
+            {onNavigateToDocuments && (
+              <button
+                onClick={onNavigateToDocuments}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#0E4268] hover:bg-[#0E4268]/5 rounded-lg transition-colors"
+              >
+                <FolderOpen size={14} />
+                Review / Upload
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Progress */}
+        <div className="px-6 py-3 border-b border-stone-100">
           <ProgressIndicator current={currentIndex} total={questions.length} />
         </div>
 

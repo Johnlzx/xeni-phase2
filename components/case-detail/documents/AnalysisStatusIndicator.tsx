@@ -48,7 +48,7 @@ function useAnalysisStats(): AnalysisStats {
 
   const totalReady = readyFiles.length;
   const totalAnalyzed = readyFiles.filter((f) =>
-    analyzedFileIds.includes(f.id)
+    analyzedFileIds.includes(f.id),
   ).length;
   const newSinceAnalysis = totalReady - totalAnalyzed;
   const pendingReview = pendingFiles.length;
@@ -154,12 +154,16 @@ export function AnalysisStatusIndicator() {
   const config = STATUS_CONFIG[stats.status];
   const runAnalysis = useCaseDetailStore((state) => state.runDocumentAnalysis);
   const isAnalyzing = useCaseDetailStore((state) => state.isAnalyzingDocuments);
-  const analysisProgress = useCaseDetailStore((state) => state.analysisProgress);
+  const analysisProgress = useCaseDetailStore(
+    (state) => state.analysisProgress,
+  );
 
   const canAnalyze =
     stats.status !== "analyzing" &&
     stats.status !== "empty" &&
-    (stats.status === "outdated" || stats.status === "partial" || stats.totalReady > 0);
+    (stats.status === "outdated" ||
+      stats.status === "partial" ||
+      stats.totalReady > 0);
 
   return (
     <div
@@ -177,12 +181,12 @@ export function AnalysisStatusIndicator() {
             exit={{ scale: 0.8, opacity: 0 }}
             className="absolute -top-1 -right-1"
           >
-            <span className="relative flex h-3 w-3">
+            <span className="relative flex size-3">
               <span
                 className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.pulseColor} opacity-75`}
               />
               <span
-                className={`relative inline-flex rounded-full h-3 w-3 ${config.pulseColor}`}
+                className={`relative inline-flex rounded-full size-3 ${config.pulseColor}`}
               />
             </span>
           </motion.div>
@@ -192,7 +196,7 @@ export function AnalysisStatusIndicator() {
       {/* Status Icon */}
       <div
         className={`
-          flex items-center justify-center w-9 h-9 rounded-lg
+          flex items-center justify-center size-9 rounded-lg
           ${stats.status === "synced" ? "bg-emerald-100" : ""}
           ${stats.status === "partial" ? "bg-amber-100" : ""}
           ${stats.status === "outdated" ? "bg-rose-100" : ""}
@@ -223,7 +227,8 @@ export function AnalysisStatusIndicator() {
               <div className="flex items-center gap-1 text-xs text-stone-500">
                 <Activity size={10} />
                 <span>
-                  {stats.totalAnalyzed}/{stats.totalReady + stats.pendingReview} in analysis
+                  {stats.totalAnalyzed}/{stats.totalReady + stats.pendingReview}{" "}
+                  in analysis
                 </span>
               </div>
               {stats.newSinceAnalysis > 0 && (
@@ -256,10 +261,10 @@ export function AnalysisStatusIndicator() {
             >
               <div className="h-1.5 bg-[#0E4268]/10 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-[#0E4268] to-[#1a5a8a] rounded-full"
+                  className="h-full bg-[#0E4268] rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${analysisProgress}%` }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.2 }}
                 />
               </div>
             </motion.div>
@@ -313,14 +318,16 @@ export function AnalysisStatusBadge() {
       `}
     >
       {config.icon}
-      <span>{stats.totalAnalyzed}/{stats.totalReady + stats.pendingReview}</span>
+      <span>
+        {stats.totalAnalyzed}/{stats.totalReady + stats.pendingReview}
+      </span>
       {config.pulseColor && (
-        <span className="relative flex h-2 w-2 ml-0.5">
+        <span className="relative flex size-2 ml-0.5">
           <span
             className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.pulseColor} opacity-75`}
           />
           <span
-            className={`relative inline-flex rounded-full h-2 w-2 ${config.pulseColor}`}
+            className={`relative inline-flex rounded-full size-2 ${config.pulseColor}`}
           />
         </span>
       )}

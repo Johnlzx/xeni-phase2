@@ -6,6 +6,7 @@ import {
   FileText,
   ClipboardCheck,
   ArrowLeft,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CaseDetailNavItem } from "@/types/case-detail";
@@ -20,6 +21,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "documents", label: "Documents", icon: FileText },
+  { id: "file-hub", label: "File Hub", icon: FolderOpen },
   { id: "application", label: "Application", icon: ClipboardCheck },
 ];
 

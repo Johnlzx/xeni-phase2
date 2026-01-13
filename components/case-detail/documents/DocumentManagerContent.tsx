@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useDrag, useDrop, useDragLayer } from "react-dnd";
 import { motion, AnimatePresence } from "motion/react";
+import { cn } from "@/lib/utils";
 import {
   FileText,
   MoreVertical,
@@ -75,7 +76,6 @@ import {
   useIsLoadingDocuments,
 } from "@/store/case-detail-store";
 import { DocumentFile, DocumentGroup } from "@/types/case-detail";
-import { AnalysisStatusIndicator } from "./AnalysisStatusIndicator";
 
 const ItemTypes = {
   PAGE: "page",
@@ -103,73 +103,73 @@ const SORT_OPTIONS: {
 // ============================================================================
 const PAGE_COLORS = [
   {
-    bg: "from-rose-100 to-rose-50",
+    bg: "bg-rose-50",
     border: "border-rose-200",
     accent: "bg-rose-500",
     label: "bg-rose-100 text-rose-700",
   },
   {
-    bg: "from-sky-100 to-sky-50",
+    bg: "bg-sky-50",
     border: "border-sky-200",
     accent: "bg-sky-500",
     label: "bg-sky-100 text-sky-700",
   },
   {
-    bg: "from-amber-100 to-amber-50",
+    bg: "bg-amber-50",
     border: "border-amber-200",
     accent: "bg-amber-500",
     label: "bg-amber-100 text-amber-700",
   },
   {
-    bg: "from-emerald-100 to-emerald-50",
+    bg: "bg-emerald-50",
     border: "border-emerald-200",
     accent: "bg-emerald-500",
     label: "bg-emerald-100 text-emerald-700",
   },
   {
-    bg: "from-violet-100 to-violet-50",
+    bg: "bg-violet-50",
     border: "border-violet-200",
     accent: "bg-violet-500",
     label: "bg-violet-100 text-violet-700",
   },
   {
-    bg: "from-orange-100 to-orange-50",
+    bg: "bg-orange-50",
     border: "border-orange-200",
     accent: "bg-orange-500",
     label: "bg-orange-100 text-orange-700",
   },
   {
-    bg: "from-cyan-100 to-cyan-50",
+    bg: "bg-cyan-50",
     border: "border-cyan-200",
     accent: "bg-cyan-500",
     label: "bg-cyan-100 text-cyan-700",
   },
   {
-    bg: "from-pink-100 to-pink-50",
+    bg: "bg-pink-50",
     border: "border-pink-200",
     accent: "bg-pink-500",
     label: "bg-pink-100 text-pink-700",
   },
   {
-    bg: "from-lime-100 to-lime-50",
+    bg: "bg-lime-50",
     border: "border-lime-200",
     accent: "bg-lime-500",
     label: "bg-lime-100 text-lime-700",
   },
   {
-    bg: "from-indigo-100 to-indigo-50",
+    bg: "bg-indigo-50",
     border: "border-indigo-200",
     accent: "bg-indigo-500",
     label: "bg-indigo-100 text-indigo-700",
   },
   {
-    bg: "from-slate-100 to-slate-50",
+    bg: "bg-slate-50",
     border: "border-slate-200",
     accent: "bg-[#0E4268]",
     label: "bg-slate-100 text-slate-700",
   },
   {
-    bg: "from-fuchsia-100 to-fuchsia-50",
+    bg: "bg-fuchsia-50",
     border: "border-fuchsia-200",
     accent: "bg-fuchsia-500",
     label: "bg-fuchsia-100 text-fuchsia-700",
@@ -195,7 +195,7 @@ const THUMBNAIL_SIZES = {
 };
 
 // ============================================================================
-// CUSTOM DRAG LAYER - Floating card that follows cursor
+// CUSTOM DRAG LAYER - Minimal floating card that follows cursor
 // ============================================================================
 const CustomDragLayer = () => {
   const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({
@@ -208,7 +208,6 @@ const CustomDragLayer = () => {
     return null;
   }
 
-  const pageColor = item.color || getPageColor(item.id);
   const sizeKey = item.size || "normal";
   const size = THUMBNAIL_SIZES[sizeKey as keyof typeof THUMBNAIL_SIZES];
 
@@ -217,47 +216,34 @@ const CustomDragLayer = () => {
       style={{
         position: "fixed",
         pointerEvents: "none",
-        zIndex: 9999,
+        zIndex: 50,
         left: 0,
         top: 0,
         transform: `translate(${currentOffset.x}px, ${currentOffset.y}px)`,
       }}
     >
       <div
-        className="bg-white rounded-xl border-2 border-[#0E4268] overflow-hidden"
+        className="bg-white rounded border-2 border-[#0E4268] shadow-xl overflow-hidden"
         style={{
-          width: size.width,
-          height: size.height,
-          transform: "rotate(2deg) scale(1.02)",
-          boxShadow:
-            "0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 12px 24px -8px rgba(0, 0, 0, 0.2)",
+          width: size.width * 0.8,
+          height: size.height * 0.8,
+          transform: "rotate(3deg)",
         }}
       >
-        {/* Gradient background */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${pageColor.bg}`}>
-          <img
-            src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=200&h=280&fit=crop&sat=-100&bri=15`}
-            alt=""
-            className="object-cover w-full h-full opacity-60 mix-blend-multiply"
-            draggable={false}
-          />
-        </div>
-
-        {/* Top accent bar */}
-        <div className={`absolute top-0 inset-x-0 h-1.5 ${pageColor.accent}`} />
-
-        {/* Page indicator */}
-        <div
-          className={`absolute bottom-2 right-2 ${pageColor.label} text-sm font-bold px-2.5 py-1 rounded-md shadow-sm`}
-        >
-          {item.pageIndex + 1}
-        </div>
-
-        {/* Drag overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0E4268]/10">
-          <div className="bg-white/95 rounded-lg p-2.5 shadow-xl">
-            <GripVertical size={24} className="text-[#0E4268]" />
+        {/* Document preview with lines */}
+        <div className="absolute inset-0 bg-stone-50 p-3">
+          <div className="space-y-2">
+            <div className="h-2 bg-stone-200 rounded w-3/4" />
+            <div className="h-2 bg-stone-200 rounded w-full" />
+            <div className="h-2 bg-stone-200 rounded w-5/6" />
+            <div className="h-2 bg-stone-200 rounded w-2/3" />
+            <div className="h-2 bg-stone-200 rounded w-4/5" />
           </div>
+        </div>
+
+        {/* Page number badge */}
+        <div className="absolute bottom-2 right-2 bg-[#0E4268] text-white text-xs font-bold px-2 py-1 rounded">
+          {item.pageIndex + 1}
         </div>
       </div>
     </div>
@@ -376,13 +362,13 @@ const PagePreviewModal = ({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80"
         onClick={onClose}
       />
 
@@ -394,9 +380,9 @@ const PagePreviewModal = ({
         className="relative z-10 flex flex-col max-w-[90vw] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 bg-gradient-to-r from-stone-50 to-white">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 bg-stone-50">
           <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${pageColor.accent}`} />
+            <div className={`size-3 rounded-full ${pageColor.accent}`} />
             <div>
               <h3 className="text-sm font-semibold text-stone-800">
                 Page {pageIndex + 1}
@@ -413,6 +399,7 @@ const PagePreviewModal = ({
               onClick={handleZoomOut}
               className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
               title="Zoom out (-)"
+              aria-label="Zoom out"
             >
               <ZoomOut size={16} />
             </button>
@@ -423,6 +410,7 @@ const PagePreviewModal = ({
               onClick={handleZoomIn}
               className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
               title="Zoom in (+)"
+              aria-label="Zoom in"
             >
               <ZoomIn size={16} />
             </button>
@@ -431,6 +419,7 @@ const PagePreviewModal = ({
               onClick={handleRotate}
               className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
               title="Rotate (R)"
+              aria-label="Rotate"
             >
               <RotateCw size={16} />
             </button>
@@ -438,6 +427,7 @@ const PagePreviewModal = ({
               onClick={handleReset}
               className="p-2 text-stone-600 hover:bg-white hover:shadow-sm rounded-md transition-all"
               title="Reset"
+              aria-label="Reset zoom and rotation"
             >
               <Undo2 size={16} />
             </button>
@@ -447,12 +437,13 @@ const PagePreviewModal = ({
           <button
             onClick={onClose}
             className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+            aria-label="Close preview"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Image Preview Area */}
+        {/* Document Preview Area */}
         <div className="flex-1 overflow-auto bg-stone-100 p-8 flex items-center justify-center min-h-[60vh]">
           <motion.div
             animate={{
@@ -463,22 +454,29 @@ const PagePreviewModal = ({
             className="relative"
           >
             <div
-              className={`bg-white rounded-xl shadow-2xl border-2 ${pageColor.border} overflow-hidden`}
+              className="bg-white rounded-lg shadow-2xl border border-stone-200 overflow-hidden"
               style={{ width: "500px", maxWidth: "70vw" }}
             >
-              <div className={`h-2 ${pageColor.accent}`} />
-              <div
-                className={`aspect-[3/4] bg-gradient-to-br ${pageColor.bg} relative`}
-              >
-                <img
-                  src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=800&h=1000&fit=crop&sat=-100&bri=${10 + pageIndex * 3}`}
-                  alt={`Page ${pageIndex + 1}`}
-                  className="object-cover w-full h-full opacity-70 mix-blend-multiply"
-                  draggable={false}
-                />
-                <div
-                  className={`absolute bottom-4 left-4 ${pageColor.label} text-lg font-bold px-4 py-2 rounded-lg shadow-md`}
-                >
+              <div className="aspect-[3/4] bg-stone-50 relative p-8">
+                {/* Simulated document lines */}
+                <div className="space-y-4">
+                  <div className="h-4 bg-stone-200 rounded w-3/4" />
+                  <div className="h-4 bg-stone-200 rounded w-full" />
+                  <div className="h-4 bg-stone-200 rounded w-5/6" />
+                  <div className="h-4 bg-stone-200 rounded w-2/3" />
+                  <div className="h-4 bg-stone-200 rounded w-4/5" />
+                  <div className="h-4 bg-stone-100 rounded w-full mt-8" />
+                  <div className="h-4 bg-stone-200 rounded w-full" />
+                  <div className="h-4 bg-stone-200 rounded w-3/4" />
+                  <div className="h-4 bg-stone-200 rounded w-5/6" />
+                  <div className="h-4 bg-stone-200 rounded w-2/3" />
+                  <div className="h-4 bg-stone-100 rounded w-full mt-8" />
+                  <div className="h-4 bg-stone-200 rounded w-4/5" />
+                  <div className="h-4 bg-stone-200 rounded w-full" />
+                  <div className="h-4 bg-stone-200 rounded w-3/5" />
+                </div>
+                {/* Page number badge */}
+                <div className="absolute bottom-4 left-4 bg-stone-100 text-stone-600 text-lg font-semibold px-4 py-2 rounded tabular-nums">
                   Page {pageIndex + 1}
                 </div>
               </div>
@@ -687,15 +685,29 @@ const PageThumbnail = ({
   // When this item is being dragged, show placeholder
   const showPlaceholder = isDragging;
 
+  // Determine border/ring state
+  const getBorderClasses = () => {
+    if (showPlaceholder) return "border-dashed border-stone-300 bg-stone-100";
+    if (isOver && !isDragging)
+      return "border-[#0E4268] ring-2 ring-[#0E4268]/20";
+    if (isSelected && !isRemoved)
+      return "border-[#0E4268] ring-2 ring-[#0E4268]/20";
+    if (isNew && !isRemoved) return "border-emerald-400";
+    if (isRemoved) return "border-red-300";
+    return "border-stone-200 hover:border-stone-300";
+  };
+
   const thumbnailContent = (
     <div
       ref={isRemoved ? undefined : ref}
       onClick={isRemoved ? undefined : onSelect || onPreview}
-      className={`
-        group relative select-none transition-transform duration-200 ease-out
-        ${isRemoved ? "opacity-50 pointer-events-none" : "cursor-grab active:cursor-grabbing"}
-        ${showPlaceholder ? "opacity-40" : "opacity-100"}
-      `}
+      className={cn(
+        "group relative select-none",
+        isRemoved
+          ? "opacity-50 pointer-events-none"
+          : "cursor-grab active:cursor-grabbing",
+        showPlaceholder && "opacity-60",
+      )}
       style={{
         touchAction: "none",
         width: cardWidth,
@@ -704,99 +716,105 @@ const PageThumbnail = ({
     >
       {/* The card */}
       <div
-        className={`
-          w-full h-full bg-white rounded-xl border-2 overflow-hidden transition-all duration-200
-          ${showPlaceholder ? "border-dashed border-[#0E4268]/50 bg-[#0E4268]/5 shadow-none" : "border-solid shadow-md hover:shadow-lg"}
-          ${isOver && !isDragging ? "ring-2 ring-offset-2 ring-[#0E4268]/60 scale-[1.02]" : ""}
-          ${isSelected && !isRemoved && !isDragging ? "ring-2 ring-offset-2 ring-[#0E4268]" : ""}
-          ${isNew && !isDragging && !isOver ? "ring-2 ring-emerald-400" : ""}
-          ${isRemoved ? "ring-2 ring-red-300" : ""}
-          ${!showPlaceholder && !isOver && !isSelected && !isNew && !isRemoved ? pageColor.border : "border-transparent"}
-        `}
+        className={cn(
+          "w-full h-full bg-white rounded border overflow-hidden shadow-sm transition-shadow",
+          !showPlaceholder && "hover:shadow-md",
+          getBorderClasses(),
+        )}
       >
-        {/* Content - hidden when showing placeholder */}
-        <div
-          className={`w-full h-full ${showPlaceholder ? "invisible" : "visible"}`}
-        >
-          {/* Gradient background */}
-          <div
-            className={`absolute inset-0 bg-gradient-to-br ${pageColor.bg} ${isRemoved ? "grayscale" : ""}`}
-          >
-            <img
-              src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=200&h=280&fit=crop&sat=-100&bri=${10 + pageIndex * 5}`}
-              alt=""
-              className={`object-cover w-full h-full opacity-60 mix-blend-multiply ${isRemoved ? "grayscale" : ""}`}
-              draggable={false}
-            />
+        {/* Placeholder state - show dashed outline */}
+        {showPlaceholder ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-stone-400 text-xs">Moving...</div>
           </div>
-
-          {/* Removed overlay */}
-          {isRemoved && (
-            <div className="absolute inset-0 bg-red-100/50 flex items-center justify-center">
-              <div className="w-full h-px bg-red-400 rotate-[-15deg]" />
-            </div>
-          )}
-
-          {/* Top accent bar */}
-          <div
-            className={`absolute top-0 inset-x-0 h-1 ${isRemoved ? "bg-red-400" : isNew ? "bg-emerald-500" : pageColor.accent}`}
-          />
-
-          {/* Status badge */}
-          {(isNew || isRemoved) && (
+        ) : (
+          <>
+            {/* Document content with colored background */}
             <div
-              className={`
-              absolute top-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded
-              ${isNew && !isRemoved ? "bg-emerald-500 text-white" : ""}
-              ${isRemoved ? "bg-red-500 text-white" : ""}
-            `}
+              className={cn(
+                "h-full flex flex-col",
+                isRemoved ? "bg-stone-100" : pageColor.bg,
+              )}
             >
-              {isRemoved ? "DEL" : "NEW"}
+              {/* Document skeleton */}
+              <div
+                className={cn(
+                  "flex-1 p-3 space-y-1.5",
+                  isRemoved && "opacity-50",
+                )}
+              >
+                <div className="h-1.5 bg-white/60 rounded w-3/4" />
+                <div className="h-1.5 bg-white/60 rounded w-full" />
+                <div className="h-1.5 bg-white/60 rounded w-5/6" />
+                <div className="h-1.5 bg-white/40 rounded w-2/3" />
+                <div className="h-1.5 bg-white/60 rounded w-4/5 mt-3" />
+                <div className="h-1.5 bg-white/60 rounded w-full" />
+                <div className="h-1.5 bg-white/40 rounded w-3/4" />
+                <div className="h-1.5 bg-white/60 rounded w-5/6 mt-3" />
+                <div className="h-1.5 bg-white/40 rounded w-2/3" />
+              </div>
+
+              {/* Footer */}
+              <div className="px-2 py-1.5 bg-white/80 border-t border-stone-100 flex items-center justify-between">
+                <GripVertical size={12} className="text-stone-300" />
+                <span
+                  className={cn(
+                    "text-[10px] font-medium tabular-nums",
+                    isRemoved ? "text-red-500" : "text-stone-500",
+                  )}
+                >
+                  {pageIndex + 1}
+                </span>
+              </div>
             </div>
-          )}
 
-          {/* Page number */}
-          <div
-            className={`
-            absolute bottom-1.5 right-1.5 text-xs font-bold px-2 py-0.5 rounded-md
-            ${isRemoved ? "bg-red-100 text-red-600" : isNew ? "bg-emerald-100 text-emerald-700" : pageColor.label}
-          `}
-          >
-            {pageIndex + 1}
-          </div>
+            {/* Removed overlay */}
+            {isRemoved && (
+              <div className="absolute inset-0 bg-red-50/60 flex items-center justify-center">
+                <div className="w-4/5 h-0.5 bg-red-400 -rotate-12" />
+              </div>
+            )}
 
-          {/* Selection check */}
-          {isSelected && !isRemoved && (
-            <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-[#0E4268] rounded-full flex items-center justify-center shadow-md">
-              <Check size={12} className="text-white" strokeWidth={3} />
-            </div>
-          )}
+            {/* NEW badge */}
+            {isNew && !isRemoved && (
+              <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded">
+                NEW
+              </div>
+            )}
 
-          {/* Preview button - top left corner (only show when not NEW/DEL badge) */}
-          {!isRemoved && !isNew && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPreview(true);
-              }}
-              className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/95 hover:bg-white rounded-lg shadow-md border border-stone-200/50 hover:border-stone-300"
-            >
-              <Eye size={12} className="text-stone-600" />
-            </button>
-          )}
-          {/* Preview button when has NEW badge - position adjusted */}
-          {!isRemoved && isNew && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPreview(true);
-              }}
-              className="absolute top-7 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/95 hover:bg-white rounded-lg shadow-md border border-stone-200/50 hover:border-stone-300"
-            >
-              <Eye size={12} className="text-stone-600" />
-            </button>
-          )}
-        </div>
+            {/* DEL badge */}
+            {isRemoved && (
+              <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded">
+                DEL
+              </div>
+            )}
+
+            {/* Selection check */}
+            {isSelected && !isRemoved && (
+              <div className="absolute top-2 right-2 size-5 bg-[#0E4268] rounded flex items-center justify-center">
+                <Check size={12} className="text-white" strokeWidth={3} />
+              </div>
+            )}
+
+            {/* Preview button on hover */}
+            {!isRemoved && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowPreview(true);
+                }}
+                className={cn(
+                  "absolute opacity-0 group-hover:opacity-100 transition-opacity",
+                  "p-1.5 bg-white/90 hover:bg-white rounded shadow-sm border border-stone-200",
+                  isNew || isSelected ? "top-8 left-2" : "top-2 left-2",
+                )}
+                aria-label="Preview page"
+              >
+                <Eye size={12} className="text-stone-500" />
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -810,7 +828,7 @@ const PageThumbnail = ({
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>{thumbnailContent}</ContextMenuTrigger>
-        <ContextMenuContent className="w-48 bg-white/95 backdrop-blur-sm border border-stone-200 shadow-xl rounded-lg overflow-hidden">
+        <ContextMenuContent className="w-48 bg-white border border-stone-200 shadow-xl rounded-lg overflow-hidden">
           {/* Preview option */}
           <ContextMenuItem
             onClick={() => setShowPreview(true)}
@@ -828,7 +846,7 @@ const PageThumbnail = ({
               <ArrowRightLeft size={14} className="text-stone-500" />
               <span>Move to</span>
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-48 bg-white/95 backdrop-blur-sm border border-stone-200 shadow-xl rounded-lg overflow-hidden">
+            <ContextMenuSubContent className="w-48 bg-white border border-stone-200 shadow-xl rounded-lg overflow-hidden">
               {otherGroups.length > 0 ? (
                 otherGroups.map((targetGroup) => (
                   <ContextMenuItem
@@ -941,7 +959,7 @@ const CategoryCard = ({
         }`}
       >
         {/* Card Header */}
-        <div className="px-4 py-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white">
+        <div className="px-4 py-3 border-b border-stone-100 bg-stone-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               {isRenaming ? (
@@ -1039,7 +1057,7 @@ const CategoryCard = ({
           </div>
         </div>
 
-        {/* Pages Preview Grid with Colors */}
+        {/* Pages Preview Grid - Clean document style */}
         <div
           className="flex-1 p-3 cursor-pointer hover:bg-stone-50/50 transition-colors"
           onClick={() => onOpenPreview(group)}
@@ -1050,33 +1068,35 @@ const CategoryCard = ({
                 .filter((f) => !f.isRemoved)
                 .slice(0, 8)
                 .map((page, idx) => {
-                  const color = getPageColor(page.id);
                   const isNew = page.isNew;
                   return (
                     <div
                       key={page.id}
-                      className={`aspect-[3/4] bg-white rounded border ${isNew ? "border-emerald-300 ring-1 ring-emerald-300" : color.border} shadow-sm overflow-hidden relative`}
+                      className={cn(
+                        "aspect-[3/4] bg-stone-50 rounded border overflow-hidden relative",
+                        isNew ? "border-emerald-400" : "border-stone-200",
+                      )}
                     >
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br ${color.bg}`}
-                      >
-                        <img
-                          src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=60&h=80&fit=crop&sat=-100&bri=${10 + idx * 5}`}
-                          alt=""
-                          className="object-cover w-full h-full opacity-60 mix-blend-multiply"
-                          draggable={false}
-                        />
+                      {/* Simulated document lines */}
+                      <div className="absolute inset-0 p-1">
+                        <div className="space-y-0.5">
+                          <div className="h-0.5 bg-stone-200 rounded w-3/4" />
+                          <div className="h-0.5 bg-stone-200 rounded w-full" />
+                          <div className="h-0.5 bg-stone-200 rounded w-2/3" />
+                        </div>
                       </div>
-                      <div
-                        className={`absolute top-0 left-0 right-0 h-0.5 ${isNew ? "bg-emerald-500" : color.accent}`}
-                      />
                       {isNew && (
                         <div className="absolute top-0 left-0 bg-emerald-500 text-white text-[5px] font-bold px-0.5 rounded-br">
                           N
                         </div>
                       )}
                       <div
-                        className={`absolute bottom-0 right-0 ${isNew ? "bg-emerald-100 text-emerald-700" : color.label} text-[6px] font-bold px-0.5 rounded-tl`}
+                        className={cn(
+                          "absolute bottom-0 right-0 text-[6px] font-semibold px-0.5 rounded-tl tabular-nums",
+                          isNew
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-stone-100 text-stone-500",
+                        )}
                       >
                         {idx + 1}
                       </div>
@@ -1085,7 +1105,7 @@ const CategoryCard = ({
                 })}
               {group.files.filter((f) => !f.isRemoved).length > 8 && (
                 <div className="aspect-[3/4] bg-stone-100 rounded border border-stone-200 flex items-center justify-center">
-                  <span className="text-[10px] font-semibold text-stone-500">
+                  <span className="text-[10px] font-semibold text-stone-500 tabular-nums">
                     +{group.files.filter((f) => !f.isRemoved).length - 8}
                   </span>
                 </div>
@@ -1094,7 +1114,7 @@ const CategoryCard = ({
           ) : (
             <div className="h-full min-h-[120px] flex flex-col items-center justify-center text-stone-400">
               <Upload size={24} className="mb-2 opacity-50" />
-              <span className="text-xs">Drop pages here</span>
+              <span className="text-xs text-pretty">Drop pages here</span>
             </div>
           )}
         </div>
@@ -1181,7 +1201,7 @@ const CategoryPreviewModal = ({
   const isPending = group.status === "pending" && activeFiles.length > 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -1189,7 +1209,7 @@ const CategoryPreviewModal = ({
         className="w-[90vw] max-w-5xl h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
       >
         {/* Modal Header */}
-        <div className="shrink-0 px-6 py-4 bg-gradient-to-r from-stone-50 to-white border-b border-stone-200 flex items-center justify-between">
+        <div className="shrink-0 px-6 py-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-red-50 text-red-500">
               <FileStack size={20} />
@@ -1261,6 +1281,7 @@ const CategoryPreviewModal = ({
             <button
               onClick={onClose}
               className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+              aria-label="Close modal"
             >
               <X size={18} />
             </button>
@@ -1290,29 +1311,25 @@ const CategoryPreviewModal = ({
           ) : (
             <div className="flex flex-col gap-6 items-center max-w-3xl mx-auto">
               {group.files.map((page, idx) => {
-                const color = getPageColor(page.id);
                 return (
                   <motion.div key={page.id} layout className="w-full">
-                    <div
-                      className={`bg-white rounded-xl shadow-md border ${color.border} overflow-hidden`}
-                    >
-                      <div className={`h-2 ${color.accent}`} />
-                      <div
-                        className={`aspect-[4/5] bg-gradient-to-br ${color.bg} relative`}
-                      >
-                        <img
-                          src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=600&h=800&fit=crop&sat=-100&bri=${10 + idx * 3}`}
-                          alt={`Page ${idx + 1}`}
-                          className="object-cover w-full h-full opacity-70 mix-blend-multiply"
-                        />
-                        <div
-                          className={`absolute bottom-4 left-4 ${color.label} text-sm font-bold px-3 py-1 rounded-lg shadow-sm`}
-                        >
+                    <div className="bg-white rounded shadow-md border border-stone-200 overflow-hidden">
+                      <div className="aspect-[4/5] bg-stone-50 relative p-6">
+                        {/* Simulated document lines */}
+                        <div className="space-y-3">
+                          <div className="h-3 bg-stone-200 rounded w-3/4" />
+                          <div className="h-3 bg-stone-200 rounded w-full" />
+                          <div className="h-3 bg-stone-200 rounded w-5/6" />
+                          <div className="h-3 bg-stone-200 rounded w-2/3" />
+                          <div className="h-3 bg-stone-200 rounded w-4/5" />
+                          <div className="h-3 bg-stone-100 rounded w-full mt-6" />
+                          <div className="h-3 bg-stone-200 rounded w-full" />
+                          <div className="h-3 bg-stone-200 rounded w-3/4" />
+                          <div className="h-3 bg-stone-200 rounded w-5/6" />
+                        </div>
+                        <div className="absolute bottom-4 left-4 bg-stone-100 text-stone-600 text-sm font-semibold px-3 py-1 rounded tabular-nums">
                           Page {idx + 1} of {group.files.length}
                         </div>
-                        <div
-                          className={`absolute top-4 right-4 w-3 h-3 rounded-full ${color.accent}`}
-                        />
                       </div>
                     </div>
                   </motion.div>
@@ -1435,7 +1452,7 @@ const SidebarCategoryItem = ({
         group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150
         ${
           isSelected
-            ? "bg-gradient-to-r from-[#0E4268]/10 to-[#0E4268]/5 border border-[#0E4268]/30 shadow-sm"
+            ? "bg-[#0E4268]/5 border border-[#0E4268]/30 shadow-sm"
             : isOver
               ? "bg-[#0E4268]/5 border border-[#0E4268]/30 border-dashed"
               : "hover:bg-stone-50 border border-transparent"
@@ -1461,7 +1478,7 @@ const SidebarCategoryItem = ({
           <span>{totalPages} pages</span>
           {isPending && (
             <>
-              <span className="w-1 h-1 rounded-full bg-amber-400" />
+              <span className="size-1 rounded-full bg-amber-400" />
               <span className="text-amber-600">Review needed</span>
             </>
           )}
@@ -1469,7 +1486,7 @@ const SidebarCategoryItem = ({
       </div>
 
       {isPending && (
-        <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />
+        <div className="size-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />
       )}
     </div>
   );
@@ -1488,7 +1505,7 @@ const PreviewEmptyState = () => {
               key={i}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4 }}
+              transition={{ delay: i * 0.1, duration: 0.2 }}
               className="absolute bg-white rounded-lg border border-stone-200 shadow-sm"
               style={{
                 width: "120px",
@@ -1510,7 +1527,7 @@ const PreviewEmptyState = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4, duration: 0.3 }}
+            transition={{ delay: 0.2, duration: 0.2 }}
             className="absolute -right-4 bottom-4 z-10"
           >
             <div className="bg-[#0E4268] rounded-full p-2 shadow-lg shadow-[#0E4268]/30">
@@ -1733,44 +1750,41 @@ const CategoryPreviewPanel = ({
         ) : (
           <div className="h-full flex">
             {/* Left Thumbnail Navigation */}
-            <div className="w-20 shrink-0 bg-stone-100/50 border-r border-stone-200 overflow-y-auto py-3 px-2">
+            <div className="w-20 shrink-0 bg-stone-50 border-r border-stone-200 overflow-y-auto py-3 px-2">
               <div className="flex flex-col gap-2">
                 {activeFiles.map((page, idx) => {
-                  const color = getPageColor(page.id);
                   const isActive = activePageIndex === idx;
                   return (
                     <button
                       key={page.id}
                       onClick={() => scrollToPage(idx)}
-                      className={`
-                        relative w-full aspect-[3/4] rounded-lg overflow-hidden transition-all duration-150
-                        ${
-                          isActive
-                            ? `ring-2 ring-[#0E4268] ring-offset-1 shadow-md scale-105`
-                            : `opacity-70 hover:opacity-100 hover:scale-102`
-                        }
-                      `}
+                      aria-label={`Go to page ${idx + 1}`}
+                      className={cn(
+                        "relative w-full aspect-[3/4] rounded overflow-hidden border bg-white",
+                        isActive
+                          ? "border-[#0E4268] ring-1 ring-[#0E4268]/30 shadow-sm"
+                          : "border-stone-200 opacity-70 hover:opacity-100 hover:border-stone-300",
+                      )}
                     >
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br ${color.bg}`}
-                      >
-                        <img
-                          src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=80&h=100&fit=crop&sat=-100&bri=${10 + idx * 3}`}
-                          alt={`Page ${idx + 1}`}
-                          className="object-cover w-full h-full opacity-60 mix-blend-multiply"
-                        />
+                      {/* Document lines */}
+                      <div className="absolute inset-0 p-1.5 bg-stone-50">
+                        <div className="space-y-0.5">
+                          <div className="h-0.5 bg-stone-200 rounded w-4/5" />
+                          <div className="h-0.5 bg-stone-200 rounded w-full" />
+                          <div className="h-0.5 bg-stone-200 rounded w-3/4" />
+                        </div>
                       </div>
+                      {/* Page number */}
                       <div
-                        className={`absolute top-0 left-0 right-0 h-0.5 ${color.accent}`}
-                      />
-                      <div
-                        className={`absolute bottom-1 right-1 ${color.label} text-[8px] font-bold px-1 rounded`}
+                        className={cn(
+                          "absolute bottom-1 right-1 text-[8px] font-semibold px-1 rounded tabular-nums",
+                          isActive
+                            ? "bg-[#0E4268] text-white"
+                            : "bg-stone-100 text-stone-500",
+                        )}
                       >
                         {idx + 1}
                       </div>
-                      {isActive && (
-                        <div className="absolute inset-0 bg-[#0E4268]/10" />
-                      )}
                     </button>
                   );
                 })}
@@ -1784,7 +1798,6 @@ const CategoryPreviewPanel = ({
             >
               <div className="flex flex-col gap-6 items-center max-w-2xl mx-auto">
                 {activeFiles.map((page, idx) => {
-                  const color = getPageColor(page.id);
                   return (
                     <div
                       key={page.id}
@@ -1793,26 +1806,29 @@ const CategoryPreviewPanel = ({
                       }}
                       className="w-full"
                     >
-                      <div
-                        className={`bg-white rounded-xl shadow-md border ${color.border} overflow-hidden`}
-                      >
-                        <div className={`h-2 ${color.accent}`} />
-                        <div
-                          className={`aspect-[4/5] bg-gradient-to-br ${color.bg} relative`}
-                        >
-                          <img
-                            src={`https://images.unsplash.com/photo-1765445773776-d3b7ddd1b19b?w=600&h=800&fit=crop&sat=-100&bri=${10 + idx * 3}`}
-                            alt={`Page ${idx + 1}`}
-                            className="object-cover w-full h-full opacity-70 mix-blend-multiply"
-                          />
-                          <div
-                            className={`absolute bottom-4 left-4 ${color.label} text-sm font-bold px-3 py-1 rounded-lg shadow-sm`}
-                          >
+                      <div className="bg-white rounded shadow-md border border-stone-200 overflow-hidden">
+                        {/* Document content simulation */}
+                        <div className="aspect-[4/5] bg-stone-50 relative p-6">
+                          {/* Simulated document lines */}
+                          <div className="space-y-3">
+                            <div className="h-3 bg-stone-200 rounded w-3/4" />
+                            <div className="h-3 bg-stone-200 rounded w-full" />
+                            <div className="h-3 bg-stone-200 rounded w-5/6" />
+                            <div className="h-3 bg-stone-200 rounded w-2/3" />
+                            <div className="h-3 bg-stone-200 rounded w-4/5" />
+                            <div className="h-3 bg-stone-100 rounded w-full mt-6" />
+                            <div className="h-3 bg-stone-200 rounded w-full" />
+                            <div className="h-3 bg-stone-200 rounded w-3/4" />
+                            <div className="h-3 bg-stone-200 rounded w-5/6" />
+                            <div className="h-3 bg-stone-200 rounded w-2/3" />
+                            <div className="h-3 bg-stone-100 rounded w-full mt-6" />
+                            <div className="h-3 bg-stone-200 rounded w-4/5" />
+                            <div className="h-3 bg-stone-200 rounded w-full" />
+                          </div>
+                          {/* Page number badge */}
+                          <div className="absolute bottom-4 left-4 bg-stone-100 text-stone-600 text-sm font-semibold px-3 py-1 rounded tabular-nums">
                             Page {idx + 1} of {activeFiles.length}
                           </div>
-                          <div
-                            className={`absolute top-4 right-4 w-3 h-3 rounded-full ${color.accent}`}
-                          />
                         </div>
                       </div>
                     </div>
@@ -2002,7 +2018,7 @@ const UnclassifiedBubble = ({
             className="absolute bottom-16 right-0 w-[480px] bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden"
           >
             {/* Header */}
-            <div className="px-4 py-3 bg-gradient-to-r from-stone-100 to-stone-50 border-b border-stone-200 flex items-center justify-between">
+            <div className="px-4 py-3 bg-stone-100 border-b border-stone-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-amber-100">
                   <Inbox size={16} className="text-amber-600" />
@@ -2019,6 +2035,7 @@ const UnclassifiedBubble = ({
               <button
                 onClick={() => setIsExpanded(false)}
                 className="p-1.5 hover:bg-stone-200 rounded-lg transition-colors"
+                aria-label="Collapse unclassified panel"
               >
                 <ChevronDown size={16} className="text-stone-500" />
               </button>
@@ -2105,7 +2122,7 @@ const UnclassifiedBubble = ({
         </button>
 
         {!isExpanded && !isDropTarget && pageCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full animate-pulse" />
+          <span className="absolute -top-1 -right-1 size-3 bg-amber-400 rounded-full animate-pulse" />
         )}
       </div>
     </div>
@@ -2146,7 +2163,7 @@ const CardViewContent = ({
             onClick={() => onAddGroup("New Category")}
           >
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center transition-colors">
+              <div className="size-12 mx-auto mb-2 rounded-full bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center transition-colors">
                 <Plus size={24} className="text-stone-400" />
               </div>
               <span className="text-sm text-stone-500 font-medium">
@@ -2251,8 +2268,17 @@ const ListViewContent = ({
 
   return (
     <div className="h-full flex">
-      {/* Left Sidebar */}
-      <div className="w-80 shrink-0 bg-white border-r border-stone-200 flex flex-col">
+      {/* Left Panel - Main Work Area */}
+      <div className="flex-1 bg-stone-50/50">
+        {selectedGroup ? (
+          <CategoryPreviewPanel group={selectedGroup} allGroups={groups} />
+        ) : (
+          <PreviewEmptyState />
+        )}
+      </div>
+
+      {/* Right Sidebar - Categories List */}
+      <div className="w-80 shrink-0 bg-white border-l border-stone-200 flex flex-col">
         {/* Sidebar Header */}
         <div className="shrink-0 px-4 py-3 border-b border-stone-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -2265,7 +2291,10 @@ const ListViewContent = ({
             {/* Sort Button */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors">
+                <button
+                  className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+                  aria-label="Sort categories"
+                >
                   <ArrowUpDown size={14} />
                 </button>
               </DropdownMenuTrigger>
@@ -2292,12 +2321,16 @@ const ListViewContent = ({
             <button
               onClick={onUpload}
               className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+              aria-label="Upload documents"
             >
               <Upload size={14} />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors">
+                <button
+                  className="p-1.5 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+                  aria-label="Add category"
+                >
                   <Plus size={14} />
                 </button>
               </DropdownMenuTrigger>
@@ -2321,11 +2354,6 @@ const ListViewContent = ({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
-
-        {/* Analysis Status Indicator */}
-        <div className="shrink-0 p-3 border-b border-stone-100">
-          <AnalysisStatusIndicator />
         </div>
 
         {/* Categories List */}
@@ -2353,15 +2381,6 @@ const ListViewContent = ({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Right Panel */}
-      <div className="flex-1 bg-stone-50/50">
-        {selectedGroup ? (
-          <CategoryPreviewPanel group={selectedGroup} allGroups={groups} />
-        ) : (
-          <PreviewEmptyState />
-        )}
       </div>
 
       {/* Floating Bubble */}
@@ -2473,7 +2492,7 @@ export default function DocumentManagerContent() {
       <div className="flex-1 overflow-hidden">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full py-12">
-            <div className="w-12 h-12 border-3 border-stone-200 border-t-[#0E4268] rounded-full animate-spin mb-4" />
+            <div className="size-12 border-3 border-stone-200 border-t-[#0E4268] rounded-full animate-spin mb-4" />
             <p className="text-sm font-medium text-stone-700">
               Processing documents...
             </p>
@@ -2483,8 +2502,8 @@ export default function DocumentManagerContent() {
           </div>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-12 px-6">
-            <div className="w-24 h-24 bg-stone-100 rounded-3xl flex items-center justify-center mb-5">
-              <Upload className="w-12 h-12 text-stone-400" />
+            <div className="size-24 bg-stone-100 rounded-3xl flex items-center justify-center mb-5">
+              <Upload className="size-12 text-stone-400" />
             </div>
             <h3 className="text-xl font-semibold text-stone-800 mb-2">
               No documents yet

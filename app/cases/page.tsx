@@ -1,53 +1,81 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { CreateCaseModal } from '@/components/case-hub';
-import { Globe, MoreVertical, Trash2, Settings, X } from 'lucide-react';
-import { MOCK_CASES } from '@/data/cases';
-import { VISA_TYPES, CASE_STATUSES, ROUTES } from '@/data/constants';
-import { formatDate } from '@/lib/utils';
-import Link from 'next/link';
-import type { Case, VisaType, PassportInfo } from '@/types';
-
-// Interface for create application form data
-interface CreateApplicationFormData {
-  visaType: VisaType;
-  referenceNumber: string;
-  advisorId: string;
-  assistantId?: string;
-  passport: PassportInfo;
-}
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Globe,
+  MoreVertical,
+  Trash2,
+  Settings,
+  X,
+  Plus,
+  Search,
+  ChevronDown,
+  Filter,
+} from "lucide-react";
+import { MOCK_CASES } from "@/data/cases";
+import { VISA_TYPES, CASE_STATUSES, ROUTES } from "@/data/constants";
+import { formatDate, cn } from "@/lib/utils";
+import Link from "next/link";
+import type { Case, VisaType, CaseStatus } from "@/types";
 
 export default function CasesPage() {
   const router = useRouter();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [cases, setCases] = useState<Case[]>(MOCK_CASES);
   const [settingsCase, setSettingsCase] = useState<Case | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<CaseStatus | "all">("all");
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
 
-  const handleCreateApplication = useCallback((data: CreateApplicationFormData) => {
-    // Generate a new application ID
-    const newAppId = `case-new-${Date.now()}`;
+  // Filter cases based on search and status
+  const filteredCases = cases.filter((c) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      `${c.applicant.passport.givenNames} ${c.applicant.passport.surname}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      c.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
-    // Store the created application data in sessionStorage for the detail page to use
-    const newAppData = {
-      id: newAppId,
-      visaType: data.visaType,
-      referenceNumber: data.referenceNumber,
-      passport: data.passport,
-      advisorId: data.advisorId,
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(event.target as Node)
+      ) {
+        setShowFilterMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleCreateNewCase = useCallback(() => {
+    // Generate a new case ID
+    const newCaseId = `case-new-${Date.now()}`;
+
+    // Store minimal data for the new empty case
+    const newCaseData = {
+      id: newCaseId,
       createdAt: new Date().toISOString(),
+      isEmpty: true,
     };
-    sessionStorage.setItem(`new-case-${newAppId}`, JSON.stringify(newAppData));
+    sessionStorage.setItem(
+      `new-case-${newCaseId}`,
+      JSON.stringify(newCaseData),
+    );
 
-    // Close modal and navigate directly to case detail
-    setIsCreateModalOpen(false);
-    router.push(ROUTES.CASE_DETAIL(newAppId));
+    // Navigate directly to the case overview
+    router.push(ROUTES.CASE_DETAIL(newCaseId));
   }, [router]);
 
   const handleDeleteCase = (caseId: string) => {
-    if (confirm('Are you sure you want to delete this case?')) {
-      setCases(cases.filter(c => c.id !== caseId));
+    if (confirm("Are you sure you want to delete this case?")) {
+      setCases(cases.filter((c) => c.id !== caseId));
     }
   };
 
@@ -55,16 +83,28 @@ export default function CasesPage() {
     setSettingsCase(caseData);
   };
 
-  const handleSaveSettings = (caseId: string, data: { referenceNumber: string; advisorId: string; assistantId: string }) => {
-    console.log('Saving settings for case:', caseId, data);
+  const handleSaveSettings = (
+    caseId: string,
+    data: { referenceNumber: string; advisorId: string; assistantId: string },
+  ) => {
+    console.log("Saving settings for case:", caseId, data);
     setSettingsCase(null);
   };
+
+  // Stats
+  const totalCases = cases.length;
+  const intakeCases = cases.filter(
+    (c) => c.status === "intake" || c.status === "review",
+  ).length;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-10">
-        <Link href="/cases" className="text-2xl font-bold text-gray-900 tracking-tight">
+      <header className="h-16 bg-white border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-20">
+        <Link
+          href="/cases"
+          className="text-2xl font-bold text-gray-900 tracking-tight"
+        >
           Xeni
         </Link>
         <div className="flex items-center gap-3">
@@ -74,41 +114,151 @@ export default function CasesPage() {
         </div>
       </header>
 
+      {/* Action Bar */}
+      <div className="sticky top-16 z-10 bg-[#F8FAFC] border-b border-gray-100">
+        <div className="px-8 py-4">
+          <div className="flex items-center justify-between gap-6">
+            {/* Left: Title & Stats */}
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-semibold text-gray-900">Cases</h1>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 bg-stone-100 text-stone-600 text-sm font-medium rounded-full">
+                  {totalCases} total
+                </span>
+                {intakeCases > 0 && (
+                  <span className="px-2.5 py-1 bg-amber-50 text-amber-600 text-sm font-medium rounded-full">
+                    {intakeCases} in progress
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Center: Search */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or reference..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#0E4369]/20 focus:border-[#0E4369] transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Right: Filter & New Case Button */}
+            <div className="flex items-center gap-3">
+              {/* Status Filter */}
+              <div className="relative" ref={filterRef}>
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors",
+                    statusFilter !== "all"
+                      ? "bg-[#0E4369]/5 border-[#0E4369]/20 text-[#0E4369]"
+                      : "bg-white border-stone-200 text-stone-600 hover:border-stone-300",
+                  )}
+                >
+                  <Filter className="w-4 h-4" />
+                  <span>
+                    {statusFilter === "all"
+                      ? "All Status"
+                      : CASE_STATUSES[statusFilter].label}
+                  </span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+
+                {showFilterMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-stone-100 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        setStatusFilter("all");
+                        setShowFilterMenu(false);
+                      }}
+                      className={cn(
+                        "w-full px-4 py-2.5 text-left text-sm transition-colors",
+                        statusFilter === "all"
+                          ? "bg-stone-50 text-[#0E4369] font-medium"
+                          : "text-stone-700 hover:bg-stone-50",
+                      )}
+                    >
+                      All Status
+                    </button>
+                    {Object.entries(CASE_STATUSES).map(([key, config]) => (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setStatusFilter(key as CaseStatus);
+                          setShowFilterMenu(false);
+                        }}
+                        className={cn(
+                          "w-full px-4 py-2.5 text-left text-sm transition-colors",
+                          statusFilter === key
+                            ? "bg-stone-50 text-[#0E4369] font-medium"
+                            : "text-stone-700 hover:bg-stone-50",
+                        )}
+                      >
+                        {config.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* New Case Button */}
+              <button
+                onClick={handleCreateNewCase}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                New Case
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="p-8">
-        {/* Case Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Upload Card - First Position */}
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="group relative bg-white rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#0E4369]/50 transition-all duration-300 min-h-[180px] flex flex-col items-center justify-center gap-4 cursor-pointer"
-          >
-            <div className="w-14 h-14 rounded-xl bg-[#F1F5F9] flex items-center justify-center group-hover:bg-[#E8F0F5] transition-colors">
-              <Globe className="w-7 h-7 text-[#94A3B8] group-hover:text-[#0E4369] transition-colors" />
+        {filteredCases.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4">
+              <Globe className="w-8 h-8 text-stone-400" />
             </div>
-            <p className="text-sm text-[#64748B] group-hover:text-[#475569] transition-colors text-center px-4">
-              Click to browse or drag and drop client's passport
+            <h3 className="text-lg font-medium text-stone-800 mb-2">
+              {searchQuery || statusFilter !== "all"
+                ? "No cases found"
+                : "No cases yet"}
+            </h3>
+            <p className="text-sm text-stone-500 mb-6 max-w-sm">
+              {searchQuery || statusFilter !== "all"
+                ? "Try adjusting your search or filter criteria."
+                : "Create your first case to get started with visa applications."}
             </p>
-          </button>
-
-          {/* Case Cards */}
-          {cases.map((caseItem) => (
-            <CaseCard
-              key={caseItem.id}
-              caseData={caseItem}
-              onDelete={handleDeleteCase}
-              onOpenSettings={handleOpenSettings}
-            />
-          ))}
-        </div>
+            {!searchQuery && statusFilter === "all" && (
+              <button
+                onClick={handleCreateNewCase}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create First Case
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCases.map((caseItem) => (
+              <CaseCard
+                key={caseItem.id}
+                caseData={caseItem}
+                onDelete={handleDeleteCase}
+                onOpenSettings={handleOpenSettings}
+              />
+            ))}
+          </div>
+        )}
       </main>
-
-      {/* Create Application Modal */}
-      <CreateCaseModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={handleCreateApplication}
-      />
 
       {/* Case Settings Modal */}
       {settingsCase && (
@@ -134,7 +284,8 @@ function CaseCard({ caseData, onDelete, onOpenSettings }: CaseCardProps) {
   const visaConfig = VISA_TYPES[caseData.visaType];
   const statusConfig = CASE_STATUSES[caseData.status];
 
-  const statusLabel = statusConfig.label === 'Intake' ? 'In take' : statusConfig.label;
+  const statusLabel =
+    statusConfig.label === "Intake" ? "In take" : statusConfig.label;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -143,8 +294,8 @@ function CaseCard({ caseData, onDelete, onOpenSettings }: CaseCardProps) {
         setShowMenu(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -211,7 +362,8 @@ function CaseCard({ caseData, onDelete, onOpenSettings }: CaseCardProps) {
         {/* Applicant Name */}
         <div className="mt-6">
           <h3 className="text-xl font-semibold text-gray-900 tracking-tight">
-            {caseData.applicant.passport.givenNames} {caseData.applicant.passport.surname}
+            {caseData.applicant.passport.givenNames}{" "}
+            {caseData.applicant.passport.surname}
           </h3>
         </div>
 
@@ -221,7 +373,7 @@ function CaseCard({ caseData, onDelete, onOpenSettings }: CaseCardProps) {
             Ref No. {caseData.referenceNumber}
           </span>
           <span className="text-sm text-[#94A3B8]">
-            Created at {formatDate(caseData.createdAt, 'long')}
+            Created at {formatDate(caseData.createdAt, "long")}
           </span>
         </div>
       </div>
@@ -233,13 +385,22 @@ function CaseCard({ caseData, onDelete, onOpenSettings }: CaseCardProps) {
 interface CaseSettingsModalProps {
   caseData: Case;
   onClose: () => void;
-  onSave: (caseId: string, data: { referenceNumber: string; advisorId: string; assistantId: string }) => void;
+  onSave: (
+    caseId: string,
+    data: { referenceNumber: string; advisorId: string; assistantId: string },
+  ) => void;
 }
 
-function CaseSettingsModal({ caseData, onClose, onSave }: CaseSettingsModalProps) {
-  const [referenceNumber, setReferenceNumber] = useState(caseData.referenceNumber);
+function CaseSettingsModal({
+  caseData,
+  onClose,
+  onSave,
+}: CaseSettingsModalProps) {
+  const [referenceNumber, setReferenceNumber] = useState(
+    caseData.referenceNumber,
+  );
   const [advisorId, setAdvisorId] = useState(caseData.advisor.id);
-  const [assistantId, setAssistantId] = useState(caseData.assistant?.id || '');
+  const [assistantId, setAssistantId] = useState(caseData.assistant?.id || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
