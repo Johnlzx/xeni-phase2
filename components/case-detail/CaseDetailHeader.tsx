@@ -133,9 +133,10 @@ const UserAvatar = () => (
 
 interface CaseDetailHeaderProps {
   contentRef: RefObject<HTMLDivElement | null>;
+  onHeightChange?: (height: number) => void;
 }
 
-export function CaseDetailHeader({ contentRef }: CaseDetailHeaderProps) {
+export function CaseDetailHeader({ contentRef, onHeightChange }: CaseDetailHeaderProps) {
   const [isCompact, setIsCompact] = useState(false);
   const [caseName, setCaseName] = useState("New Case");
 
@@ -161,6 +162,11 @@ export function CaseDetailHeader({ contentRef }: CaseDetailHeaderProps) {
     content.addEventListener("scroll", handleScroll, { passive: true });
     return () => content.removeEventListener("scroll", handleScroll);
   }, [contentRef]);
+
+  // Notify parent of height changes
+  useEffect(() => {
+    onHeightChange?.(isCompact ? 48 : 104);
+  }, [isCompact, onHeightChange]);
 
   const handleCaseNameSave = (newName: string) => {
     setCaseName(newName);

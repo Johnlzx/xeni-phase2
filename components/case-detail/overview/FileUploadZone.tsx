@@ -8,7 +8,7 @@ import {
   Upload,
   FolderOpen,
   FileText,
-  ArrowRight,
+  ExternalLink,
   CheckCircle2,
   Clock,
 } from "lucide-react";
@@ -48,8 +48,15 @@ export function FileUploadZone() {
 
   return (
     <div className="h-full min-h-[240px] flex flex-col rounded-xl border border-stone-200 overflow-hidden bg-white">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-stone-50 border-b border-stone-200">
+      {/* Header - clickable to open File Hub - unified height h-14 */}
+      <button
+        onClick={() => totalFiles > 0 && setActiveNav("documents")}
+        className={cn(
+          "shrink-0 h-14 flex items-center justify-between px-4 bg-stone-50 border-b border-stone-200 w-full text-left",
+          totalFiles > 0 && "hover:bg-stone-100 transition-colors group cursor-pointer",
+          totalFiles === 0 && "cursor-default",
+        )}
+      >
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-lg border border-stone-300 bg-white flex items-center justify-center">
             <FolderOpen className="size-4 text-stone-500" />
@@ -60,22 +67,16 @@ export function FileUploadZone() {
             </h3>
             {totalFiles > 0 && (
               <p className="text-[10px] text-stone-500">
-                {totalFiles} documents
+                {classifiedGroups.length} documents
               </p>
             )}
           </div>
         </div>
 
         {totalFiles > 0 && (
-          <button
-            onClick={() => setActiveNav("documents")}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-stone-600 hover:bg-stone-100 transition-colors"
-          >
-            <span>Open</span>
-            <ArrowRight className="size-3" />
-          </button>
+          <ExternalLink className="size-4 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" />
         )}
-      </div>
+      </button>
 
       {/* Main content area */}
       <div className="flex-1 p-3 overflow-hidden">
@@ -119,29 +120,28 @@ export function FileUploadZone() {
                     <button
                       key={group.id}
                       onClick={() => handleOpenReview(group)}
-                      className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-stone-50 transition-colors group"
+                      title={group.title}
+                      className="flex flex-col items-center gap-1.5 p-2 rounded-lg hover:bg-stone-50 transition-colors"
                     >
-                      {/* Folder icon */}
-                      <div className={cn(
-                        "size-10 rounded-lg flex items-center justify-center transition-colors",
-                        isReviewed ? "bg-emerald-50" : "bg-amber-50",
-                      )}>
-                        <FolderOpen className={cn(
-                          "size-5",
-                          isReviewed ? "text-emerald-500" : "text-amber-500",
-                        )} />
+                      {/* File icon with status badge */}
+                      <div className="relative">
+                        <FileText className="size-8 text-stone-400" />
+                        {/* Status badge - bottom right */}
+                        <div className={cn(
+                          "absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full flex items-center justify-center",
+                          isReviewed ? "bg-emerald-500" : "bg-amber-500",
+                        )}>
+                          {isReviewed ? (
+                            <CheckCircle2 className="size-2.5 text-white" strokeWidth={3} />
+                          ) : (
+                            <Clock className="size-2 text-white" strokeWidth={3} />
+                          )}
+                        </div>
                       </div>
-                      {/* Title with status indicator */}
-                      <div className="w-full flex items-center justify-center gap-0.5">
-                        {isReviewed ? (
-                          <CheckCircle2 className="size-2.5 text-emerald-500 shrink-0" />
-                        ) : (
-                          <Clock className="size-2.5 text-amber-500 shrink-0" />
-                        )}
-                        <span className="text-[10px] font-medium text-stone-600 truncate max-w-[60px]">
-                          {group.title}
-                        </span>
-                      </div>
+                      {/* File name */}
+                      <span className="text-[10px] font-medium text-stone-600 truncate max-w-[64px] text-center">
+                        {group.title}
+                      </span>
                     </button>
                   );
                 })}
@@ -165,7 +165,7 @@ export function FileUploadZone() {
                 <div className="flex items-center justify-center gap-1.5 text-[10px]">
                   <CheckCircle2 className="size-3 text-emerald-500" />
                   <span className="font-medium text-emerald-600">
-                    All {classifiedGroups.length} categories ready
+                    All {classifiedGroups.length} documents ready
                   </span>
                 </div>
               )}

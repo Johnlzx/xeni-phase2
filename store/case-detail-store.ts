@@ -1777,3 +1777,30 @@ export const useFormPilotStatus = () =>
   useCaseDetailStore((state) => state.formPilotStatus);
 export const useAnalyzedFiles = () =>
   useCaseDetailStore((state) => state.analyzedFiles);
+
+// Selector to detect if reviewed files have changed since the last analysis
+// Like git diff: compares current ready files vs last analyzed files
+export const useHasNewFilesAfterAnalysis = () =>
+  useCaseDetailStore((state) => {
+    // Only check if analysis has been completed
+    if (!state.lastAnalysisAt) return false;
+
+    // Get all file IDs from reviewed groups (excluding unclassified and removed)
+    const currentReviewedFileIds = state.documentGroups
+      .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
+      .flatMap((g) => g.files.filter((f) => !f.isRemoved).map((f) => f.id));
+
+    const analyzedFileIds = state.analyzedFileIds;
+
+    // Check if any file was added (in current but not in analyzed)
+    const hasAdditions = currentReviewedFileIds.some(
+      (id) => !analyzedFileIds.includes(id)
+    );
+
+    // Check if any file was removed (in analyzed but not in current)
+    const hasRemovals = analyzedFileIds.some(
+      (id) => !currentReviewedFileIds.includes(id)
+    );
+
+    return hasAdditions || hasRemovals;
+  });

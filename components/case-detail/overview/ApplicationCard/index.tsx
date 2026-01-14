@@ -1,7 +1,7 @@
 "use client";
 
-import { Clock, ChevronRight, Loader2, FileSearch, Sparkles } from "lucide-react";
-import { useCaseDetailStore } from "@/store/case-detail-store";
+import { ChevronRight, Loader2, FileSearch, Sparkles, RefreshCw } from "lucide-react";
+import { useCaseDetailStore, useHasNewFilesAfterAnalysis } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
 import { getVisaConfig } from "./VisaTypeDialog";
 import { AnalyzedFilesCard } from "./cards/AnalyzedFilesCard";
@@ -27,29 +27,18 @@ function ApplicationHeader({
   );
   const lastAnalysisAt = useCaseDetailStore((state) => state.lastAnalysisAt);
   const analysisProgress = useCaseDetailStore((state) => state.analysisProgress);
+  const startAnalysis = useCaseDetailStore((state) => state.startAnalysis);
+  const hasNewFilesAfterAnalysis = useHasNewFilesAfterAnalysis();
 
   const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
-
-  // Format time ago
-  const getTimeAgo = () => {
-    if (!lastAnalysisAt) return null;
-    const diff = Date.now() - new Date(lastAnalysisAt).getTime();
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes} min ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-    const days = Math.floor(hours / 24);
-    return `${days} day${days > 1 ? "s" : ""} ago`;
-  };
 
   // State: No visa type selected
   if (!selectedVisaType) {
     return (
-      <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+      <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
         <div>
-          <h3 className="text-sm font-medium text-stone-800">Application</h3>
-          <p className="text-xs text-stone-400 mt-0.5">
+          <h3 className="text-sm font-semibold text-stone-800">Application</h3>
+          <p className="text-[10px] text-stone-400">
             Select visa type to begin
           </p>
         </div>
@@ -71,35 +60,73 @@ function ApplicationHeader({
   // State: Analyzing documents
   if (isAnalyzingDocuments) {
     return (
-      <div className="px-4 py-3 border-b border-stone-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {visaConfig && (
-              <>
-                <div
-                  className={cn(
-                    "size-8 rounded-lg flex items-center justify-center",
-                    visaConfig.bgColor,
-                  )}
-                >
-                  <visaConfig.icon size={16} className={visaConfig.color} />
+      <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
+        <div className="flex items-center gap-2">
+          {visaConfig && (
+            <>
+              <div
+                className={cn(
+                  "size-8 rounded-lg flex items-center justify-center",
+                  visaConfig.bgColor,
+                )}
+              >
+                <visaConfig.icon size={16} className={visaConfig.color} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-stone-800">
+                  {visaConfig.shortName}
+                </h3>
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <Loader2 className="size-3 animate-spin text-[#0E4268]" />
+                  <span className="text-[#0E4268]">Analyzing... {analysisProgress}%</span>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-stone-800">
-                    {visaConfig.shortName}
-                  </h3>
-                  <p className="text-xs text-stone-400">
-                    Processing: {visaConfig.processingTime}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[#0E4268]">
-            <Loader2 className="size-3.5 animate-spin" />
-            <span>Analyzing... {analysisProgress}%</span>
-          </div>
+              </div>
+            </>
+          )}
         </div>
+      </div>
+    );
+  }
+
+  // State: Analysis completed but new files available
+  if (lastAnalysisAt && hasNewFilesAfterAnalysis) {
+    return (
+      <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
+        <div className="flex items-center gap-2">
+          {visaConfig && (
+            <>
+              <div
+                className={cn(
+                  "size-8 rounded-lg flex items-center justify-center",
+                  visaConfig.bgColor,
+                )}
+              >
+                <visaConfig.icon size={16} className={visaConfig.color} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-stone-800">
+                  {visaConfig.shortName}
+                </h3>
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <div className="size-1.5 rounded-full bg-amber-500" />
+                  <span className="text-amber-600">Update available</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <button
+          onClick={() => startAnalysis()}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
+            "border border-[#0E4268] text-[#0E4268] bg-transparent",
+            "hover:bg-[#0E4268]/5",
+            "flex items-center gap-1.5",
+          )}
+        >
+          Re-analyze
+          <RefreshCw className="size-3.5" />
+        </button>
       </div>
     );
   }
@@ -107,45 +134,29 @@ function ApplicationHeader({
   // State: Analysis completed
   if (lastAnalysisAt) {
     return (
-      <div className="px-4 py-3 border-b border-stone-100">
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-3">
-            {visaConfig && (
-              <>
-                <div
-                  className={cn(
-                    "size-8 rounded-lg flex items-center justify-center",
-                    visaConfig.bgColor,
-                  )}
-                >
-                  <visaConfig.icon size={16} className={visaConfig.color} />
+      <div className="shrink-0 h-14 px-4 flex items-center bg-stone-50 border-b border-stone-200">
+        <div className="flex items-center gap-2">
+          {visaConfig && (
+            <>
+              <div
+                className={cn(
+                  "size-8 rounded-lg flex items-center justify-center",
+                  visaConfig.bgColor,
+                )}
+              >
+                <visaConfig.icon size={16} className={visaConfig.color} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-stone-800">
+                  {visaConfig.shortName}
+                </h3>
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <div className="size-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-600">Ready</span>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-stone-800">
-                    {visaConfig.shortName}
-                  </h3>
-                  <p className="text-xs text-stone-400">
-                    Processing: {visaConfig.processingTime}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-          <button
-            onClick={onOpenVisaDialog}
-            className="text-xs text-stone-500 hover:text-stone-700 transition-colors"
-          >
-            Change Visa
-          </button>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-emerald-600">
-          <div className="size-1.5 rounded-full bg-emerald-500" />
-          <span>Analysis completed</span>
-          <span className="text-stone-400">·</span>
-          <span className="text-stone-500 flex items-center gap-1">
-            <Clock className="size-3" />
-            {getTimeAgo()}
-          </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -153,8 +164,8 @@ function ApplicationHeader({
 
   // State: Visa selected but not analyzed
   return (
-    <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
+      <div className="flex items-center gap-2">
         {visaConfig && (
           <>
             <div
@@ -166,10 +177,10 @@ function ApplicationHeader({
               <visaConfig.icon size={16} className={visaConfig.color} />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-stone-800">
+              <h3 className="text-sm font-semibold text-stone-800">
                 {visaConfig.shortName}
               </h3>
-              <p className="text-xs text-stone-400">
+              <p className="text-[10px] text-stone-400">
                 Processing: {visaConfig.processingTime}
               </p>
             </div>

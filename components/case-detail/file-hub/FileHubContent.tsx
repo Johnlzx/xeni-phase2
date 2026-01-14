@@ -18,6 +18,7 @@ import {
   FilePlus,
   Pencil,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -114,25 +115,51 @@ const generateUniqueName = (
   return `${baseName} ${maxNum + 1}`;
 };
 
+// Processing stages for file upload workflow
+const PROCESSING_STAGES = [
+  { key: "uploading", label: "Uploading...", duration: 600 },
+  { key: "splitting", label: "Splitting...", duration: 800 },
+  { key: "optimizing", label: "Optimizing...", duration: 700 },
+  { key: "classifying", label: "Classifying...", duration: 900 },
+] as const;
+
 // ============================================================================
-// DOCUMENTS TOOLBAR - Upload button fixed on right, Unclassified expandable
+// SIDEBAR - macOS-style collapsible sidebar for unclassified pages
 // ============================================================================
-const DocumentsToolbar = ({
+const Sidebar = ({
   unclassifiedFiles,
   allGroups,
-  onUpload,
+  isCollapsed,
+  onToggleCollapse,
   onPreviewPage,
 }: {
   unclassifiedFiles: DocumentFile[];
   allGroups: DocumentGroup[];
-  onUpload: () => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
   onPreviewPage: (file: DocumentFile, index: number) => void;
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [processingStage, setProcessingStage] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
 
-  // Drop target for unclassified area
-  const [{ isOver }, drop] = useDrop(
+  const isProcessing = processingStage !== null;
+
+  // Run processing workflow
+  const runProcessingWorkflow = async () => {
+    for (let i = 0; i < PROCESSING_STAGES.length; i++) {
+      setProcessingStage(i);
+      await new Promise((resolve) => setTimeout(resolve, PROCESSING_STAGES[i].duration));
+    }
+    setProcessingStage(null);
+    const pageCount = Math.floor(Math.random() * 4) + 3;
+    uploadToGroup("unclassified", pageCount);
+  };
+
+  // Drop target for internal page drags
+  const [{ isOver: isInternalDragOver }, drop] = useDrop(
     () => ({
       accept: ItemTypes.PAGE,
       drop: (item: { id: string; groupId: string }) => {
@@ -145,88 +172,296 @@ const DocumentsToolbar = ({
     [moveFileToGroup],
   );
 
-  const hasUnclassified = unclassifiedFiles.length > 0;
+  // Native file drag handlers
+  const handleNativeDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files") && !isProcessing) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
+  };
+
+  const handleNativeDragLeave = (e: React.DragEvent) => {
+    if (!isDragOver) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+        setIsDragOver(false);
+      }
+    }
+  };
+
+  const handleNativeDrop = (e: React.DragEvent) => {
+    if (e.dataTransfer.files.length > 0 && !isProcessing) {
+      e.preventDefault();
+      setIsDragOver(false);
+      runProcessingWorkflow();
+    }
+  };
+
+  const isAnyDragOver = isDragOver || isInternalDragOver;
+  const currentStage = processingStage !== null ? PROCESSING_STAGES[processingStage] : null;
+
+  const setRefs = (el: HTMLDivElement | null) => {
+    containerRef.current = el;
+    drop(el);
+  };
+
+  // Collapsed state - unified icon group with subtle indicator
+  if (isCollapsed) {
+    const hasFiles = unclassifiedFiles.length > 0;
+
+    return (
+      <div
+        className="fixed z-30 transition-all duration-200 ease-out"
+        style={{
+          top: "calc(var(--header-height, 104px) + 16px)",
+          left: "16px",
+        }}
+      >
+        <div className="flex flex-col rounded-2xl bg-white border border-stone-200 shadow-sm overflow-hidden">
+          {/* Expand button with subtle dot indicator */}
+          <button
+            onClick={onToggleCollapse}
+            className={cn(
+              "relative size-11 flex items-center justify-center transition-colors",
+              hasFiles
+                ? "text-stone-600 hover:text-stone-800 hover:bg-stone-50"
+                : "text-stone-400 hover:text-stone-600 hover:bg-stone-50",
+            )}
+            aria-label="Expand sidebar"
+          >
+            <Inbox size={18} />
+            {/* Subtle dot indicator - just shows presence, not count */}
+            {hasFiles && (
+              <span className="absolute top-2 right-2 size-2 rounded-full bg-amber-400" />
+            )}
+          </button>
+
+          {/* Divider */}
+          <div className="mx-2 h-px bg-stone-100" />
+
+          {/* Upload button */}
+          <button
+            onClick={() => !isProcessing && runProcessingWorkflow()}
+            disabled={isProcessing}
+            className={cn(
+              "size-11 flex items-center justify-center transition-colors",
+              isProcessing
+                ? "text-[#0E4268]"
+                : "text-stone-400 hover:text-[#0E4268] hover:bg-stone-50",
+            )}
+            aria-label="Upload files"
+          >
+            {isProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Plus size={18} />
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="shrink-0 mx-4 mt-4">
-      {/* Header row: Unclassified toggle + Upload button (fixed position) */}
-      <div className="flex items-center justify-between gap-3">
-        {/* Left side: Unclassified toggle button */}
-        {hasUnclassified ? (
-          <button
-            ref={drop as unknown as React.LegacyRef<HTMLButtonElement>}
-            onClick={() => setIsExpanded(!isExpanded)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-lg border bg-white transition-colors",
-              isOver
-                ? "border-[#0E4268] bg-[#0E4268]/5"
-                : "border-stone-200 hover:bg-stone-50",
-            )}
-            aria-label={
-              isExpanded
-                ? "Collapse unclassified pages"
-                : "Expand unclassified pages"
-            }
-          >
-            <Inbox size={16} className="text-stone-400" />
-            <span className="text-sm font-medium text-stone-700">
-              Unclassified
-            </span>
-            <span className="inline-flex items-center justify-center size-5 rounded-full bg-amber-500 text-white text-xs font-bold tabular-nums">
-              {unclassifiedFiles.length}
-            </span>
-            <motion.div
-              animate={{ rotate: isExpanded ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ChevronDown size={16} className="text-stone-400" />
-            </motion.div>
-          </button>
-        ) : (
-          <div /> /* Empty spacer when no unclassified files */
-        )}
-
-        {/* Right side: Upload button (always fixed position) */}
+    <div
+      ref={setRefs}
+      onDragOver={handleNativeDragOver}
+      onDragLeave={handleNativeDragLeave}
+      onDrop={handleNativeDrop}
+      style={{
+        top: "calc(var(--header-height, 104px) + 16px)",
+        left: "16px",
+        height: "calc(100dvh - var(--header-height, 104px) - 32px)",
+      }}
+      className={cn(
+        "fixed z-30 w-64 flex flex-col rounded-xl border shadow-sm overflow-hidden transition-all duration-200 ease-out",
+        isAnyDragOver
+          ? "bg-[#0E4268]/5 border-[#0E4268]"
+          : "bg-white/80 backdrop-blur-sm border-stone-200",
+      )}
+    >
+      {/* Sidebar Header */}
+      <div className="h-10 px-3 flex items-center justify-between border-b border-stone-100 shrink-0">
+        <span className="text-xs font-medium text-stone-600">
+          Unclassified{unclassifiedFiles.length > 0 && ` (${unclassifiedFiles.length})`}
+        </span>
         <button
-          onClick={onUpload}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0E4268] text-white text-sm font-medium rounded-lg hover:bg-[#0a3555] transition-colors shrink-0"
-          aria-label="Upload documents"
+          onClick={onToggleCollapse}
+          className="p-1 rounded hover:bg-stone-100 transition-colors"
+          aria-label="Collapse sidebar"
         >
-          <FilePlus size={16} />
-          Upload
+          <ChevronLeft size={14} className="text-stone-400" />
         </button>
       </div>
 
-      {/* Expanded content - separate from header row */}
-      <AnimatePresence initial={false}>
-        {isExpanded && hasUnclassified && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-3 p-3 rounded-lg border border-stone-200 bg-white">
-              <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto">
-                {unclassifiedFiles.map((file, idx) => (
-                  <DraggableUnclassifiedPage
-                    key={file.id}
-                    file={file}
-                    index={idx}
-                    allGroups={allGroups}
-                    onPreview={() => onPreviewPage(file, idx)}
-                  />
-                ))}
-              </div>
-              <p className="text-[11px] text-stone-400 mt-2">
-                Drag to categories below or right-click to move
-              </p>
-            </div>
-          </motion.div>
+      {/* Pages List - Scrollable */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-2 py-2 min-h-0">
+        {unclassifiedFiles.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <Inbox size={24} className="text-stone-300 mb-2" />
+            <p className="text-[11px] text-stone-400 text-pretty">
+              No unclassified pages
+            </p>
+            <p className="text-[10px] text-stone-300 mt-1">
+              Upload files below
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {unclassifiedFiles.map((file, idx) => (
+              <SidebarPageItem
+                key={file.id}
+                file={file}
+                index={idx}
+                allGroups={allGroups}
+                onPreview={() => onPreviewPage(file, idx)}
+              />
+            ))}
+          </div>
         )}
-      </AnimatePresence>
+      </div>
+
+      {/* Upload Zone - Fixed at bottom, more prominent */}
+      <div className="shrink-0 p-3 border-t border-stone-100">
+        <button
+          onClick={() => !isProcessing && runProcessingWorkflow()}
+          disabled={isProcessing}
+          className={cn(
+            "w-full px-4 py-3 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all",
+            isProcessing
+              ? "border-[#0E4268]/40 bg-[#0E4268]/5 cursor-default"
+              : isAnyDragOver
+                ? "border-[#0E4268] bg-[#0E4268]/10 scale-[1.02]"
+                : "border-stone-300 hover:border-[#0E4268] hover:bg-stone-50",
+          )}
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 size={20} className="text-[#0E4268] animate-spin" />
+              <span className="text-xs font-medium text-[#0E4268]">
+                {currentStage?.label}
+              </span>
+            </>
+          ) : (
+            <>
+              <FilePlus size={20} className={cn(
+                "transition-colors",
+                isAnyDragOver ? "text-[#0E4268]" : "text-stone-400",
+              )} />
+              <span className={cn(
+                "text-xs font-medium transition-colors",
+                isAnyDragOver ? "text-[#0E4268]" : "text-stone-500",
+              )}>
+                {isAnyDragOver ? "Drop here" : "Upload Files"}
+              </span>
+              <span className="text-[10px] text-stone-400">
+                Drop or click
+              </span>
+            </>
+          )}
+        </button>
+      </div>
     </div>
+  );
+};
+
+// ============================================================================
+// SIDEBAR PAGE ITEM - Single page row in sidebar list
+// ============================================================================
+const SidebarPageItem = ({
+  file,
+  index,
+  allGroups,
+  onPreview,
+}: {
+  file: DocumentFile;
+  index: number;
+  allGroups: DocumentGroup[];
+  onPreview: () => void;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const classifiedGroups = allGroups.filter((g) => g.id !== "unclassified");
+
+  const [{ isDragging }, drag] = useDrag({
+    type: ItemTypes.PAGE,
+    item: () => ({ id: file.id, groupId: "unclassified", pageIndex: index }),
+    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  });
+
+  drag(ref);
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={ref}
+          onClick={onPreview}
+          className={cn(
+            "group flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors select-none",
+            isDragging ? "opacity-50" : "hover:bg-white/80",
+          )}
+        >
+          {/* Page thumbnail */}
+          <div className="relative shrink-0">
+            <div className="w-8 aspect-[1/1.414] rounded border border-stone-200 bg-white overflow-hidden">
+              <div className="w-full h-full p-1">
+                <div className="space-y-px">
+                  <div className="h-px bg-stone-300 rounded w-1/2" />
+                  <div className="h-px bg-stone-200 rounded w-full mt-0.5" />
+                  <div className="h-px bg-stone-200 rounded w-4/5" />
+                  <div className="h-px bg-stone-200 rounded w-full" />
+                </div>
+              </div>
+            </div>
+            {/* New indicator */}
+            {file.isNew && (
+              <div className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500 border border-white" />
+            )}
+          </div>
+
+          {/* Page info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-stone-700 truncate">Page {index + 1}</p>
+            <p className="text-[10px] text-stone-400 truncate">{file.name}</p>
+          </div>
+
+          {/* Page number badge */}
+          <span className="text-[10px] font-medium text-stone-400 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
+            #{index + 1}
+          </span>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <FolderOpen size={14} className="mr-2" />
+            Move to
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            {classifiedGroups.map((group) => (
+              <ContextMenuItem
+                key={group.id}
+                onClick={() => moveFileToGroup(file.id, group.id)}
+              >
+                <FileText size={14} className="mr-2 text-stone-400" />
+                {group.title}
+              </ContextMenuItem>
+            ))}
+            {classifiedGroups.length === 0 && (
+              <ContextMenuItem disabled>No categories</ContextMenuItem>
+            )}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem className="text-red-600">
+          <Trash2 size={14} className="mr-2" />
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 };
 
@@ -1173,6 +1408,7 @@ export function FileHubContent() {
     file: DocumentFile;
     index: number;
   } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const classifiedGroups = groups.filter((g) => g.id !== "unclassified");
   const unclassifiedGroup = groups.find((g) => g.id === "unclassified");
@@ -1181,7 +1417,7 @@ export function FileHubContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-full flex flex-col bg-stone-50">
+      <div className="bg-stone-100 p-4 pb-20" style={{ minHeight: "calc(100% + 60px)" }}>
         <LoadingState />
       </div>
     );
@@ -1191,42 +1427,44 @@ export function FileHubContent() {
 
   if (!hasAnyFiles && classifiedGroups.length === 0) {
     return (
-      <div className="min-h-full flex flex-col bg-stone-50">
+      <div className="bg-stone-100 p-4 pb-20" style={{ minHeight: "calc(100% + 60px)" }}>
         <EmptyState onUpload={uploadDocuments} />
       </div>
     );
   }
 
+  // Calculate sidebar width for content margin
+  const sidebarWidth = sidebarCollapsed ? 44 : 256; // collapsed icon (44px) or full width (w-64 = 256px)
+
   return (
-    <div className="min-h-full flex flex-col bg-stone-50">
-      {/* Toolbar: Upload button + Unclassified tray in one row */}
-      <DocumentsToolbar
+    <div className="bg-stone-100 p-4 pb-20" style={{ minHeight: "calc(100% + 60px)" }}>
+      {/* Left Sidebar - Fixed position */}
+      <Sidebar
         unclassifiedFiles={unclassifiedFiles}
         allGroups={groups}
-        onUpload={uploadDocuments}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         onPreviewPage={(file, index) => setPreviewPage({ file, index })}
       />
 
-      {/* Category Grid */}
-      <div className="flex-1 p-4">
-        <div
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3"
-          style={{ gridAutoRows: "360px" }}
-        >
-          {classifiedGroups.map((group) => (
-            <CategoryCard
-              key={group.id}
-              group={group}
-              allGroups={groups}
-              onReview={() => setReviewGroup(group)}
-            />
-          ))}
-
-          <AddCategoryCard
-            onAdd={addDocumentGroup}
-            existingGroups={classifiedGroups}
+      {/* Main Content - Category Grid with dynamic left margin */}
+      <div
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 transition-[margin] duration-200 ease-out"
+        style={{ marginLeft: `${sidebarWidth + 16}px`, gridAutoRows: "360px" }}
+      >
+        {classifiedGroups.map((group) => (
+          <CategoryCard
+            key={group.id}
+            group={group}
+            allGroups={groups}
+            onReview={() => setReviewGroup(group)}
           />
-        </div>
+        ))}
+
+        <AddCategoryCard
+          onAdd={addDocumentGroup}
+          existingGroups={classifiedGroups}
+        />
       </div>
 
       <AnimatePresence>
