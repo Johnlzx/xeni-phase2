@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { Upload, HelpCircle, ListChecks, CheckSquare } from 'lucide-react';
-import { useCaseDetailStore } from '@/store/case-detail-store';
-import { QuestionnaireMode } from './QuestionnaireMode';
-import { MultiStepMode } from './MultiStepMode';
-import { cn } from '@/lib/utils';
+import { Upload, HelpCircle, ListChecks, CheckSquare } from "lucide-react";
+import { useCaseDetailStore } from "@/store/case-detail-store";
+import { QuestionnaireMode } from "./QuestionnaireMode";
+import { MultiStepMode } from "./MultiStepMode";
+import { cn } from "@/lib/utils";
 
 // Stage indicator component
 function StageIndicator() {
   const stage = useCaseDetailStore((state) => state.checklist.stage);
 
   const stages = [
-    { id: 'empty', label: 'Upload', icon: Upload },
-    { id: 'questionnaire', label: 'Questions', icon: HelpCircle },
-    { id: 'partial', label: 'Review', icon: ListChecks },
-    { id: 'detailed', label: 'Complete', icon: CheckSquare },
+    { id: "empty", label: "Upload", icon: Upload },
+    { id: "questionnaire", label: "Questions", icon: HelpCircle },
+    { id: "partial", label: "Review", icon: ListChecks },
+    { id: "detailed", label: "Complete", icon: CheckSquare },
   ];
 
   const currentIndex = stages.findIndex((s) => s.id === stage);
@@ -30,12 +30,12 @@ function StageIndicator() {
           <div key={s.id} className="flex items-center">
             <div
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all',
+                "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all",
                 isActive
-                  ? 'bg-blue-100 text-blue-700 font-medium'
+                  ? "bg-blue-100 text-blue-700 font-medium"
                   : isPast
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-gray-100 text-gray-400'
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-400",
               )}
             >
               <Icon className="w-4 h-4" />
@@ -44,8 +44,8 @@ function StageIndicator() {
             {index < stages.length - 1 && (
               <div
                 className={cn(
-                  'w-8 h-0.5 mx-1',
-                  index < currentIndex ? 'bg-green-300' : 'bg-gray-200'
+                  "w-8 h-0.5 mx-1",
+                  index < currentIndex ? "bg-green-300" : "bg-gray-200",
                 )}
               />
             )}
@@ -70,13 +70,14 @@ function EmptyState() {
           Upload Documents to Begin
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          Start by uploading your documents. Your personalized checklist will be generated based on the documents you provide.
+          Start by uploading your documents. Your personalized checklist will be
+          generated based on the documents you provide.
         </p>
         <button
-          onClick={() => setActiveNav('documents')}
+          onClick={() => setActiveNav("documents")}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
         >
-          Go to Documents
+          Go to File Hub
         </button>
       </div>
     </div>
@@ -86,7 +87,9 @@ function EmptyState() {
 // Partial mode - mixed questionnaire and checklist
 function PartialMode() {
   const checklist = useCaseDetailStore((state) => state.checklist);
-  const unansweredQuestions = checklist.questions.filter((q) => q.answer === undefined);
+  const unansweredQuestions = checklist.questions.filter(
+    (q) => q.answer === undefined,
+  );
 
   return (
     <div className="space-y-6">
@@ -117,10 +120,10 @@ export function DynamicChecklist() {
       <StageIndicator />
 
       {/* Content based on stage */}
-      {stage === 'empty' && <EmptyState />}
-      {stage === 'questionnaire' && <QuestionnaireMode />}
-      {stage === 'partial' && <PartialMode />}
-      {stage === 'detailed' && <MultiStepMode />}
+      {stage === "empty" && <EmptyState />}
+      {stage === "questionnaire" && <QuestionnaireMode />}
+      {stage === "partial" && <PartialMode />}
+      {stage === "detailed" && <MultiStepMode />}
     </div>
   );
 }

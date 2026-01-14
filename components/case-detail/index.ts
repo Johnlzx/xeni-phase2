@@ -1,8 +1,8 @@
-export { CaseDetailLayout } from './CaseDetailLayout';
-export { CaseDetailSidebar } from './CaseDetailSidebar';
-export { CaseDetailContent } from './CaseDetailContent';
+export { CaseDetailLayout } from "./CaseDetailLayout";
+export { CaseDetailHeader } from "./CaseDetailHeader";
+export { CaseDetailContent } from "./CaseDetailContent";
+export { XeniLogo } from "./XeniLogo";
 
 // Sub-pages
-export { OverviewPage } from './overview/OverviewPage';
-export { DocumentsPage } from './documents/DocumentsPage';
-export { ApplicationPage } from './application/ApplicationPage';
+export { OverviewPage } from "./overview/OverviewPage";
+export { ApplicationPage } from "./application/ApplicationPage";

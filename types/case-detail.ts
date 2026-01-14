@@ -1,11 +1,7 @@
 import { PassportInfo, VisaType } from "./index";
 
 // Navigation
-export type CaseDetailNavItem =
-  | "overview"
-  | "documents"
-  | "file-hub"
-  | "application";
+export type CaseDetailNavItem = "overview" | "documents" | "application";
 
 // Client Profile (progressively filled from documents)
 export interface ClientProfile {
@@ -16,6 +12,20 @@ export interface ClientProfile {
     address?: string;
   };
   completeness: number; // 0-100
+}
+
+// Case Team Member
+export interface CaseTeamMember {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+}
+
+// Case Team
+export interface CaseTeam {
+  lawyer: CaseTeamMember;
+  assistant?: CaseTeamMember;
 }
 
 // Checklist Evolution Stages
@@ -108,10 +118,50 @@ export interface DocumentGroup {
   files: DocumentFile[];
 }
 
+// Application Phase (state machine)
+export type ApplicationPhase =
+  | "idle" // No visa selected, show visa selection UI
+  | "visa_selected" // Visa chosen, show files ready for analysis
+  | "analyzing" // Document analysis in progress
+  | "completed"; // Analysis done, show three info cards
+
+// Form Schema Status
+export interface FormSchemaStatus {
+  schemaName: string;
+  schemaVersion: string;
+  totalFields: number;
+  filledFields: number;
+  completionPercentage: number;
+  emptyRequiredFields: string[];
+  lastUpdatedAt: string | null;
+}
+
+// Form Pilot Status
+export interface FormPilotStatus {
+  totalSessions: number;
+  lastRunAt: string | null;
+  lastRunStatus: "success" | "cancelled" | "error" | null;
+}
+
+// Analyzed File Summary
+export interface AnalyzedFileSummary {
+  id: string;
+  name: string;
+  groupTitle: string;
+  pages: number;
+  analyzedAt: string;
+}
+
 // Case Detail Store State
 export interface CaseDetailState {
   // Current case ID
   caseId: string | null;
+
+  // Case Reference
+  caseReference: string;
+
+  // Case Team
+  caseTeam: CaseTeam;
 
   // Navigation
   activeNav: CaseDetailNavItem;
@@ -141,6 +191,18 @@ export interface CaseDetailState {
   analysisProgress: number; // 0-100
   lastAnalysisAt: string | null; // ISO timestamp of last analysis
   analyzedFileIds: string[]; // IDs of files included in last analysis
+
+  // Application Phase (state machine)
+  applicationPhase: ApplicationPhase;
+
+  // Form Schema (visa-specific schema once visa is selected)
+  formSchema: FormSchemaStatus | null;
+
+  // Form Pilot
+  formPilotStatus: FormPilotStatus;
+
+  // Analyzed Files Summary (populated after analysis)
+  analyzedFiles: AnalyzedFileSummary[];
 }
 
 // Case Detail Store Actions
@@ -150,6 +212,11 @@ export interface CaseDetailActions {
 
   // Case
   setCaseId: (caseId: string) => void;
+  setCaseReference: (reference: string) => void;
+
+  // Case Team
+  setLawyer: (lawyer: CaseTeamMember) => void;
+  setAssistant: (assistant: CaseTeamMember | undefined) => void;
 
   // Client Profile
   updateClientProfile: (updates: Partial<ClientProfile>) => void;
@@ -181,6 +248,8 @@ export interface CaseDetailActions {
     toIndex: number,
   ) => void;
   markFileForDeletion: (fileId: string, groupId: string) => void;
+  clearFileNewStatus: (fileId: string) => void;
+  clearGroupChangesFlag: (groupId: string) => void;
   confirmGroupReview: (groupId: string) => void;
   uploadDocuments: () => Promise<void>;
   uploadToGroup: (groupId: string, fileCount?: number) => void;
@@ -194,6 +263,12 @@ export interface CaseDetailActions {
 
   // Analysis
   runDocumentAnalysis: () => Promise<void>;
+
+  // Application Phase
+  setApplicationPhase: (phase: ApplicationPhase) => void;
+  startAnalysis: () => Promise<void>;
+  initFormSchema: (visaType: VisaType) => void;
+  launchFormPilot: () => void;
 
   // Reset
   reset: () => void;

@@ -7,9 +7,7 @@ import { FileHubContent } from "./FileHubContent";
 export function FileHubPage() {
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="h-full bg-stone-50">
-        <FileHubContent />
-      </div>
+      <FileHubContent />
     </DndProvider>
   );
 }

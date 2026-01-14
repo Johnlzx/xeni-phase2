@@ -1,20 +1,23 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Upload,
   FileText,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
+  ChevronDown,
+  Download,
   Plus,
   Check,
   Inbox,
   FolderOpen,
   File,
   X,
+  FilePlus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,43 +43,189 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { CategoryReviewModal, getPageColor } from "../shared";
+import { CategoryReviewModal } from "../shared";
+
+// ============================================================================
+// REALISTIC DOCUMENT PREVIEW - Simulates scanned document appearance
+// ============================================================================
+const DocumentPreviewContent = ({
+  size = "sm",
+}: {
+  size?: "sm" | "md" | "lg";
+}) => {
+  const lineHeight = size === "sm" ? "h-0.5" : size === "md" ? "h-1" : "h-1.5";
+  const spacing =
+    size === "sm" ? "space-y-0.5" : size === "md" ? "space-y-1" : "space-y-2";
+  const marginTop = size === "sm" ? "mt-1" : size === "md" ? "mt-2" : "mt-4";
+
+  return (
+    <div className={spacing}>
+      <div className={cn(lineHeight, "bg-stone-300 rounded w-1/3")} />
+      <div
+        className={cn(lineHeight, "bg-stone-200 rounded w-1/4", marginTop)}
+      />
+      <div
+        className={cn(lineHeight, "bg-stone-200 rounded w-full", marginTop)}
+      />
+      <div className={cn(lineHeight, "bg-stone-200 rounded w-full")} />
+      <div className={cn(lineHeight, "bg-stone-200 rounded w-5/6")} />
+      <div className={cn(lineHeight, "bg-stone-200 rounded w-full")} />
+      <div className={cn(lineHeight, "bg-stone-200 rounded w-3/4")} />
+      <div
+        className={cn(lineHeight, "bg-stone-200 rounded w-full", marginTop)}
+      />
+      <div className={cn(lineHeight, "bg-stone-200 rounded w-4/5")} />
+      <div
+        className={cn(lineHeight, "bg-stone-300 rounded w-1/4", marginTop)}
+      />
+    </div>
+  );
+};
 import type { DocumentGroup, DocumentFile } from "@/types/case-detail";
 
 const ItemTypes = {
   PAGE: "page",
 };
 
+// Helper to generate unique name for duplicate categories
+const generateUniqueName = (
+  baseName: string,
+  existingGroups: DocumentGroup[],
+): string => {
+  const baseTag = baseName.toLowerCase().replace(/\s+/g, "-");
+  const existingWithSameTag = existingGroups.filter(
+    (g) => g.tag === baseTag || g.tag.startsWith(`${baseTag}-`),
+  );
+
+  if (existingWithSameTag.length === 0) {
+    return baseName;
+  }
+
+  // Find the highest number suffix
+  let maxNum = 0;
+  existingWithSameTag.forEach((g) => {
+    const match = g.title.match(new RegExp(`^${baseName}\\s*(\\d+)?$`, "i"));
+    if (match) {
+      const num = match[1] ? parseInt(match[1]) : 0;
+      maxNum = Math.max(maxNum, num);
+    }
+  });
+
+  return `${baseName} ${maxNum + 1}`;
+};
+
 // ============================================================================
-// FILE HUB HEADER
+// DOCUMENTS TOOLBAR - Upload button fixed on right, Unclassified expandable
 // ============================================================================
-const FileHubHeader = ({ groups }: { groups: DocumentGroup[] }) => {
-  const pendingCount = groups.filter(
-    (g) =>
-      g.id !== "unclassified" && g.status === "pending" && g.files.length > 0,
-  ).length;
+const DocumentsToolbar = ({
+  unclassifiedFiles,
+  allGroups,
+  onUpload,
+  onPreviewPage,
+}: {
+  unclassifiedFiles: DocumentFile[];
+  allGroups: DocumentGroup[];
+  onUpload: () => void;
+  onPreviewPage: (file: DocumentFile, index: number) => void;
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+
+  // Drop target for unclassified area
+  const [{ isOver }, drop] = useDrop(
+    () => ({
+      accept: ItemTypes.PAGE,
+      drop: (item: { id: string; groupId: string }) => {
+        if (item.groupId !== "unclassified") {
+          moveFileToGroup(item.id, "unclassified");
+        }
+      },
+      collect: (monitor) => ({ isOver: monitor.isOver() }),
+    }),
+    [moveFileToGroup],
+  );
+
+  const hasUnclassified = unclassifiedFiles.length > 0;
 
   return (
-    <div className="shrink-0 px-6 py-4 bg-white border-b border-stone-200">
-      <div className="flex items-center gap-4">
-        <div className="p-2 rounded-xl bg-[#0E4268]/10">
-          <FolderOpen size={20} className="text-[#0E4268]" />
-        </div>
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-stone-800">File Hub</h1>
-            {pendingCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-                {pendingCount} pending review
-              </span>
+    <div className="shrink-0 mx-4 mt-4">
+      {/* Header row: Unclassified toggle + Upload button (fixed position) */}
+      <div className="flex items-center justify-between gap-3">
+        {/* Left side: Unclassified toggle button */}
+        {hasUnclassified ? (
+          <button
+            ref={drop as unknown as React.LegacyRef<HTMLButtonElement>}
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg border bg-white transition-colors",
+              isOver
+                ? "border-[#0E4268] bg-[#0E4268]/5"
+                : "border-stone-200 hover:bg-stone-50",
             )}
-          </div>
-          <p className="text-sm text-stone-500">
-            Organize and manage your documents
-          </p>
-        </div>
+            aria-label={
+              isExpanded
+                ? "Collapse unclassified pages"
+                : "Expand unclassified pages"
+            }
+          >
+            <Inbox size={16} className="text-stone-400" />
+            <span className="text-sm font-medium text-stone-700">
+              Unclassified
+            </span>
+            <span className="inline-flex items-center justify-center size-5 rounded-full bg-amber-500 text-white text-xs font-bold tabular-nums">
+              {unclassifiedFiles.length}
+            </span>
+            <motion.div
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown size={16} className="text-stone-400" />
+            </motion.div>
+          </button>
+        ) : (
+          <div /> /* Empty spacer when no unclassified files */
+        )}
+
+        {/* Right side: Upload button (always fixed position) */}
+        <button
+          onClick={onUpload}
+          className="flex items-center gap-2 px-4 py-2 bg-[#0E4268] text-white text-sm font-medium rounded-lg hover:bg-[#0a3555] transition-colors shrink-0"
+          aria-label="Upload documents"
+        >
+          <FilePlus size={16} />
+          Upload
+        </button>
       </div>
+
+      {/* Expanded content - separate from header row */}
+      <AnimatePresence initial={false}>
+        {isExpanded && hasUnclassified && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 p-3 rounded-lg border border-stone-200 bg-white">
+              <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto">
+                {unclassifiedFiles.map((file, idx) => (
+                  <DraggableUnclassifiedPage
+                    key={file.id}
+                    file={file}
+                    index={idx}
+                    allGroups={allGroups}
+                    onPreview={() => onPreviewPage(file, idx)}
+                  />
+                ))}
+              </div>
+              <p className="text-[11px] text-stone-400 mt-2">
+                Drag to categories below or right-click to move
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -95,18 +244,42 @@ const SinglePagePreviewModal = ({
   allGroups: DocumentGroup[];
   onClose: () => void;
 }) => {
-  const pageColor = getPageColor(file.id);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const markFileForDeletion = useCaseDetailStore(
+    (state) => state.markFileForDeletion,
+  );
+  const clearFileNewStatus = useCaseDetailStore(
+    (state) => state.clearFileNewStatus,
+  );
   const classifiedGroups = allGroups.filter((g) => g.id !== "unclassified");
+
+  // Clear NEW status when modal opens
+  React.useEffect(() => {
+    if (file.isNew) {
+      clearFileNewStatus(file.id);
+    }
+  }, [file.id, file.isNew, clearFileNewStatus]);
 
   // Close on escape
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, showDeleteConfirm]);
+
+  const handleDelete = () => {
+    markFileForDeletion(file.id, "unclassified");
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -117,30 +290,22 @@ const SinglePagePreviewModal = ({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
         className="absolute inset-0 bg-black/70"
-        onClick={onClose}
+        onClick={showDeleteConfirm ? undefined : onClose}
       />
 
-      {/* Modal Content */}
+      {/* Modal Content - larger size for A4 preview */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.15 }}
-        className="relative z-10 flex flex-col max-w-lg w-full mx-4 bg-white rounded-xl shadow-2xl overflow-hidden"
+        className="relative z-10 flex flex-col max-w-2xl w-full mx-4 bg-white rounded-xl shadow-2xl overflow-hidden"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50">
-          <div className="flex items-center gap-2">
-            <div className={cn("size-3 rounded-full", pageColor.accent)} />
-            <span className="text-sm font-medium text-stone-800">
-              Page {pageIndex + 1}
-            </span>
-            {file.isNew && (
-              <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded">
-                NEW
-              </span>
-            )}
-          </div>
+        {/* Header - no circle before page name */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-stone-200 bg-stone-50">
+          <span className="text-sm font-medium text-stone-800">
+            Page {pageIndex + 1}
+          </span>
           <button
             onClick={onClose}
             className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
@@ -150,55 +315,58 @@ const SinglePagePreviewModal = ({
           </button>
         </div>
 
-        {/* Page Preview */}
-        <div className="p-6 bg-stone-100">
-          <div
-            className={cn(
-              "aspect-[3/4] rounded-lg border border-stone-200 shadow-md p-6 mx-auto max-w-xs",
-              pageColor.bg,
-            )}
-          >
-            <div className="space-y-3">
-              <div className="h-3 bg-white/60 rounded w-3/4" />
-              <div className="h-3 bg-white/60 rounded w-full" />
-              <div className="h-3 bg-white/60 rounded w-5/6" />
-              <div className="h-3 bg-white/40 rounded w-2/3" />
-              <div className="h-3 bg-white/60 rounded w-4/5 mt-6" />
-              <div className="h-3 bg-white/60 rounded w-full" />
-              <div className="h-3 bg-white/40 rounded w-3/4" />
-              <div className="h-3 bg-white/60 rounded w-5/6 mt-6" />
-              <div className="h-3 bg-white/60 rounded w-2/3" />
-              <div className="h-3 bg-white/40 rounded w-4/5" />
-            </div>
+        {/* Page Preview - larger A4 ratio */}
+        <div className="p-8 bg-stone-100 flex items-center justify-center">
+          <div className="aspect-[1/1.414] w-full max-w-md rounded-lg border border-stone-200 shadow-md p-8 bg-white">
+            <DocumentPreviewContent size="lg" />
           </div>
         </div>
 
-        {/* Footer - Move Actions */}
-        <div className="px-4 py-3 border-t border-stone-200 bg-white">
+        {/* Footer - Move to dropdown and Delete button */}
+        <div className="px-5 py-3 border-t border-stone-200 bg-white">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-stone-500">Move to category:</span>
-            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-              {classifiedGroups.slice(0, 4).map((group) => (
+            {/* Left side - Delete with confirmation */}
+            {showDeleteConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-red-600">Delete this page?</span>
                 <button
-                  key={group.id}
-                  onClick={() => {
-                    moveFileToGroup(file.id, group.id);
-                    onClose();
-                  }}
-                  className="px-2.5 py-1 text-xs font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 rounded transition-colors"
+                  onClick={handleDelete}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
                 >
-                  {group.title}
+                  Confirm
                 </button>
-              ))}
-              {classifiedGroups.length > 4 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="px-2.5 py-1 text-xs font-medium text-stone-500 bg-stone-100 hover:bg-stone-200 rounded transition-colors">
-                      +{classifiedGroups.length - 4} more
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    {classifiedGroups.slice(4).map((group) => (
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-3 py-1.5 text-sm font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                aria-label="Delete page"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            )}
+
+            {/* Right side - Move to dropdown */}
+            {!showDeleteConfirm && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors">
+                    Move to
+                    <ChevronDown size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>Categories</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {classifiedGroups.length > 0 ? (
+                    classifiedGroups.map((group) => (
                       <DropdownMenuItem
                         key={group.id}
                         onClick={() => {
@@ -208,11 +376,15 @@ const SinglePagePreviewModal = ({
                       >
                         {group.title}
                       </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled>
+                      No categories available
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </motion.div>
@@ -235,7 +407,6 @@ const DraggableUnclassifiedPage = ({
   onPreview: () => void;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const pageColor = getPageColor(file.id);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
 
   const classifiedGroups = allGroups.filter((g) => g.id !== "unclassified");
@@ -255,28 +426,33 @@ const DraggableUnclassifiedPage = ({
           ref={ref}
           onClick={onPreview}
           className={cn(
-            "w-12 h-[60px] rounded border overflow-hidden flex flex-col cursor-pointer transition-all hover:scale-105 hover:shadow-md relative select-none",
+            "w-12 aspect-[1/1.414] rounded border border-stone-200 bg-white overflow-hidden cursor-pointer transition-all hover:scale-105 hover:shadow-md relative select-none",
             isDragging && "opacity-50 cursor-grabbing",
-            file.isNew ? "border-emerald-400" : "border-stone-200",
           )}
           title={file.name}
         >
-          <div className={cn("flex-1 p-1", pageColor.bg)}>
+          {/* Page content */}
+          <div className="w-full h-full p-1">
             <div className="space-y-0.5">
-              <div className="h-0.5 bg-white/60 rounded w-3/4" />
-              <div className="h-0.5 bg-white/60 rounded w-full" />
-              <div className="h-0.5 bg-white/40 rounded w-2/3" />
-              <div className="h-0.5 bg-white/60 rounded w-4/5" />
+              <div className="h-px bg-stone-300 rounded w-1/3" />
+              <div className="h-px bg-stone-200 rounded w-full mt-0.5" />
+              <div className="h-px bg-stone-200 rounded w-full" />
+              <div className="h-px bg-stone-200 rounded w-4/5" />
+              <div className="h-px bg-stone-200 rounded w-full" />
+              <div className="h-px bg-stone-200 rounded w-2/3" />
             </div>
           </div>
-          <div className="h-3.5 bg-white flex items-center justify-center border-t border-stone-100">
-            <span className="text-[8px] text-stone-500 font-medium tabular-nums">
-              {index + 1}
-            </span>
+          {/* Page number circle - top left, new files have blue fill */}
+          <div
+            className={cn(
+              "absolute top-0.5 left-0.5 size-4 flex items-center justify-center text-[8px] font-semibold tabular-nums rounded-full",
+              file.isNew
+                ? "bg-blue-500 text-white"
+                : "border border-stone-300 text-stone-500",
+            )}
+          >
+            {index + 1}
           </div>
-          {file.isNew && (
-            <div className="absolute -top-0.5 -right-0.5 size-2 bg-emerald-500 rounded-full" />
-          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
@@ -310,81 +486,7 @@ const DraggableUnclassifiedPage = ({
 };
 
 // ============================================================================
-// UPLOAD AREA (drop zone left, unclassified container right)
-// ============================================================================
-const UploadArea = ({
-  unclassifiedFiles,
-  allGroups,
-  onUpload,
-  onPreviewPage,
-}: {
-  unclassifiedFiles: DocumentFile[];
-  allGroups: DocumentGroup[];
-  onUpload: () => void;
-  onPreviewPage: (file: DocumentFile, index: number) => void;
-}) => {
-  const [{ isOver }, drop] = useDrop(
-    () => ({
-      accept: ItemTypes.PAGE,
-      collect: (monitor) => ({ isOver: monitor.isOver() }),
-    }),
-    [],
-  );
-
-  return (
-    <div className="shrink-0 px-4 py-4 bg-stone-50 border-b border-stone-200">
-      <div className="flex items-stretch gap-4">
-        {/* Drop Zone (left side - larger) */}
-        <div
-          ref={drop as unknown as React.LegacyRef<HTMLDivElement>}
-          onClick={onUpload}
-          className={cn(
-            "flex items-center gap-4 px-6 py-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors min-w-[300px]",
-            isOver
-              ? "border-[#0E4268] bg-[#0E4268]/5"
-              : "border-stone-300 hover:border-stone-400 hover:bg-white",
-          )}
-        >
-          <div className="size-14 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
-            <Upload size={28} className="text-stone-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-base font-medium text-stone-700">
-              Drag & Drop files here
-            </p>
-            <p className="text-sm text-stone-500 mt-1">or click to browse</p>
-          </div>
-        </div>
-
-        {/* Unclassified Pages Container (right side) */}
-        {unclassifiedFiles.length > 0 && (
-          <div className="flex-1 bg-white rounded-xl border border-stone-200 p-4 min-w-0">
-            <div className="flex items-center gap-2 mb-3">
-              <Inbox size={16} className="text-stone-400" />
-              <span className="text-sm font-medium text-stone-600">
-                Unclassified ({unclassifiedFiles.length})
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2 max-h-[88px] overflow-y-auto">
-              {unclassifiedFiles.map((file, idx) => (
-                <DraggableUnclassifiedPage
-                  key={file.id}
-                  file={file}
-                  index={idx}
-                  allGroups={allGroups}
-                  onPreview={() => onPreviewPage(file, idx)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// CATEGORY CARD WITH PAGE NAVIGATION (smaller size)
+// CATEGORY CARD (A4 ratio, no icon, uppercase type)
 // ============================================================================
 const CategoryCard = ({
   group,
@@ -396,24 +498,99 @@ const CategoryCard = ({
   onReview: () => void;
 }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isRenamingTitle, setIsRenamingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(group.title);
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const confirmGroupReview = useCaseDetailStore(
     (state) => state.confirmGroupReview,
   );
   const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
+  const renameDocumentGroup = useCaseDetailStore(
+    (state) => state.renameDocumentGroup,
+  );
+
+  // Handle native file drag and drop (only for files from OS, not react-dnd)
+  const handleNativeDragOver = (e: React.DragEvent) => {
+    // Only handle native file drags, not react-dnd internal drags
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      setIsFileDragOver(true);
+    }
+  };
+
+  const handleNativeDragLeave = (e: React.DragEvent) => {
+    // Only handle if we were tracking a native file drag
+    if (!isFileDragOver) return;
+
+    // Only set to false if we're leaving the card entirely
+    const rect = cardRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        setIsFileDragOver(false);
+      }
+    }
+  };
+
+  const handleNativeDrop = (e: React.DragEvent) => {
+    // Only handle native file drops
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      e.preventDefault();
+      setIsFileDragOver(false);
+      // Simulate uploading files - in real app would process actual files
+      uploadToGroup(group.id, files.length);
+    }
+  };
 
   const handleUpload = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Simulate uploading 1-3 pages
     const pageCount = Math.floor(Math.random() * 3) + 1;
     uploadToGroup(group.id, pageCount);
   };
 
   const activeFiles = group.files.filter((f) => !f.isRemoved);
   const totalPages = activeFiles.length;
-  const currentFile = activeFiles[currentPageIndex];
-  const currentPageColor = currentFile ? getPageColor(currentFile.id) : null;
 
+  // Jump to latest page when new files are added
+  const prevTotalPagesRef = useRef(totalPages);
+  useEffect(() => {
+    if (totalPages > prevTotalPagesRef.current) {
+      // New files added, jump to the last page
+      setCurrentPageIndex(totalPages - 1);
+    }
+    prevTotalPagesRef.current = totalPages;
+  }, [totalPages]);
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log("Download", group.id);
+  };
+
+  const handleConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    confirmGroupReview(group.id);
+  };
+
+  const handleRenameSubmit = () => {
+    if (editedTitle.trim() && editedTitle !== group.title) {
+      renameDocumentGroup(group.id, editedTitle.trim());
+    } else {
+      setEditedTitle(group.title);
+    }
+    setIsRenamingTitle(false);
+  };
+
+  const currentFile = activeFiles[currentPageIndex];
   const isPending = group.status === "pending" && totalPages > 0;
 
   const handlePrev = (e: React.MouseEvent) => {
@@ -426,7 +603,6 @@ const CategoryCard = ({
     setCurrentPageIndex((prev) => Math.min(totalPages - 1, prev + 1));
   };
 
-  // Drop target for receiving files
   const [{ isOver }, drop] = useDrop<
     { id: string; groupId: string },
     void,
@@ -444,191 +620,455 @@ const CategoryCard = ({
     [group.id, moveFileToGroup],
   );
 
+  // Display type from tag (uppercase with tracking)
+  const displayType = group.tag
+    .split("-")
+    .map((word) => word.toUpperCase())
+    .join(" ");
+
+  // Combine refs for both react-dnd and native drag
+  const setRefs = (el: HTMLDivElement | null) => {
+    cardRef.current = el;
+    drop(el);
+  };
+
   return (
     <div
-      ref={drop as unknown as React.LegacyRef<HTMLDivElement>}
+      ref={setRefs}
       className={cn(
         "bg-white rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer",
-        isOver
+        isOver || isFileDragOver
           ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 scale-[1.02]"
           : "border-stone-200 hover:border-stone-300 hover:shadow-md",
       )}
       onClick={onReview}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onDragOver={handleNativeDragOver}
+      onDragLeave={handleNativeDragLeave}
+      onDrop={handleNativeDrop}
     >
-      {/* Card Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1 rounded-md bg-red-50 text-red-500 shrink-0">
-            <FileText size={12} />
-          </div>
-          <span className="text-sm font-semibold text-stone-800 truncate">
-            {group.title}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          {isPending ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                confirmGroupReview(group.id);
-              }}
-              className="px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded transition-colors"
-            >
-              Review
-            </button>
-          ) : totalPages > 0 ? (
-            <span className="px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded flex items-center gap-0.5">
-              <Check size={10} strokeWidth={3} />
-              Ready
-            </span>
-          ) : null}
-          <button
-            onClick={handleUpload}
-            className="p-1 text-stone-400 hover:text-[#0E4268] hover:bg-[#0E4268]/10 rounded transition-colors"
-            aria-label="Upload to category"
-          >
-            <Upload size={14} />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
+      {/* Card Header - no icon */}
+      <div className="px-3 py-2 border-b border-stone-100 shrink-0">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {isRenamingTitle ? (
+              <input
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleRenameSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRenameSubmit();
+                  if (e.key === "Escape") {
+                    setEditedTitle(group.title);
+                    setIsRenamingTitle(false);
+                  }
+                  e.stopPropagation();
+                }}
                 onClick={(e) => e.stopPropagation()}
-                className="p-1 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded transition-colors"
-                aria-label="Category options"
+                className="text-xs font-semibold text-stone-800 bg-white border-2 border-[#0E4268] rounded px-1.5 py-0.5 outline-none flex-1 min-w-0 shadow-sm"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRenamingTitle(true);
+                }}
+                className="group text-xs font-semibold text-stone-800 truncate text-left hover:text-[#0E4268] hover:bg-stone-50 rounded px-1 py-0.5 -mx-1 transition-all flex-1 min-w-0 flex items-center gap-1"
+                title="Click to rename"
+                aria-label="Rename document"
               >
-                <MoreVertical size={14} />
+                <span className="truncate">{group.title}</span>
+                <Pencil
+                  size={10}
+                  className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[#0E4268]"
+                />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={handleUpload}>
-                <Upload size={14} className="mr-2" />
-                Upload
-              </DropdownMenuItem>
-              <DropdownMenuItem>Rename</DropdownMenuItem>
-              <DropdownMenuItem>Download</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {group.hasChanges && (
+              <span
+                className="size-1.5 rounded-full bg-blue-500"
+                title="Recently updated"
+              />
+            )}
+            {isPending ? (
+              <span className="px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded whitespace-nowrap">
+                Pending Review
+              </span>
+            ) : totalPages > 0 ? (
+              <span className="px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded flex items-center gap-0.5">
+                <Check size={10} strokeWidth={3} />
+                Ready
+              </span>
+            ) : null}
+          </div>
+        </div>
+        {/* File Type Display - uppercase with tracking */}
+        <div className="text-[9px] text-stone-400 uppercase tracking-wide font-medium">
+          {displayType}
         </div>
       </div>
 
-      {/* Card Content - Page Preview (smaller) */}
-      <div className="flex-1 p-3 bg-stone-50/50 min-h-[140px] flex items-center justify-center">
+      {/* Card Content - Page Preview (A4 ratio) */}
+      <div className="flex-1 relative bg-stone-50 flex items-center justify-center overflow-hidden min-h-0">
         {totalPages > 0 && currentFile ? (
-          <div className="w-full">
-            {/* Document Preview with color */}
-            <div
-              className={cn(
-                "aspect-[4/3] rounded border border-stone-200 shadow-sm p-3 relative",
-                currentPageColor?.bg || "bg-white",
-              )}
-            >
-              <div className="space-y-1.5">
-                <div className="h-1.5 bg-white/60 rounded w-3/4" />
-                <div className="h-1.5 bg-white/60 rounded w-full" />
-                <div className="h-1.5 bg-white/60 rounded w-5/6" />
-                <div className="h-1.5 bg-white/40 rounded w-full mt-3" />
-                <div className="h-1.5 bg-white/60 rounded w-2/3" />
-              </div>
-              {/* Page Number */}
-              <div className="absolute bottom-1.5 right-1.5 text-[9px] font-medium text-stone-600 bg-white/80 px-1 py-0.5 rounded tabular-nums">
-                {currentPageIndex + 1}/{totalPages}
-              </div>
-              {/* New Badge */}
-              {currentFile.isNew && (
-                <div className="absolute top-1.5 left-1.5 px-1 py-0.5 bg-emerald-500 text-white text-[8px] font-bold rounded">
-                  NEW
+          <>
+            <div className="w-full h-full p-2 flex items-center justify-center">
+              <div className="h-full aspect-[1/1.414] rounded border border-stone-200 shadow-sm p-2 relative bg-white">
+                <DocumentPreviewContent size="sm" />
+
+                {/* New page indicator on current preview */}
+                {currentFile.isNew && (
+                  <div className="absolute top-1 right-1">
+                    <div className="size-1.5 rounded-full bg-blue-500" />
+                  </div>
+                )}
+
+                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-medium text-stone-600 bg-stone-50 px-1.5 py-0.5 rounded tabular-nums">
+                  {currentPageIndex + 1}/{totalPages}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
+
+            <motion.button
+              onClick={handlePrev}
+              disabled={currentPageIndex === 0}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: isHovered && currentPageIndex > 0 ? 1 : 0 }}
+              transition={{ duration: 0.2 }}
+              className={cn(
+                "absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 shadow-md transition-colors z-10",
+                currentPageIndex === 0
+                  ? "cursor-not-allowed text-stone-300"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white",
+              )}
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={14} />
+            </motion.button>
+
+            <motion.button
+              onClick={handleNext}
+              disabled={currentPageIndex >= totalPages - 1}
+              initial={{ opacity: 0 }}
+              animate={{
+                opacity: isHovered && currentPageIndex < totalPages - 1 ? 1 : 0,
+              }}
+              transition={{ duration: 0.2 }}
+              className={cn(
+                "absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 shadow-md transition-colors z-10",
+                currentPageIndex >= totalPages - 1
+                  ? "cursor-not-allowed text-stone-300"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white",
+              )}
+              aria-label="Next page"
+            >
+              <ChevronRight size={14} />
+            </motion.button>
+          </>
         ) : (
           <div className="text-center">
-            <Inbox size={24} className="mx-auto mb-1.5 text-stone-300" />
-            <p className="text-xs text-stone-400">No files</p>
-            <p className="text-[10px] text-stone-300 mt-0.5">Drop files here</p>
+            <Inbox size={18} className="mx-auto mb-1 text-stone-300" />
+            <p className="text-[10px] text-stone-400">No files</p>
+            <p className="text-[9px] text-stone-300 mt-0.5">Drop files here</p>
+          </div>
+        )}
+
+        {/* Native file drag overlay */}
+        {isFileDragOver && (
+          <div className="absolute inset-0 bg-[#0E4268]/10 flex items-center justify-center z-20 pointer-events-none">
+            <div className="bg-white/95 rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
+              <FilePlus size={16} className="text-[#0E4268]" />
+              <span className="text-sm font-medium text-[#0E4268]">
+                Drop to upload
+              </span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Card Footer - Navigation */}
-      <div className="px-3 py-1.5 border-t border-stone-100 flex items-center justify-between bg-white">
+      {/* Card Footer */}
+      <div className="px-2 py-1.5 border-t border-stone-100 flex items-center gap-1 bg-white shrink-0">
         <button
-          onClick={handlePrev}
-          disabled={currentPageIndex === 0 || totalPages === 0}
-          className={cn(
-            "p-1 rounded transition-colors",
-            currentPageIndex === 0 || totalPages === 0
-              ? "text-stone-200 cursor-not-allowed"
-              : "text-stone-500 hover:text-stone-700 hover:bg-stone-100",
-          )}
-          aria-label="Previous page"
+          onClick={handleUpload}
+          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors flex-1 justify-center"
+          aria-label="Add files to category"
         >
-          <ChevronLeft size={16} />
+          <FilePlus size={11} />
+          <span>Add</span>
         </button>
 
-        <span className="text-[11px] text-stone-400 tabular-nums">
-          {totalPages > 0 ? `${totalPages} pages` : "Empty"}
-        </span>
-
-        <button
-          onClick={handleNext}
-          disabled={currentPageIndex >= totalPages - 1 || totalPages === 0}
-          className={cn(
-            "p-1 rounded transition-colors",
-            currentPageIndex >= totalPages - 1 || totalPages === 0
-              ? "text-stone-200 cursor-not-allowed"
-              : "text-stone-500 hover:text-stone-700 hover:bg-stone-100",
-          )}
-          aria-label="Next page"
-        >
-          <ChevronRight size={16} />
-        </button>
+        {/* Confirm / Download - mutually exclusive */}
+        {isPending ? (
+          <button
+            onClick={handleConfirm}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors flex-1 justify-center"
+            aria-label="Confirm review"
+          >
+            <Check size={11} />
+            <span>Confirm</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleDownload}
+            disabled={totalPages === 0}
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors flex-1 justify-center",
+              totalPages === 0
+                ? "text-stone-300 cursor-not-allowed"
+                : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
+            )}
+            aria-label="Download category"
+          >
+            <Download size={11} />
+            <span>Download</span>
+          </button>
+        )}
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// ADD CATEGORY CARD (smaller)
+// ADD CATEGORY CARD
 // ============================================================================
-const AddCategoryCard = ({ onAdd }: { onAdd: (name: string) => void }) => {
+const AddCategoryCard = ({
+  onAdd,
+  existingGroups,
+}: {
+  onAdd: (name: string) => void;
+  existingGroups: DocumentGroup[];
+}) => {
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const [droppedFileCount, setDroppedFileCount] = useState(0);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
+  const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const documentGroups = useCaseDetailStore((state) => state.documentGroups);
+
+  // Track if we're receiving an internal page drag (from react-dnd)
+  const [pendingPageMove, setPendingPageMove] = useState<string | null>(null);
+
+  // react-dnd drop handler for internal page drags
+  const [{ isOver: isInternalDragOver }, drop] = useDrop<
+    { id: string; groupId: string },
+    void,
+    { isOver: boolean }
+  >(
+    () => ({
+      accept: ItemTypes.PAGE,
+      drop: (item) => {
+        // Store the file id, show category picker to choose destination
+        setPendingPageMove(item.id);
+        setShowCategoryPicker(true);
+      },
+      collect: (monitor) => ({ isOver: monitor.isOver() }),
+    }),
+    [moveFileToGroup],
+  );
+
+  const handleAddCategory = (baseName: string) => {
+    const uniqueName = generateUniqueName(baseName, existingGroups);
+    onAdd(uniqueName);
+  };
+
+  const handleAddCategoryWithFiles = (baseName: string) => {
+    const uniqueName = generateUniqueName(baseName, existingGroups);
+    onAdd(uniqueName);
+    // After adding category, either upload files or move page
+    // Use setTimeout to let state update first, then find the new group
+    setTimeout(() => {
+      // Find the newly created group by title
+      const newGroup = useCaseDetailStore
+        .getState()
+        .documentGroups.find((g) => g.title === uniqueName);
+      if (newGroup) {
+        if (pendingPageMove) {
+          // Move existing page to new category
+          moveFileToGroup(pendingPageMove, newGroup.id);
+          setPendingPageMove(null);
+        } else if (droppedFileCount > 0) {
+          // Upload new files to category
+          uploadToGroup(newGroup.id, droppedFileCount);
+          setDroppedFileCount(0);
+        }
+      }
+      setShowCategoryPicker(false);
+    }, 50);
+  };
+
+  // Handle native file drag and drop (only for files from OS, not react-dnd)
+  const handleNativeDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      setIsFileDragOver(true);
+    }
+  };
+
+  const handleNativeDragLeave = (e: React.DragEvent) => {
+    if (!isFileDragOver) return;
+
+    const rect = cardRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        setIsFileDragOver(false);
+      }
+    }
+  };
+
+  const handleNativeDrop = (e: React.DragEvent) => {
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      e.preventDefault();
+      setIsFileDragOver(false);
+      setDroppedFileCount(files.length);
+      setShowCategoryPicker(true);
+    }
+  };
+
+  // Combine refs for both react-dnd and native drag
+  const setRefs = (el: HTMLDivElement | null) => {
+    cardRef.current = el;
+    drop(el);
+  };
+
+  const isDragOver = isFileDragOver || isInternalDragOver;
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="h-full min-h-[220px] bg-white rounded-xl border-2 border-dashed border-stone-200 hover:border-stone-300 hover:bg-stone-50/50 flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer group">
-          <div className="size-10 rounded-xl bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center transition-colors">
-            <Plus size={20} className="text-stone-400" />
+    <>
+      <div
+        ref={setRefs}
+        onDragOver={handleNativeDragOver}
+        onDragLeave={handleNativeDragLeave}
+        onDrop={handleNativeDrop}
+        className="relative"
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                "w-full h-full bg-white rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer group",
+                isDragOver
+                  ? "border-[#0E4268] bg-[#0E4268]/5 scale-[1.02]"
+                  : "border-stone-200 hover:border-stone-300 hover:bg-stone-50/50",
+              )}
+            >
+              {isDragOver ? (
+                <>
+                  <div className="size-8 rounded-xl bg-[#0E4268]/10 flex items-center justify-center">
+                    <FilePlus size={16} className="text-[#0E4268]" />
+                  </div>
+                  <span className="text-xs font-medium text-[#0E4268]">
+                    Drop to create category
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="size-8 rounded-xl bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center transition-colors">
+                    <Plus size={16} className="text-stone-400" />
+                  </div>
+                  <span className="text-xs font-medium text-stone-500">
+                    Add Category
+                  </span>
+                </>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-48">
+            <DropdownMenuLabel>Add Category</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleAddCategory("Passport")}>
+              Passport
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleAddCategory("Bank Statement")}
+            >
+              Bank Statement
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddCategory("Utility Bill")}>
+              Utility Bill
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleAddCategory("Employment Letter")}
+            >
+              Employment Letter
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleAddCategory("Other Documents")}
+            >
+              Other Documents
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Category picker dialog after file drop */}
+      <AnimatePresence>
+        {showCategoryPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="bg-white rounded-xl shadow-xl p-4 w-64"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-stone-800">
+                  Select Category
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowCategoryPicker(false);
+                    setDroppedFileCount(0);
+                    setPendingPageMove(null);
+                  }}
+                  className="p-1 text-stone-400 hover:text-stone-600 rounded transition-colors"
+                  aria-label="Close"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <p className="text-xs text-stone-500 mb-3">
+                {pendingPageMove
+                  ? "Page will be moved to the new category"
+                  : `${droppedFileCount} file${droppedFileCount > 1 ? "s" : ""} will be added to the new category`}
+              </p>
+              <div className="space-y-1">
+                {[
+                  "Passport",
+                  "Bank Statement",
+                  "Utility Bill",
+                  "Employment Letter",
+                  "Other Documents",
+                ].map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => handleAddCategoryWithFiles(category)}
+                    className="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
           </div>
-          <span className="text-sm font-medium text-stone-500">
-            Add Category
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" className="w-48">
-        <DropdownMenuLabel>Add Category</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onAdd("Passport")}>
-          Passport
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onAdd("Bank Statement")}>
-          Bank Statement
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onAdd("Utility Bill")}>
-          Utility Bill
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onAdd("Employment Letter")}>
-          Employment Letter
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onAdd("Other Documents")}>
-          Other Documents
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
@@ -636,24 +1076,71 @@ const AddCategoryCard = ({ onAdd }: { onAdd: (name: string) => void }) => {
 // EMPTY STATE
 // ============================================================================
 const EmptyState = ({ onUpload }: { onUpload: () => void }) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      onUpload();
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="size-16 rounded-2xl bg-stone-100 flex items-center justify-center mb-4">
-        <FileText size={32} className="text-stone-300" />
-      </div>
-      <h3 className="text-lg font-semibold text-stone-800 mb-2 text-balance">
-        No documents yet
-      </h3>
-      <p className="text-sm text-stone-500 text-center max-w-sm mb-6 text-pretty">
-        Upload documents to organize them into categories for your application.
-      </p>
-      <button
+      {/* Upload drop zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         onClick={onUpload}
-        className="flex items-center gap-2 px-5 py-2.5 bg-[#0E4268] text-white text-sm font-medium rounded-xl hover:bg-[#0a3555] transition-colors"
+        className={cn(
+          "w-full max-w-md aspect-[4/3] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-4 cursor-pointer transition-all",
+          isDragOver
+            ? "border-[#0E4268] bg-[#0E4268]/5 scale-[1.02]"
+            : "border-stone-200 hover:border-stone-300 hover:bg-stone-50",
+        )}
       >
-        <Upload size={16} />
-        Upload Documents
-      </button>
+        <div
+          className={cn(
+            "size-14 rounded-2xl flex items-center justify-center transition-colors",
+            isDragOver ? "bg-[#0E4268]/10" : "bg-stone-100",
+          )}
+        >
+          <FilePlus
+            size={28}
+            className={cn(
+              "transition-colors",
+              isDragOver ? "text-[#0E4268]" : "text-stone-400",
+            )}
+          />
+        </div>
+        <div className="text-center">
+          <p
+            className={cn(
+              "text-sm font-medium mb-1",
+              isDragOver ? "text-[#0E4268]" : "text-stone-600",
+            )}
+          >
+            {isDragOver ? "Drop files here" : "No documents yet"}
+          </p>
+          <p className="text-xs text-stone-400">
+            Drag and drop files or click to upload
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -681,10 +1168,7 @@ export function FileHubContent() {
     (state) => state.addDocumentGroup,
   );
 
-  // Review modal state
   const [reviewGroup, setReviewGroup] = useState<DocumentGroup | null>(null);
-
-  // Single page preview state
   const [previewPage, setPreviewPage] = useState<{
     file: DocumentFile;
     index: number;
@@ -697,8 +1181,7 @@ export function FileHubContent() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col bg-stone-50">
-        <FileHubHeader groups={groups} />
+      <div className="min-h-full flex flex-col bg-stone-50">
         <LoadingState />
       </div>
     );
@@ -708,26 +1191,16 @@ export function FileHubContent() {
 
   if (!hasAnyFiles && classifiedGroups.length === 0) {
     return (
-      <div className="h-full flex flex-col bg-stone-50">
-        <FileHubHeader groups={groups} />
-        <UploadArea
-          unclassifiedFiles={[]}
-          allGroups={groups}
-          onUpload={uploadDocuments}
-          onPreviewPage={() => {}}
-        />
+      <div className="min-h-full flex flex-col bg-stone-50">
         <EmptyState onUpload={uploadDocuments} />
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-stone-50">
-      {/* Header */}
-      <FileHubHeader groups={groups} />
-
-      {/* Upload Area with Unclassified Preview */}
-      <UploadArea
+    <div className="min-h-full flex flex-col bg-stone-50">
+      {/* Toolbar: Upload button + Unclassified tray in one row */}
+      <DocumentsToolbar
         unclassifiedFiles={unclassifiedFiles}
         allGroups={groups}
         onUpload={uploadDocuments}
@@ -735,8 +1208,11 @@ export function FileHubContent() {
       />
 
       {/* Category Grid */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="flex-1 p-4">
+        <div
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+          style={{ gridAutoRows: "360px" }}
+        >
           {classifiedGroups.map((group) => (
             <CategoryCard
               key={group.id}
@@ -746,12 +1222,13 @@ export function FileHubContent() {
             />
           ))}
 
-          {/* Add Category Card */}
-          <AddCategoryCard onAdd={addDocumentGroup} />
+          <AddCategoryCard
+            onAdd={addDocumentGroup}
+            existingGroups={classifiedGroups}
+          />
         </div>
       </div>
 
-      {/* Review Modal */}
       <AnimatePresence>
         {reviewGroup && (
           <CategoryReviewModal
@@ -762,7 +1239,6 @@ export function FileHubContent() {
         )}
       </AnimatePresence>
 
-      {/* Single Page Preview Modal */}
       <AnimatePresence>
         {previewPage && (
           <SinglePagePreviewModal

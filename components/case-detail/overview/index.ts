@@ -1,5 +1,4 @@
 export { OverviewPage } from './OverviewPage';
-export { ClientProfileCard } from './ClientProfileCard';
-export { VisaTypeSelector } from './VisaTypeSelector';
+export { CaseProfileCard } from './CaseProfileCard';
 export { FileUploadZone } from './FileUploadZone';
-export { ProgressDashboard } from './ProgressDashboard';
+export { ApplicationCard } from './ApplicationCard';

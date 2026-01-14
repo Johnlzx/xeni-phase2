@@ -1,2 +1,2 @@
-export { CategoryReviewModal, getPageColor } from "./CategoryReviewModal";
+export { CategoryReviewModal } from "./CategoryReviewModal";
 export type { CategoryReviewModalProps } from "./CategoryReviewModal";

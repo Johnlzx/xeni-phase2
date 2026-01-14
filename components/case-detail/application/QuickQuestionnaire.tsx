@@ -1,25 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect, useRef } from "react";
+import { motion } from "motion/react";
 import {
-  ChevronRight,
-  ChevronLeft,
   Check,
   Sparkles,
   FileText,
   User,
   Briefcase,
-  Calendar,
   MapPin,
   GraduationCap,
   Building2,
   Plane,
   Heart,
-  Clock,
   AlertCircle,
   CheckCircle2,
-  ArrowRight,
   X,
   FolderOpen,
   Files,
@@ -62,6 +57,7 @@ interface QuickQuestionnaireProps {
   onNavigateToDocuments?: () => void;
   analyzedDocuments?: AnalyzedDocument[];
   isInline?: boolean;
+  hideHeader?: boolean;
 }
 
 // Questions configuration based on visa type
@@ -334,34 +330,7 @@ const getQuestionsForVisa = (visaType: VisaType): Question[] => {
   return [...baseQuestions, ...(visaSpecificQuestions[visaType] || [])];
 };
 
-// Progress indicator component
-const ProgressIndicator = ({
-  current,
-  total,
-}: {
-  current: number;
-  total: number;
-}) => {
-  const progress = ((current + 1) / total) * 100;
-
-  return (
-    <div className="flex items-center gap-4">
-      <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full bg-[#0E4268] rounded-full"
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-        />
-      </div>
-      <span className="text-sm font-medium text-stone-500 tabular-nums">
-        {current + 1}/{total}
-      </span>
-    </div>
-  );
-};
-
-// Option button component
+// Option button component (compact for scrollable form)
 const OptionButton = ({
   option,
   isSelected,
@@ -379,57 +348,55 @@ const OptionButton = ({
   const Icon = option.icon;
 
   return (
-    <motion.button
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+    <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all",
+        "w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors",
         isSelected
-          ? "border-[#0E4268] bg-[#0E4268]/5 shadow-md"
-          : "border-stone-200 bg-white hover:border-stone-300 hover:shadow-sm",
+          ? "border-[#0E4268] bg-[#0E4268]/5"
+          : "border-stone-200 bg-white hover:border-stone-300",
       )}
     >
       {Icon && (
         <div
           className={cn(
-            "size-10 rounded-lg flex items-center justify-center",
+            "size-8 rounded-lg flex items-center justify-center shrink-0",
             isSelected
               ? "bg-[#0E4268] text-white"
               : "bg-stone-100 text-stone-500",
           )}
         >
-          <Icon size={20} />
+          <Icon size={16} />
         </div>
       )}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <p
           className={cn(
-            "font-medium text-balance",
+            "text-sm font-medium text-balance",
             isSelected ? "text-[#0E4268]" : "text-stone-800",
           )}
         >
           {option.label}
         </p>
         {option.description && (
-          <p className="text-sm text-stone-500 mt-0.5 text-pretty">
+          <p className="text-xs text-stone-500 mt-0.5 text-pretty">
             {option.description}
           </p>
         )}
       </div>
       <div
         className={cn(
-          "size-5 rounded-full border-2 flex items-center justify-center",
+          "size-4 rounded-full border-2 flex items-center justify-center shrink-0",
           isSelected ? "border-[#0E4268] bg-[#0E4268]" : "border-stone-300",
         )}
       >
-        {isSelected && <Check size={12} className="text-white" />}
+        {isSelected && <Check size={10} className="text-white" />}
       </div>
-    </motion.button>
+    </button>
   );
 };
 
-// Extracted value hint component
+// Extracted value hint component (compact)
 const ExtractedHint = ({
   value,
   source,
@@ -438,18 +405,69 @@ const ExtractedHint = ({
   source: string;
 }) => {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg mb-4"
-    >
-      <FileText size={14} className="text-emerald-600" />
-      <span className="text-sm text-emerald-700 text-pretty">
-        <span className="font-medium">Extracted from {source}:</span> {value}
+    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg mb-3">
+      <FileText size={12} className="text-emerald-600 shrink-0" />
+      <span className="text-xs text-emerald-700 text-pretty">
+        <span className="font-medium">From {source}:</span> {value}
       </span>
-      <CheckCircle2 size={14} className="text-emerald-500 ml-auto" />
-    </motion.div>
+      <CheckCircle2 size={12} className="text-emerald-500 ml-auto shrink-0" />
+    </div>
+  );
+};
+
+// Single question section component
+const QuestionSection = ({
+  question,
+  index,
+  answer,
+  onAnswer,
+}: {
+  question: Question;
+  index: number;
+  answer: unknown;
+  onAnswer: (value: unknown) => void;
+}) => {
+  return (
+    <div className="py-6 border-b border-stone-100 last:border-b-0">
+      {/* Extracted value hint */}
+      {question.extractedValue && (
+        <ExtractedHint
+          value={question.extractedValue}
+          source={question.extractedFrom || "documents"}
+        />
+      )}
+
+      {/* Question header */}
+      <div className="flex items-start gap-3 mb-4">
+        <span className="flex items-center justify-center size-6 rounded-full bg-stone-100 text-stone-600 text-xs font-medium shrink-0 tabular-nums">
+          {index + 1}
+        </span>
+        <div className="flex-1">
+          <h3 className="text-base font-semibold text-stone-900 text-balance">
+            {question.question}
+          </h3>
+          {question.description && (
+            <p className="text-sm text-stone-500 mt-1 text-pretty">
+              {question.description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Options */}
+      {question.type === "single" && question.options && (
+        <div className="space-y-2 pl-9">
+          {question.options.map((option) => (
+            <OptionButton
+              key={option.id}
+              option={option}
+              isSelected={answer === option.id}
+              onClick={() => onAnswer(option.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -473,18 +491,9 @@ const GeneratingChecklist = () => {
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <div className="size-16 rounded-full border-4 border-[#0E4268]/20 border-t-[#0E4268] animate-spin mb-6" />
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={currentItem}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-          className="text-lg font-medium text-stone-700 text-balance"
-        >
-          {items[currentItem]}
-        </motion.p>
-      </AnimatePresence>
+      <p className="text-lg font-medium text-stone-700 text-balance">
+        {items[currentItem]}
+      </p>
       <p className="text-sm text-stone-400 mt-2 text-pretty">
         This won't take long
       </p>
@@ -511,34 +520,28 @@ export function QuickQuestionnaire({
   onNavigateToDocuments,
   analyzedDocuments = MOCK_ANALYZED_DOCUMENTS,
   isInline = false,
+  hideHeader = false,
 }: QuickQuestionnaireProps) {
   const questions = getQuestionsForVisa(visaType);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const currentQuestion = questions[currentIndex];
-  const isLastQuestion = currentIndex === questions.length - 1;
-  const canProceed = answers[currentQuestion.id] !== undefined;
+  // Count answered questions
+  const answeredCount = Object.keys(answers).length;
+  const totalCount = questions.length;
+  const allAnswered = answeredCount === totalCount;
 
-  const handleAnswer = (value: unknown) => {
-    setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+  const handleAnswer = (questionId: string, value: unknown) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const handleNext = () => {
-    if (isLastQuestion) {
+  const handleSubmit = () => {
+    if (allAnswered) {
       setIsGenerating(true);
       setTimeout(() => {
         onComplete(answers);
       }, 4000);
-    } else {
-      setCurrentIndex((prev) => prev + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
     }
   };
 
@@ -546,10 +549,8 @@ export function QuickQuestionnaire({
   if (isGenerating) {
     if (isInline) {
       return (
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
-            <GeneratingChecklist />
-          </div>
+        <div className="flex-1 flex items-center justify-center bg-stone-50">
+          <GeneratingChecklist />
         </div>
       );
     }
@@ -567,167 +568,101 @@ export function QuickQuestionnaire({
     );
   }
 
-  // Inline questionnaire content
-  const questionnaireContent = (
-    <>
-      {/* Document Analysis Info */}
-      <div className="px-6 py-3 bg-stone-50 border-b border-stone-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <Files size={14} className="text-stone-500" />
-              <span className="text-xs font-medium text-stone-600">
-                {analyzedDocuments.length} documents analyzed
-              </span>
+  // Inline mode - scrollable form
+  if (isInline) {
+    return (
+      <div className="flex-1 flex flex-col bg-stone-50">
+        {/* Scrollable content */}
+        <div ref={scrollRef} className="flex-1 overflow-auto">
+          <div className="max-w-2xl mx-auto px-6 py-8">
+            {/* Form header */}
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-stone-900 text-balance">
+                Case Assessment
+              </h2>
+              <p className="text-sm text-stone-500 mt-1 text-pretty">
+                Answer these questions to generate your application checklist
+              </p>
             </div>
-            <div className="flex items-center gap-1">
-              {analyzedDocuments.slice(0, 3).map((doc) => (
-                <span
-                  key={doc.id}
-                  className="px-2 py-0.5 bg-white border border-stone-200 rounded text-[10px] text-stone-600 truncate max-w-[100px]"
-                  title={doc.name}
-                >
-                  {doc.type}
-                </span>
-              ))}
-              {analyzedDocuments.length > 3 && (
-                <span className="px-2 py-0.5 bg-stone-100 rounded text-[10px] text-stone-500">
-                  +{analyzedDocuments.length - 3}
-                </span>
+
+            {/* Progress summary */}
+            <div className="flex items-center gap-3 mb-6 p-3 bg-white rounded-lg border border-stone-200">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm font-medium text-stone-700">
+                    Progress
+                  </span>
+                  <span className="text-xs text-stone-500 tabular-nums">
+                    {answeredCount} of {totalCount} answered
+                  </span>
+                </div>
+                <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#0E4268] rounded-full transition-all duration-200"
+                    style={{
+                      width: `${(answeredCount / totalCount) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              {allAnswered && (
+                <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
               )}
             </div>
-          </div>
-          {onNavigateToDocuments && (
-            <button
-              onClick={onNavigateToDocuments}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#0E4268] hover:bg-[#0E4268]/5 rounded-lg transition-colors"
-            >
-              <FolderOpen size={14} />
-              Review / Upload
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Progress */}
-      <div className="px-6 py-3 border-b border-stone-100">
-        <ProgressIndicator current={currentIndex} total={questions.length} />
-      </div>
-
-      {/* Question content */}
-      <div className="p-6">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentQuestion.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {/* Extracted value hint */}
-            {currentQuestion.extractedValue && (
-              <ExtractedHint
-                value={currentQuestion.extractedValue}
-                source={currentQuestion.extractedFrom || "documents"}
-              />
-            )}
-
-            {/* Question */}
-            <h3 className="text-xl font-semibold text-stone-900 mb-2 text-balance">
-              {currentQuestion.question}
-            </h3>
-            {currentQuestion.description && (
-              <p className="text-sm text-stone-500 mb-6 text-pretty">
-                {currentQuestion.description}
-              </p>
-            )}
-
-            {/* Options */}
-            {currentQuestion.type === "single" && currentQuestion.options && (
-              <div className="space-y-3">
-                {currentQuestion.options.map((option) => (
-                  <OptionButton
-                    key={option.id}
-                    option={option}
-                    isSelected={answers[currentQuestion.id] === option.id}
-                    onClick={() => handleAnswer(option.id)}
+            {/* Questions */}
+            <div className="bg-white rounded-xl border border-stone-200">
+              <div className="px-5">
+                {questions.map((question, index) => (
+                  <QuestionSection
+                    key={question.id}
+                    question={question}
+                    index={index}
+                    answer={answers[question.id]}
+                    onAnswer={(value) => handleAnswer(question.id, value)}
                   />
                 ))}
               </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+            </div>
 
-      {/* Footer */}
-      <div className="px-6 py-4 bg-stone-50 border-t border-stone-100 flex items-center justify-between">
-        <button
-          onClick={handleBack}
-          disabled={currentIndex === 0}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all",
-            currentIndex === 0
-              ? "text-stone-300 cursor-not-allowed"
-              : "text-stone-600 hover:bg-stone-200",
-          )}
-        >
-          <ChevronLeft size={18} />
-          Back
-        </button>
-
-        <button
-          onClick={handleNext}
-          disabled={!canProceed}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all",
-            canProceed
-              ? "bg-[#0E4268] text-white hover:bg-[#0a3555] shadow-lg shadow-[#0E4268]/20"
-              : "bg-stone-200 text-stone-400 cursor-not-allowed",
-          )}
-        >
-          {isLastQuestion ? (
-            <>
-              Generate Checklist
-              <Sparkles size={16} />
-            </>
-          ) : (
-            <>
-              Continue
-              <ChevronRight size={18} />
-            </>
-          )}
-        </button>
-      </div>
-    </>
-  );
-
-  // Inline mode - render as part of page
-  if (isInline) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="w-full max-w-xl bg-white rounded-2xl shadow-lg overflow-hidden"
-        >
-          {questionnaireContent}
-        </motion.div>
+            {/* Submit button */}
+            <div className="mt-6 pb-4">
+              <button
+                onClick={handleSubmit}
+                disabled={!allAnswered}
+                className={cn(
+                  "w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-colors",
+                  allAnswered
+                    ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
+                    : "bg-stone-200 text-stone-400 cursor-not-allowed",
+                )}
+              >
+                <Sparkles size={18} />
+                Generate Checklist
+              </button>
+              {!allAnswered && (
+                <p className="text-xs text-stone-500 text-center mt-2">
+                  Answer all questions to continue
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Modal mode (legacy)
+  // Modal mode (legacy - keep for backward compatibility)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-xl bg-[#0E4268] flex items-center justify-center">
               <Sparkles size={18} className="text-white" />
@@ -737,7 +672,7 @@ export function QuickQuestionnaire({
                 Case Assessment
               </h2>
               <p className="text-xs text-stone-500">
-                Quick questions about your client's situation
+                {answeredCount} of {totalCount} answered
               </p>
             </div>
           </div>
@@ -750,7 +685,62 @@ export function QuickQuestionnaire({
           </button>
         </div>
 
-        {questionnaireContent}
+        {/* Document Analysis Info */}
+        {!hideHeader && (
+          <div className="px-6 py-3 bg-stone-50 border-b border-stone-100 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Files size={14} className="text-stone-500" />
+                  <span className="text-xs font-medium text-stone-600">
+                    {analyzedDocuments.length} documents analyzed
+                  </span>
+                </div>
+              </div>
+              {onNavigateToDocuments && (
+                <button
+                  onClick={onNavigateToDocuments}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#0E4268] hover:bg-[#0E4268]/5 rounded-lg transition-colors"
+                >
+                  <FolderOpen size={14} />
+                  Review / Upload
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Scrollable questions */}
+        <div className="flex-1 overflow-auto">
+          <div className="px-5">
+            {questions.map((question, index) => (
+              <QuestionSection
+                key={question.id}
+                question={question}
+                index={index}
+                answer={answers[question.id]}
+                onAnswer={(value) => handleAnswer(question.id, value)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-stone-50 border-t border-stone-100 shrink-0">
+          <button
+            onClick={handleSubmit}
+            disabled={!allAnswered}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-colors",
+              allAnswered
+                ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
+                : "bg-stone-200 text-stone-400 cursor-not-allowed",
+            )}
+          >
+            <Sparkles size={18} />
+            Generate Checklist
+          </button>
+        </div>
       </motion.div>
     </div>
   );

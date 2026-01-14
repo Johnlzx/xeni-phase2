@@ -1,46 +1,41 @@
 "use client";
 
-import { ClientProfileCard } from "./ClientProfileCard";
-import { VisaTypeSelector } from "./VisaTypeSelector";
+import { useState } from "react";
+import { CaseProfileCard } from "./CaseProfileCard";
 import { FileUploadZone } from "./FileUploadZone";
-import { ProgressDashboard } from "./ProgressDashboard";
-import { DynamicChecklist } from "../checklist/DynamicChecklist";
-import { DemoControls } from "./DemoControls";
+import { ApplicationCard } from "./ApplicationCard";
+import { VisaTypeDialog } from "./ApplicationCard/VisaTypeDialog";
 
 export function OverviewPage() {
+  const [visaDialogOpen, setVisaDialogOpen] = useState(false);
+
+  const handleOpenVisaDialog = () => {
+    setVisaDialogOpen(true);
+  };
+
   return (
-    <div className="h-full overflow-auto">
-      <div className="max-w-7xl mx-auto p-4 space-y-4">
-        {/* First Viewport Section - Profile, Documents, Dashboard */}
-        <div className="min-h-0">
-          {/* Top Section - Three Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-            {/* Left Column - Profile */}
-            <div className="lg:col-span-5">
-              <ClientProfileCard />
-            </div>
+    <div className="h-full overflow-y-auto scrollbar-hide">
+      <div className="max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
+        {/* Top Section - Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[320px]">
+          {/* Left Column - Case Profile */}
+          <CaseProfileCard onOpenVisaDialog={handleOpenVisaDialog} />
 
-            {/* Middle Column - Visa Type */}
-            <div className="lg:col-span-3">
-              <VisaTypeSelector />
-            </div>
-
-            {/* Right Column - File Upload */}
-            <div className="lg:col-span-4">
-              <FileUploadZone />
-            </div>
-          </div>
-
-          {/* Dashboard Section */}
-          <ProgressDashboard />
+          {/* Right Column - Document Hub */}
+          <FileUploadZone />
         </div>
 
-        {/* Bottom Section - Dynamic Checklist (scrollable) */}
-        <DynamicChecklist />
+        {/* Application Section - Full Width */}
+        <div className="min-h-[360px]">
+          <ApplicationCard
+            onOpenVisaDialog={handleOpenVisaDialog}
+            className="h-full"
+          />
+        </div>
       </div>
 
-      {/* Demo Controls - Floating Panel */}
-      <DemoControls />
+      {/* Shared Visa Type Dialog */}
+      <VisaTypeDialog open={visaDialogOpen} onOpenChange={setVisaDialogOpen} />
     </div>
   );
 }

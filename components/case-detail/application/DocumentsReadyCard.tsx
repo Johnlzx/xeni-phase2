@@ -49,11 +49,13 @@ const CategoryBadge = ({
 interface DocumentsReadyCardProps {
   variant?: "full" | "compact" | "inline";
   className?: string;
+  isAnalyzing?: boolean;
 }
 
 export function DocumentsReadyCard({
   variant = "full",
   className,
+  isAnalyzing = false,
 }: DocumentsReadyCardProps) {
   const documentGroups = useDocumentGroups();
   const setActiveNav = useCaseDetailStore((state) => state.setActiveNav);
@@ -99,47 +101,73 @@ export function DocumentsReadyCard({
     return (
       <div
         className={cn(
-          "flex items-center gap-4 px-4 py-3 bg-stone-50 border-b border-stone-200",
+          "flex items-center gap-4 px-6 py-3 border-b border-stone-200",
+          isAnalyzing ? "bg-blue-50" : "bg-stone-50",
           className,
         )}
       >
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-[#0E4268]/10">
-            <FileText size={14} className="text-[#0E4268]" />
+          <div
+            className={cn(
+              "p-1.5 rounded-lg",
+              isAnalyzing ? "bg-blue-100" : "bg-[#0E4268]/10",
+            )}
+          >
+            {isAnalyzing ? (
+              <div className="size-3.5 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin" />
+            ) : (
+              <FileText size={14} className="text-[#0E4268]" />
+            )}
           </div>
           <div className="text-sm">
-            <span className="text-stone-600">Evidence from </span>
-            <span className="font-medium text-stone-800 tabular-nums">
-              {totalFiles} documents
-            </span>
-            <span className="text-stone-400 mx-1.5">·</span>
-            <span className="font-medium text-stone-800 tabular-nums">
-              {totalPages} pages
-            </span>
+            {isAnalyzing ? (
+              <span className="text-blue-700 font-medium">
+                Analyzing {totalFiles} documents...
+              </span>
+            ) : (
+              <>
+                <span className="text-stone-600">Information from </span>
+                <span className="font-medium text-stone-800 tabular-nums">
+                  {totalFiles} documents
+                </span>
+                <span className="text-stone-400 mx-1.5">·</span>
+                <span className="font-medium text-stone-800 tabular-nums">
+                  {totalPages} pages
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {readyGroups.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">
-              <CheckCircle2 size={10} />
-              {readyGroups.length} verified
-            </span>
-          )}
-          {pendingGroups.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700">
-              <Clock size={10} />
-              {pendingGroups.length} pending
-            </span>
-          )}
-        </div>
+        {!isAnalyzing && (
+          <div className="flex items-center gap-2">
+            {readyGroups.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">
+                <CheckCircle2 size={10} />
+                {readyGroups.length} verified
+              </span>
+            )}
+            {pendingGroups.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700">
+                <Clock size={10} />
+                {pendingGroups.length} pending
+              </span>
+            )}
+          </div>
+        )}
 
-        <button
-          onClick={handleNavigateToDocuments}
-          className="ml-auto text-xs font-medium text-[#0E4268] hover:underline"
-        >
-          Manage documents
-        </button>
+        {isAnalyzing ? (
+          <span className="ml-auto text-xs text-blue-600">
+            Extracting data for auto-fill
+          </span>
+        ) : (
+          <button
+            onClick={handleNavigateToDocuments}
+            className="ml-auto text-xs font-medium text-[#0E4268] hover:underline"
+          >
+            Manage documents
+          </button>
+        )}
       </div>
     );
   }

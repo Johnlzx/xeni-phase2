@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Filter,
 } from "lucide-react";
+import { XeniLogo } from "@/components/case-detail/XeniLogo";
 import { MOCK_CASES } from "@/data/cases";
 import { VISA_TYPES, CASE_STATUSES, ROUTES } from "@/data/constants";
 import { formatDate, cn } from "@/lib/utils";
@@ -100,17 +101,21 @@ export default function CasesPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-20">
+      <header className="h-14 bg-white border-b border-stone-200 px-6 flex items-center justify-between sticky top-0 z-40">
         <Link
           href="/cases"
-          className="text-2xl font-bold text-gray-900 tracking-tight"
+          className="hover:opacity-80 transition-opacity"
+          aria-label="Xeni home"
         >
-          Xeni
+          <XeniLogo size="md" />
         </Link>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#0E4369] flex items-center justify-center text-white font-semibold text-sm">
-            Jo
-          </div>
+          <button
+            className="size-8 rounded-full bg-[#0E4268] text-white font-medium flex items-center justify-center text-sm"
+            aria-label="User menu"
+          >
+            JD
+          </button>
         </div>
       </header>
 
