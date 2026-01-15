@@ -92,12 +92,6 @@ export function ApplicationWorkspace({
             </button>
           </div>
         </div>
-
-        {/* Documents info bar - shows analyzing status during questionnaire */}
-        <DocumentsReadyCard
-          variant="inline"
-          isAnalyzing={phase === "questionnaire"}
-        />
       </div>
 
       {/* Content Area */}

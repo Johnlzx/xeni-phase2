@@ -14,11 +14,13 @@ import {
   Filter,
 } from "lucide-react";
 import { XeniLogo } from "@/components/case-detail/XeniLogo";
+import { CreateCaseModal } from "@/components/case-hub/CreateCaseModal";
+import { useCaseDetailStore } from "@/store/case-detail-store";
 import { MOCK_CASES } from "@/data/cases";
 import { VISA_TYPES, CASE_STATUSES, ROUTES } from "@/data/constants";
 import { formatDate, cn } from "@/lib/utils";
 import Link from "next/link";
-import type { Case, VisaType, CaseStatus } from "@/types";
+import type { Case, VisaType, CaseStatus, PassportInfo } from "@/types";
 
 export default function CasesPage() {
   const router = useRouter();
@@ -27,6 +29,7 @@ export default function CasesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<CaseStatus | "all">("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
   // Filter cases based on search and status
@@ -55,24 +58,61 @@ export default function CasesPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleCreateNewCase = useCallback(() => {
-    // Generate a new case ID
-    const newCaseId = `case-new-${Date.now()}`;
+  const handleOpenCreateModal = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
 
-    // Store minimal data for the new empty case
-    const newCaseData = {
-      id: newCaseId,
-      createdAt: new Date().toISOString(),
-      isEmpty: true,
-    };
-    sessionStorage.setItem(
-      `new-case-${newCaseId}`,
-      JSON.stringify(newCaseData),
-    );
+  // Get store initialization function
+  const initializeCaseFromCreation = useCaseDetailStore(
+    (state) => state.initializeCaseFromCreation
+  );
 
-    // Navigate directly to the case overview
-    router.push(ROUTES.CASE_DETAIL(newCaseId));
-  }, [router]);
+  const handleCreateCase = useCallback(
+    (data: {
+      visaType: VisaType;
+      referenceNumber: string;
+      advisorId: string;
+      assistantId?: string;
+      passport: PassportInfo;
+      caseNotesFile: File;
+      passportFile: File;
+    }) => {
+      // Generate a new case ID
+      const newCaseId = `case-new-${Date.now()}`;
+
+      // Initialize the case store with documents and visa type
+      // Case notes and passport are special - auto-confirmed (no need for review)
+      initializeCaseFromCreation({
+        visaType: data.visaType,
+        passport: data.passport,
+        caseNotesFileName: data.caseNotesFile.name,
+        passportFileName: data.passportFile.name,
+        referenceNumber: data.referenceNumber,
+        advisorId: data.advisorId,
+        assistantId: data.assistantId,
+      });
+
+      // Store case data for session persistence
+      const newCaseData = {
+        id: newCaseId,
+        createdAt: new Date().toISOString(),
+        visaType: data.visaType,
+        referenceNumber: data.referenceNumber,
+        advisorId: data.advisorId,
+        assistantId: data.assistantId,
+        passport: data.passport,
+        hasCaseNotes: !!data.caseNotesFile,
+      };
+      sessionStorage.setItem(
+        `new-case-${newCaseId}`,
+        JSON.stringify(newCaseData)
+      );
+
+      // Navigate to the case overview
+      router.push(ROUTES.CASE_DETAIL(newCaseId));
+    },
+    [router, initializeCaseFromCreation]
+  );
 
   const handleDeleteCase = (caseId: string) => {
     if (confirm("Are you sure you want to delete this case?")) {
@@ -213,7 +253,7 @@ export default function CasesPage() {
 
               {/* New Case Button */}
               <button
-                onClick={handleCreateNewCase}
+                onClick={handleOpenCreateModal}
                 className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
@@ -243,7 +283,7 @@ export default function CasesPage() {
             </p>
             {!searchQuery && statusFilter === "all" && (
               <button
-                onClick={handleCreateNewCase}
+                onClick={handleOpenCreateModal}
                 className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -273,6 +313,13 @@ export default function CasesPage() {
           onSave={handleSaveSettings}
         />
       )}
+
+      {/* Create Case Modal */}
+      <CreateCaseModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateCase}
+      />
     </div>
   );
 }

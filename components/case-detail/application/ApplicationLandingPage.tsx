@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React from "react";
+import { motion } from "motion/react";
 import {
   Briefcase,
   GraduationCap,
@@ -12,15 +12,22 @@ import {
   Sparkles,
   Shield,
   Clock,
-  CheckCircle2,
+  Play,
   ArrowRight,
+  FileText,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VisaType } from "@/types";
 import { DocumentsReadyCard } from "./DocumentsReadyCard";
+import {
+  useCaseDetailStore,
+  useDocumentGroups,
+  useSelectedVisaType,
+} from "@/store/case-detail-store";
 
 // UK Visa Types Configuration
-const VISA_TYPES: {
+export const VISA_TYPES: {
   id: VisaType;
   name: string;
   shortName: string;
@@ -104,176 +111,192 @@ export const getVisaConfig = (visaId: VisaType) => {
   return VISA_TYPES.find((v) => v.id === visaId);
 };
 
-// Visa type card for grid layout
-const VisaTypeCard = ({
-  visa,
-  isSelected,
-  onSelect,
-  index,
-}: {
-  visa: (typeof VISA_TYPES)[0];
-  isSelected: boolean;
-  onSelect: () => void;
-  index: number;
-}) => {
-  const Icon = visa.icon;
-
-  return (
-    <motion.button
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.2, ease: "easeOut" }}
-      onClick={onSelect}
-      className={cn(
-        "group relative text-left p-4 rounded-xl border-2 transition-all",
-        isSelected
-          ? "border-[#0E4268] bg-[#0E4268]/5 shadow-md"
-          : "border-stone-200 bg-white hover:border-stone-300 hover:shadow-sm",
-      )}
-    >
-      {/* Selection indicator */}
-      <AnimatePresence>
-        {isSelected && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-3 right-3 size-5 bg-[#0E4268] rounded-full flex items-center justify-center"
-          >
-            <CheckCircle2 size={12} className="text-white" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Icon */}
-      <div
-        className={cn(
-          "size-10 rounded-lg flex items-center justify-center mb-3 transition-transform",
-          visa.bgColor,
-          "group-hover:scale-105",
-        )}
-      >
-        <Icon size={20} className={visa.color} />
-      </div>
-
-      {/* Content */}
-      <h3
-        className={cn(
-          "text-sm font-semibold mb-1 text-balance",
-          isSelected ? "text-[#0E4268]" : "text-stone-800",
-        )}
-      >
-        {visa.shortName}
-      </h3>
-      <p className="text-xs text-stone-500 leading-relaxed line-clamp-2 mb-2 text-pretty">
-        {visa.description}
-      </p>
-
-      {/* Processing time */}
-      <div className="flex items-center gap-1 text-[10px] text-stone-400">
-        <Clock size={10} />
-        <span>{visa.processingTime}</span>
-      </div>
-    </motion.button>
-  );
-};
-
 interface ApplicationLandingPageProps {
-  onStartQuestionnaire?: (visaType: VisaType) => void;
+  onRunAnalysis?: () => void;
 }
 
 export function ApplicationLandingPage({
-  onStartQuestionnaire,
+  onRunAnalysis,
 }: ApplicationLandingPageProps) {
-  const [selectedVisa, setSelectedVisa] = useState<VisaType | null>(null);
+  const selectedVisaType = useSelectedVisaType();
+  const documentGroups = useDocumentGroups();
+  const startAnalysisAndGenerateQuestionnaire = useCaseDetailStore(
+    (state) => state.startAnalysisAndGenerateQuestionnaire
+  );
 
-  const handleBuildApplication = () => {
-    if (selectedVisa && onStartQuestionnaire) {
-      onStartQuestionnaire(selectedVisa);
+  const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
+
+  // Calculate document stats
+  const classifiedGroups = documentGroups.filter(
+    (g) => g.id !== "unclassified"
+  );
+  const readyGroups = classifiedGroups.filter((g) => g.status === "reviewed");
+  const totalPages = readyGroups.reduce(
+    (sum, g) => sum + g.files.filter((f) => !f.isRemoved).length,
+    0
+  );
+
+  // Check if we can run analysis (need reviewed documents)
+  const canRunAnalysis = readyGroups.length > 0;
+
+  const handleRunAnalysis = () => {
+    if (onRunAnalysis) {
+      onRunAnalysis();
+    } else {
+      startAnalysisAndGenerateQuestionnaire();
     }
   };
 
   return (
     <div className="h-full flex flex-col bg-stone-50 overflow-auto">
-      <div className="flex-1 max-w-4xl mx-auto w-full px-6 py-6">
-        {/* Header */}
+      <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-8">
+        {/* Header with Visa Type Badge */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="text-center mb-6"
+          className="text-center mb-8"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#0E4268]/5 rounded-full mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#0E4268]/5 rounded-full mb-4">
             <Shield size={14} className="text-[#0E4268]" />
             <span className="text-xs font-medium text-[#0E4268] tracking-wide">
               UK Visa Application
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-stone-900 mb-1.5 tracking-tight text-balance">
+
+          <h1 className="text-2xl font-bold text-stone-900 mb-2 tracking-tight text-balance">
             Build Your Application
           </h1>
-          <p className="text-sm text-stone-500 text-pretty">
-            Select a visa type to start building your case
+
+          <p className="text-sm text-stone-500 text-pretty max-w-md mx-auto">
+            We'll analyze your documents and extract information to auto-fill
+            your application form
           </p>
         </motion.div>
 
-        {/* Documents Ready Card */}
-        <DocumentsReadyCard className="mb-6" />
+        {/* Visa Type Card - shows selected visa from case creation */}
+        {visaConfig && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.2, ease: "easeOut" }}
+            className="mb-6"
+          >
+            <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-4">
+              <div className="flex items-center gap-4">
+                <div
+                  className={cn(
+                    "size-12 rounded-xl flex items-center justify-center",
+                    visaConfig.bgColor
+                  )}
+                >
+                  <visaConfig.icon size={24} className={visaConfig.color} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-semibold text-stone-900">
+                    {visaConfig.name}
+                  </h3>
+                  <p className="text-sm text-stone-500">
+                    {visaConfig.description}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-stone-400">
+                  <Clock size={12} />
+                  <span>{visaConfig.processingTime}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
-        {/* Visa Type Grid */}
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-stone-700 mb-3">
-            Select Visa Type
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {VISA_TYPES.map((visa, index) => (
-              <VisaTypeCard
-                key={visa.id}
-                visa={visa}
-                isSelected={selectedVisa === visa.id}
-                onSelect={() => setSelectedVisa(visa.id)}
-                index={index}
-              />
-            ))}
+        {/* Documents Ready Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.2, ease: "easeOut" }}
+        >
+          <DocumentsReadyCard className="mb-8" />
+        </motion.div>
+
+        {/* Analysis Info Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.2, ease: "easeOut" }}
+          className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-8"
+        >
+          <h3 className="text-sm font-semibold text-stone-800 mb-3">
+            What happens next?
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="size-6 rounded-full bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                <FileText size={12} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-stone-700">
+                  <span className="font-medium">Document Analysis</span> - AI
+                  extracts data from your uploaded documents
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="size-6 rounded-full bg-violet-50 flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles size={12} className="text-violet-600" />
+              </div>
+              <div>
+                <p className="text-sm text-stone-700">
+                  <span className="font-medium">Gap Analysis</span> - We
+                  identify missing information and generate targeted questions
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="size-6 rounded-full bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
+                <CheckCircle2 size={12} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm text-stone-700">
+                  <span className="font-medium">Checklist Generation</span> -
+                  Build a complete checklist with quality audit
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* CTA Button */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.2, ease: "easeOut" }}
-          className="text-center pt-4"
+          transition={{ delay: 0.25, duration: 0.2, ease: "easeOut" }}
+          className="text-center"
         >
           <button
-            onClick={handleBuildApplication}
-            disabled={!selectedVisa}
+            onClick={handleRunAnalysis}
+            disabled={!canRunAnalysis}
             className={cn(
               "group inline-flex items-center gap-3 px-8 py-4 rounded-xl font-semibold text-base transition-all",
-              selectedVisa
+              canRunAnalysis
                 ? "bg-[#0E4268] text-white shadow-lg shadow-[#0E4268]/20 hover:bg-[#0a3555] hover:shadow-xl"
-                : "bg-stone-100 text-stone-400 cursor-not-allowed",
+                : "bg-stone-100 text-stone-400 cursor-not-allowed"
             )}
           >
-            <Sparkles
-              size={20}
-              className={selectedVisa ? "text-blue-200" : ""}
-            />
-            <span>Build Application</span>
+            <Play size={20} className={canRunAnalysis ? "text-blue-200" : ""} />
+            <span>Run Analysis</span>
             <ArrowRight
               size={18}
               className={cn(
                 "transition-transform",
-                selectedVisa && "group-hover:translate-x-1",
+                canRunAnalysis && "group-hover:translate-x-1"
               )}
             />
           </button>
 
           <p className="mt-3 text-xs text-stone-400 text-pretty">
-            {selectedVisa
-              ? `Ready to build your ${VISA_TYPES.find((v) => v.id === selectedVisa)?.name} application`
-              : "Select a visa type above to continue"}
+            {canRunAnalysis
+              ? `Ready to analyze ${readyGroups.length} documents (${totalPages} pages)`
+              : "Confirm your documents to proceed"}
           </p>
         </motion.div>
       </div>

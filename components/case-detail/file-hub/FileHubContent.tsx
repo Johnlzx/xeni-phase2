@@ -151,7 +151,9 @@ const Sidebar = ({
   const runProcessingWorkflow = async () => {
     for (let i = 0; i < PROCESSING_STAGES.length; i++) {
       setProcessingStage(i);
-      await new Promise((resolve) => setTimeout(resolve, PROCESSING_STAGES[i].duration));
+      await new Promise((resolve) =>
+        setTimeout(resolve, PROCESSING_STAGES[i].duration),
+      );
     }
     setProcessingStage(null);
     const pageCount = Math.floor(Math.random() * 4) + 3;
@@ -185,7 +187,12 @@ const Sidebar = ({
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
       const { clientX, clientY } = e;
-      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
         setIsDragOver(false);
       }
     }
@@ -200,7 +207,8 @@ const Sidebar = ({
   };
 
   const isAnyDragOver = isDragOver || isInternalDragOver;
-  const currentStage = processingStage !== null ? PROCESSING_STAGES[processingStage] : null;
+  const currentStage =
+    processingStage !== null ? PROCESSING_STAGES[processingStage] : null;
 
   const setRefs = (el: HTMLDivElement | null) => {
     containerRef.current = el;
@@ -285,7 +293,8 @@ const Sidebar = ({
       {/* Sidebar Header */}
       <div className="h-10 px-3 flex items-center justify-between border-b border-stone-100 shrink-0">
         <span className="text-xs font-medium text-stone-600">
-          Unclassified{unclassifiedFiles.length > 0 && ` (${unclassifiedFiles.length})`}
+          Unclassified
+          {unclassifiedFiles.length > 0 && ` (${unclassifiedFiles.length})`}
         </span>
         <button
           onClick={onToggleCollapse}
@@ -346,19 +355,22 @@ const Sidebar = ({
             </>
           ) : (
             <>
-              <FilePlus size={20} className={cn(
-                "transition-colors",
-                isAnyDragOver ? "text-[#0E4268]" : "text-stone-400",
-              )} />
-              <span className={cn(
-                "text-xs font-medium transition-colors",
-                isAnyDragOver ? "text-[#0E4268]" : "text-stone-500",
-              )}>
+              <FilePlus
+                size={20}
+                className={cn(
+                  "transition-colors",
+                  isAnyDragOver ? "text-[#0E4268]" : "text-stone-400",
+                )}
+              />
+              <span
+                className={cn(
+                  "text-xs font-medium transition-colors",
+                  isAnyDragOver ? "text-[#0E4268]" : "text-stone-500",
+                )}
+              >
                 {isAnyDragOver ? "Drop here" : "Upload Files"}
               </span>
-              <span className="text-[10px] text-stone-400">
-                Drop or click
-              </span>
+              <span className="text-[10px] text-stone-400">Drop or click</span>
             </>
           )}
         </button>
@@ -1308,10 +1320,11 @@ const AddCategoryCard = ({
 };
 
 // ============================================================================
-// EMPTY STATE
+// EMPTY STATE - Minimal modern design with clear action
 // ============================================================================
 const EmptyState = ({ onUpload }: { onUpload: () => void }) => {
   const [isDragOver, setIsDragOver] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     if (e.dataTransfer.types.includes("Files")) {
@@ -1321,8 +1334,18 @@ const EmptyState = ({ onUpload }: { onUpload: () => void }) => {
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        setIsDragOver(false);
+      }
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -1334,60 +1357,130 @@ const EmptyState = ({ onUpload }: { onUpload: () => void }) => {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      {/* Upload drop zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={onUpload}
-        className={cn(
-          "w-full max-w-md aspect-[4/3] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-4 cursor-pointer transition-all",
-          isDragOver
-            ? "border-[#0E4268] bg-[#0E4268]/5 scale-[1.02]"
-            : "border-stone-200 hover:border-stone-300 hover:bg-stone-50",
-        )}
-      >
+    <div
+      ref={containerRef}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="flex-1 flex items-center justify-center p-8"
+    >
+      <div className="flex flex-col items-center max-w-sm text-center">
+        {/* Minimal icon */}
         <div
           className={cn(
-            "size-14 rounded-2xl flex items-center justify-center transition-colors",
-            isDragOver ? "bg-[#0E4268]/10" : "bg-stone-100",
+            "size-12 rounded-xl flex items-center justify-center mb-4 transition-colors",
+            isDragOver ? "bg-[#0E4268]/10" : "bg-stone-200/60",
           )}
         >
-          <FilePlus
-            size={28}
+          <FolderOpen
+            size={24}
             className={cn(
               "transition-colors",
               isDragOver ? "text-[#0E4268]" : "text-stone-400",
             )}
           />
         </div>
-        <div className="text-center">
-          <p
-            className={cn(
-              "text-sm font-medium mb-1",
-              isDragOver ? "text-[#0E4268]" : "text-stone-600",
-            )}
-          >
-            {isDragOver ? "Drop files here" : "No documents yet"}
-          </p>
-          <p className="text-xs text-stone-400">
-            Drag and drop files or click to upload
-          </p>
-        </div>
+
+        {/* Title */}
+        <h3 className="text-sm font-medium text-stone-700 mb-1 text-balance">
+          {isDragOver ? "Drop to upload" : "No documents"}
+        </h3>
+
+        {/* Subtitle */}
+        <p className="text-xs text-stone-400 mb-5 text-pretty">
+          Upload files to organize and manage your case documents
+        </p>
+
+        {/* Single clear action button */}
+        <button
+          onClick={onUpload}
+          className={cn(
+            "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+            isDragOver
+              ? "bg-[#0E4268] text-white"
+              : "bg-stone-800 text-white hover:bg-stone-700",
+          )}
+        >
+          Upload Files
+        </button>
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// LOADING STATE
+// LOADING STATE - Structural skeleton layout
 // ============================================================================
 const LoadingState = () => {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="size-10 border-2 border-stone-200 border-t-[#0E4268] rounded-full animate-spin mb-4" />
-      <p className="text-sm text-stone-500">Processing documents...</p>
+    <div className="flex-1 p-4">
+      {/* Sidebar skeleton */}
+      <div
+        className="fixed z-30 w-64 rounded-xl border border-stone-200 bg-white overflow-hidden"
+        style={{
+          top: "calc(var(--header-height, 104px) + 16px)",
+          left: "16px",
+          height: "calc(100dvh - var(--header-height, 104px) - 32px)",
+        }}
+      >
+        {/* Sidebar header skeleton */}
+        <div className="h-10 px-3 flex items-center justify-between border-b border-stone-100">
+          <div className="h-3 w-24 bg-stone-200 rounded animate-pulse" />
+          <div className="size-5 bg-stone-100 rounded animate-pulse" />
+        </div>
+        {/* Sidebar content skeleton */}
+        <div className="p-2 space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex items-center gap-2.5 px-2 py-1.5">
+              <div className="w-8 aspect-[1/1.414] bg-stone-100 rounded animate-pulse" />
+              <div className="flex-1 space-y-1">
+                <div className="h-2.5 w-12 bg-stone-100 rounded animate-pulse" />
+                <div className="h-2 w-20 bg-stone-50 rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Category cards skeleton grid */}
+      <div
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"
+        style={{ marginLeft: "272px", gridAutoRows: "360px" }}
+      >
+        {[...Array(4)].map((_, i) => (
+          <div
+            key={i}
+            className="bg-white rounded-xl border border-stone-200 overflow-hidden flex flex-col"
+          >
+            {/* Card header skeleton */}
+            <div className="px-3 py-2 border-b border-stone-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="h-3 w-20 bg-stone-100 rounded animate-pulse" />
+                <div className="h-4 w-16 bg-stone-50 rounded animate-pulse" />
+              </div>
+              <div className="h-2 w-14 bg-stone-50 rounded animate-pulse" />
+            </div>
+            {/* Card content skeleton - A4 preview */}
+            <div className="flex-1 bg-stone-50 flex items-center justify-center p-2">
+              <div className="h-full aspect-[1/1.414] bg-white rounded border border-stone-200 p-3">
+                <div className="space-y-1.5">
+                  <div className="h-1.5 w-1/3 bg-stone-100 rounded animate-pulse" />
+                  <div className="h-1 w-full bg-stone-50 rounded animate-pulse mt-2" />
+                  <div className="h-1 w-full bg-stone-50 rounded animate-pulse" />
+                  <div className="h-1 w-4/5 bg-stone-50 rounded animate-pulse" />
+                  <div className="h-1 w-full bg-stone-50 rounded animate-pulse" />
+                  <div className="h-1 w-2/3 bg-stone-50 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+            {/* Card footer skeleton */}
+            <div className="px-2 py-1.5 border-t border-stone-100 flex gap-1">
+              <div className="h-6 flex-1 bg-stone-50 rounded animate-pulse" />
+              <div className="h-6 flex-1 bg-stone-50 rounded animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -1417,7 +1510,10 @@ export function FileHubContent() {
 
   if (isLoading) {
     return (
-      <div className="bg-stone-100 p-4 pb-20" style={{ minHeight: "calc(100% + 60px)" }}>
+      <div
+        className="bg-stone-100 p-4 pb-20"
+        style={{ minHeight: "calc(100% + 60px)" }}
+      >
         <LoadingState />
       </div>
     );
@@ -1427,7 +1523,10 @@ export function FileHubContent() {
 
   if (!hasAnyFiles && classifiedGroups.length === 0) {
     return (
-      <div className="bg-stone-100 p-4 pb-20" style={{ minHeight: "calc(100% + 60px)" }}>
+      <div
+        className="bg-stone-100 flex flex-col"
+        style={{ height: "calc(100dvh - var(--header-height, 104px))" }}
+      >
         <EmptyState onUpload={uploadDocuments} />
       </div>
     );
@@ -1437,7 +1536,10 @@ export function FileHubContent() {
   const sidebarWidth = sidebarCollapsed ? 44 : 256; // collapsed icon (44px) or full width (w-64 = 256px)
 
   return (
-    <div className="bg-stone-100 p-4 pb-20" style={{ minHeight: "calc(100% + 60px)" }}>
+    <div
+      className="bg-stone-100 p-4 pb-20"
+      style={{ minHeight: "calc(100% + 60px)" }}
+    >
       {/* Left Sidebar - Fixed position */}
       <Sidebar
         unclassifiedFiles={unclassifiedFiles}

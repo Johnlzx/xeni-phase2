@@ -26,7 +26,7 @@ const NavTab = ({
   <button
     onClick={onClick}
     className={cn(
-      "relative py-3 text-sm font-medium transition-colors flex items-center gap-1.5",
+      "relative h-12 text-sm font-medium transition-colors flex items-center gap-1.5",
       isActive ? "text-stone-900" : "text-stone-500 hover:text-stone-700",
     )}
   >
@@ -39,7 +39,7 @@ const NavTab = ({
     {isActive && (
       <motion.div
         layoutId="nav-tab-indicator"
-        className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900"
+        className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-stone-900"
         transition={{ type: "spring", stiffness: 500, damping: 30 }}
       />
     )}
@@ -174,7 +174,7 @@ export function CaseDetailHeader({ contentRef, onHeightChange }: CaseDetailHeade
 
   // Tabs component - shared between both modes
   const Tabs = () => (
-    <nav className="flex items-center gap-6">
+    <nav className="h-full flex items-end gap-6">
       <NavTab
         label="Overview"
         isActive={activeNav === "overview"}
@@ -220,6 +220,13 @@ export function CaseDetailHeader({ contentRef, onHeightChange }: CaseDetailHeade
             <XeniLogo size="md" />
           </Link>
           <span className="text-stone-300">/</span>
+          <Link
+            href="/cases"
+            className="text-sm text-stone-500 hover:text-stone-700 transition-colors"
+          >
+            All cases
+          </Link>
+          <span className="text-stone-300">/</span>
           <EditableCaseName name={caseName} onSave={handleCaseNameSave} />
         </div>
         <UserAvatar />
@@ -227,7 +234,7 @@ export function CaseDetailHeader({ contentRef, onHeightChange }: CaseDetailHeade
 
       {/* Row 2: Tabs - slides up to become Row 1 */}
       <motion.div
-        className="px-6 flex items-center gap-6"
+        className="h-12 px-6 flex items-stretch gap-6"
         initial={false}
         animate={{
           y: isCompact ? -56 : 0,
@@ -242,7 +249,7 @@ export function CaseDetailHeader({ contentRef, onHeightChange }: CaseDetailHeade
             width: isCompact ? "auto" : 0,
           }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="overflow-hidden"
+          className="overflow-hidden flex items-center"
         >
           <Link
             href="/cases"

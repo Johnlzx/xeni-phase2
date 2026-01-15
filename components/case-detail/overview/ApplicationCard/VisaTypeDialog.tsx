@@ -8,7 +8,6 @@ import {
   Plane,
   Lightbulb,
   Star,
-  Clock,
   CheckCircle2,
   Shield,
   FileText,
@@ -159,14 +158,9 @@ function VisaTypeCard({
       >
         {visa.shortName}
       </h3>
-      <p className="text-xs text-stone-500 leading-relaxed line-clamp-2 mb-2 text-pretty">
+      <p className="text-xs text-stone-500 leading-relaxed line-clamp-2 text-pretty">
         {visa.description}
       </p>
-
-      <div className="flex items-center gap-1 text-[10px] text-stone-400">
-        <Clock size={10} />
-        <span>{visa.processingTime}</span>
-      </div>
     </button>
   );
 }
@@ -240,15 +234,22 @@ function ReadyForAnalysisStep({
   selectedVisa,
   onBack,
   onStartAnalysis,
+  onClose,
   isStarting,
 }: {
   selectedVisa: VisaType | null;
   onBack: () => void;
   onStartAnalysis: () => void;
+  onClose: () => void;
   isStarting: boolean;
 }) {
   const documentGroups = useDocumentGroups();
+  const setActiveNav = useCaseDetailStore((state) => state.setActiveNav);
+  const uploadDocuments = useCaseDetailStore((state) => state.uploadDocuments);
   const visaConfig = selectedVisa ? getVisaConfig(selectedVisa) : null;
+
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Get ready files (reviewed status, excluding unclassified)
   const readyGroups = documentGroups.filter(
@@ -263,6 +264,161 @@ function ReadyForAnalysisStep({
   );
   const totalPages = readyFiles.reduce((sum, f) => sum + (f.pages || 1), 0);
 
+  const hasNoReadyDocuments = readyFiles.length === 0;
+
+  // Handle going to documents page
+  const handleGoToDocuments = () => {
+    onClose();
+    setActiveNav("documents");
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      setUploadedFiles(Array.from(files));
+    }
+  };
+
+  // Handle drag and drop
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files) {
+      setUploadedFiles(Array.from(files));
+    }
+  };
+
+  // Handle submit upload
+  const handleSubmitUpload = async () => {
+    setIsUploading(true);
+    // Simulate upload and trigger document processing
+    uploadDocuments();
+    onClose();
+  };
+
+  // Remove a file from selection
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Empty state - no ready documents
+  if (hasNoReadyDocuments) {
+    return (
+      <>
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="size-10 rounded-xl bg-amber-50 flex items-center justify-center">
+              <FileText size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-balance">
+                Upload Documents
+              </DialogTitle>
+              <DialogDescription className="text-pretty mt-0.5">
+                Add files to continue with your application
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="px-6 pb-6">
+          {/* Uploaded Files Display */}
+          {uploadedFiles.length > 0 && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2">
+                {uploadedFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-stone-200 bg-white"
+                  >
+                    <div className="size-6 rounded bg-rose-100 flex items-center justify-center shrink-0">
+                      <FileText size={12} className="text-rose-600" />
+                    </div>
+                    <span className="text-sm text-stone-700 max-w-[180px] truncate">
+                      {file.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(index)}
+                      className="size-5 rounded-full flex items-center justify-center text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <span className="text-lg leading-none">&times;</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upload Zone */}
+          <label
+            className={cn(
+              "block border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors",
+              "border-stone-200 hover:border-stone-300 hover:bg-stone-50",
+            )}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <input
+              type="file"
+              className="hidden"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileSelect}
+            />
+            <div className="size-12 mx-auto mb-3 rounded-full bg-stone-100 flex items-center justify-center">
+              <ArrowRight size={24} className="text-stone-400 -rotate-90" />
+            </div>
+            <p className="text-sm font-medium text-stone-800">
+              Drop files here or click to browse
+            </p>
+            <p className="text-xs text-stone-500 mt-1">
+              PDF, JPG, PNG supported
+            </p>
+          </label>
+
+          {/* Info text */}
+          <p className="text-xs text-stone-500 mt-4 text-center text-pretty">
+            After upload, you'll need to review and confirm documents in the Documents section
+          </p>
+        </div>
+
+        <DialogFooter className="px-6 py-4 border-t border-stone-100 bg-stone-50 flex-row justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          {uploadedFiles.length > 0 ? (
+            <button
+              onClick={handleSubmitUpload}
+              disabled={isUploading}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                isUploading
+                  ? "bg-stone-100 text-stone-400"
+                  : "bg-[#0E4268] text-white hover:bg-[#0a3555]",
+              )}
+            >
+              {isUploading ? "Uploading..." : "Upload"}
+            </button>
+          ) : (
+            <button
+              onClick={handleGoToDocuments}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors"
+            >
+              Go to Documents
+            </button>
+          )}
+        </DialogFooter>
+      </>
+    );
+  }
+
+  // Has ready documents
   return (
     <>
       <DialogHeader className="px-6 pt-6 pb-4 border-b border-stone-100">
@@ -333,21 +489,15 @@ function ReadyForAnalysisStep({
 
         {/* Summary */}
         <div className="mt-4 pt-4 border-t border-stone-100">
-          {readyFiles.length > 0 ? (
-            <div className="flex items-center gap-2 text-xs text-stone-600">
-              <FileText className="size-3.5" />
-              <span className="tabular-nums">
-                {readyGroups.length}{" "}
-                {readyGroups.length === 1 ? "category" : "categories"} ready
-              </span>
-              <span className="text-stone-400">·</span>
-              <span className="tabular-nums">{totalPages} pages total</span>
-            </div>
-          ) : (
-            <div className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-              No documents ready for analysis. Please review documents first.
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-xs text-stone-600">
+            <FileText className="size-3.5" />
+            <span className="tabular-nums">
+              {readyGroups.length}{" "}
+              {readyGroups.length === 1 ? "category" : "categories"} ready
+            </span>
+            <span className="text-stone-400">·</span>
+            <span className="tabular-nums">{totalPages} pages total</span>
+          </div>
         </div>
       </div>
 
@@ -361,10 +511,10 @@ function ReadyForAnalysisStep({
         </button>
         <button
           onClick={onStartAnalysis}
-          disabled={readyFiles.length === 0 || isStarting}
+          disabled={isStarting}
           className={cn(
             "px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2",
-            readyFiles.length > 0 && !isStarting
+            !isStarting
               ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
               : "bg-stone-100 text-stone-400 cursor-not-allowed",
           )}
@@ -452,6 +602,7 @@ export function VisaTypeDialog({ open, onOpenChange }: VisaTypeDialogProps) {
             selectedVisa={localSelectedVisa}
             onBack={handleBack}
             onStartAnalysis={handleStartAnalysis}
+            onClose={handleCancel}
             isStarting={isStarting}
           />
         )}

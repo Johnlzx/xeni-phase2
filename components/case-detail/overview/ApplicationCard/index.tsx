@@ -1,8 +1,14 @@
 "use client";
 
-import { ChevronRight, Loader2, FileSearch, Sparkles, RefreshCw } from "lucide-react";
+import { ChevronRight, Loader2, FileSearch, Sparkles, RefreshCw, Play } from "lucide-react";
 import { useCaseDetailStore, useHasNewFilesAfterAnalysis } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getVisaConfig } from "./VisaTypeDialog";
 import { AnalyzedFilesCard } from "./cards/AnalyzedFilesCard";
 import { FormSchemaCard } from "./cards/FormSchemaCard";
@@ -25,12 +31,35 @@ function ApplicationHeader({
   const isAnalyzingDocuments = useCaseDetailStore(
     (state) => state.isAnalyzingDocuments,
   );
+  const isLoadingDocuments = useCaseDetailStore(
+    (state) => state.isLoadingDocuments,
+  );
+  const documentGroups = useCaseDetailStore((state) => state.documentGroups);
   const lastAnalysisAt = useCaseDetailStore((state) => state.lastAnalysisAt);
   const analysisProgress = useCaseDetailStore((state) => state.analysisProgress);
   const startAnalysis = useCaseDetailStore((state) => state.startAnalysis);
   const hasNewFilesAfterAnalysis = useHasNewFilesAfterAnalysis();
 
   const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
+
+  // Check if there are confirmed documents
+  const hasConfirmedDocs = documentGroups.some(
+    (g) => g.id !== "unclassified" && g.status === "reviewed" && g.files.some((f) => !f.isRemoved)
+  );
+
+  // Button should be disabled when processing or no confirmed docs
+  const isRunAnalysisDisabled = isLoadingDocuments || !hasConfirmedDocs;
+
+  // Tooltip message for disabled button
+  const getDisabledReason = () => {
+    if (isLoadingDocuments) {
+      return "Please wait while documents are being processed";
+    }
+    if (!hasConfirmedDocs) {
+      return "Review and confirm documents in Documents first";
+    }
+    return "";
+  };
 
   // State: No visa type selected
   if (!selectedVisaType) {
@@ -162,7 +191,7 @@ function ApplicationHeader({
     );
   }
 
-  // State: Visa selected but not analyzed
+  // State: Visa selected but not analyzed - show Run Analysis button
   return (
     <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
       <div className="flex items-center gap-2">
@@ -180,24 +209,47 @@ function ApplicationHeader({
               <h3 className="text-sm font-semibold text-stone-800">
                 {visaConfig.shortName}
               </h3>
-              <p className="text-[10px] text-stone-400">
-                Processing: {visaConfig.processingTime}
-              </p>
+              {isLoadingDocuments ? (
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <Loader2 className="size-3 animate-spin text-stone-400" />
+                  <span className="text-stone-500">Processing documents...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <div className="size-1.5 rounded-full bg-stone-400" />
+                  <span className="text-stone-500">Ready to analyze</span>
+                </div>
+              )}
             </div>
           </>
         )}
       </div>
-      <button
-        onClick={onOpenVisaDialog}
-        className={cn(
-          "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
-          "bg-[#0E4268] text-white hover:bg-[#0a3555]",
-          "flex items-center gap-1.5",
-        )}
-      >
-        Run Analysis
-        <ChevronRight className="size-3.5" />
-      </button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <button
+                onClick={() => startAnalysis()}
+                disabled={isRunAnalysisDisabled}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5",
+                  isRunAnalysisDisabled
+                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
+                    : "bg-[#0E4268] text-white hover:bg-[#0a3555]",
+                )}
+              >
+                <Play className="size-3.5" />
+                Run Analysis
+              </button>
+            </span>
+          </TooltipTrigger>
+          {isRunAnalysisDisabled && (
+            <TooltipContent side="bottom">
+              <p className="text-xs">{getDisabledReason()}</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

@@ -1,39 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { LayoutGrid, ChevronDown, ChevronUp } from "lucide-react";
+import { LayoutGrid, ArrowRight } from "lucide-react";
 import { useCaseDetailStore, useFormSchema } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
 
 // Skeleton loading state
 function FormSchemaCardSkeleton() {
   return (
-    <div className="flex flex-col h-full rounded-lg border border-stone-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50/50">
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
+      <div className="px-3 py-2 border-b border-stone-100 bg-stone-50/50">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-stone-100 flex items-center justify-center">
-            <LayoutGrid className="size-3.5 text-stone-400" />
+          <div className="size-5 rounded bg-stone-100 flex items-center justify-center">
+            <LayoutGrid className="size-3 text-stone-400" />
           </div>
-          <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
             Completeness
           </span>
         </div>
       </div>
-
-      {/* Content - Skeleton */}
-      <div className="flex-1 p-3">
-        <div className="space-y-2 mb-3">
-          <div className="h-5 w-32 bg-stone-100 rounded animate-pulse" />
-          <div className="h-3 w-20 bg-stone-100 rounded animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-2 bg-stone-100 rounded-full animate-pulse" />
-          <div className="flex justify-between">
-            <div className="h-4 w-10 bg-stone-100 rounded animate-pulse" />
-            <div className="h-4 w-16 bg-stone-100 rounded animate-pulse" />
-          </div>
-        </div>
+      <div className="p-3">
+        <div className="h-6 w-12 bg-stone-100 rounded animate-pulse mb-1" />
+        <div className="h-3 w-24 bg-stone-100 rounded animate-pulse" />
       </div>
     </div>
   );
@@ -42,27 +29,19 @@ function FormSchemaCardSkeleton() {
 // Empty state
 function FormSchemaCardEmpty() {
   return (
-    <div className="flex flex-col h-full rounded-lg border border-stone-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50/50">
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
+      <div className="px-3 py-2 border-b border-stone-100 bg-stone-50/50">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-stone-100 flex items-center justify-center">
-            <LayoutGrid className="size-3.5 text-stone-400" />
+          <div className="size-5 rounded bg-stone-100 flex items-center justify-center">
+            <LayoutGrid className="size-3 text-stone-400" />
           </div>
-          <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
             Completeness
           </span>
         </div>
       </div>
-
-      {/* Content - Empty */}
-      <div className="flex-1 p-3 flex flex-col items-center justify-center text-center">
-        <div className="size-10 rounded-lg bg-stone-100 flex items-center justify-center mb-2">
-          <LayoutGrid className="size-5 text-stone-400" />
-        </div>
-        <p className="text-xs text-stone-400 text-pretty">
-          Select visa type to view schema
-        </p>
+      <div className="p-3 flex items-center justify-center">
+        <p className="text-xs text-stone-400">Select visa type</p>
       </div>
     </div>
   );
@@ -73,115 +52,77 @@ export function FormSchemaCard() {
     (state) => state.isAnalyzingDocuments,
   );
   const formSchema = useFormSchema();
-  const [showEmptyFields, setShowEmptyFields] = useState(false);
+  const setActiveNav = useCaseDetailStore((state) => state.setActiveNav);
 
-  // Loading state
   if (isAnalyzing) {
     return <FormSchemaCardSkeleton />;
   }
 
-  // Empty state - no schema loaded
   if (!formSchema) {
     return <FormSchemaCardEmpty />;
   }
 
   const {
-    schemaName,
-    schemaVersion,
     totalFields,
     filledFields,
     completionPercentage,
-    emptyRequiredFields,
   } = formSchema;
 
-  const emptyCount = emptyRequiredFields.length;
-  const visibleEmptyFields = showEmptyFields
-    ? emptyRequiredFields
-    : emptyRequiredFields.slice(0, 3);
+  const handleViewDetails = () => {
+    setActiveNav("application");
+  };
 
   return (
-    <div className="flex flex-col h-full rounded-lg border border-stone-200 bg-white overflow-hidden">
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50/50">
+      <div className="px-3 py-2 border-b border-stone-100 bg-stone-50/50">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-stone-100 flex items-center justify-center">
-            <LayoutGrid className="size-3.5 text-stone-600" />
+          <div className="size-5 rounded bg-stone-100 flex items-center justify-center">
+            <LayoutGrid className="size-3 text-stone-600" />
           </div>
-          <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
             Completeness
           </span>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-3 overflow-y-auto">
-        {/* Schema Info */}
-        <div className="mb-3">
-          <p className="text-sm font-medium text-stone-800 text-balance leading-tight">
-            {schemaName.replace(" Application", "")}
-          </p>
-          <p className="text-xs text-stone-400 mt-0.5">
-            Version {schemaVersion}
-          </p>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mb-3">
-          <div className="h-2 bg-stone-200 rounded-full overflow-hidden">
-            <div
+      <div className="p-3 flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <span
               className={cn(
-                "h-full rounded-full transition-all",
-                completionPercentage === 100 ? "bg-emerald-500" : "bg-[#0E4268]",
+                "text-lg font-semibold tabular-nums leading-none",
+                completionPercentage === 100
+                  ? "text-emerald-600"
+                  : "text-stone-800",
               )}
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between mt-1.5">
-            <span className="text-sm font-semibold text-stone-800 tabular-nums">
+            >
               {completionPercentage}%
             </span>
-            <span className="text-xs text-stone-500 tabular-nums">
-              {filledFields}/{totalFields} fields
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  completionPercentage === 100 ? "bg-emerald-500" : "bg-[#0E4268]",
+                )}
+                style={{ width: `${completionPercentage}%` }}
+              />
+            </div>
+            <span className="text-[11px] text-stone-500 tabular-nums shrink-0">
+              {filledFields}/{totalFields}
             </span>
           </div>
         </div>
-
-        {/* Empty Required Fields */}
-        {emptyCount > 0 && (
-          <div className="pt-2 border-t border-stone-100">
-            <p className="text-xs text-stone-500 mb-1.5">
-              {emptyCount} empty required
-            </p>
-            <div className="space-y-1">
-              {visibleEmptyFields.map((field, i) => (
-                <div key={i} className="flex items-start gap-1.5">
-                  <span className="text-stone-300 text-xs">•</span>
-                  <span className="text-xs text-stone-600 line-clamp-1">
-                    {field}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {emptyCount > 3 && (
-              <button
-                onClick={() => setShowEmptyFields(!showEmptyFields)}
-                className="mt-1.5 text-xs text-stone-400 hover:text-stone-600 flex items-center gap-0.5"
-              >
-                {showEmptyFields ? (
-                  <>
-                    Show less
-                    <ChevronUp className="size-3" />
-                  </>
-                ) : (
-                  <>
-                    +{emptyCount - 3} more
-                    <ChevronDown className="size-3" />
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        )}
+        <button
+          onClick={handleViewDetails}
+          className="size-7 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors ml-3"
+          aria-label="View completeness details"
+        >
+          <ArrowRight className="size-4" />
+        </button>
       </div>
     </div>
   );

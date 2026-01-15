@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import {
@@ -15,6 +16,16 @@ import {
   FormSchemaStatus,
   FormPilotStatus,
   AnalyzedFileSummary,
+  ApplicationChecklistItem,
+  QualityIssue,
+  ChecklistSectionType,
+  // Enhanced types for checklist workspace
+  EnhancedChecklistItem,
+  EnhancedQualityIssue,
+  IssueStatus,
+  IssueHistoryEntry,
+  ForwardToClientData,
+  LinkedDocument,
 } from "@/types/case-detail";
 import { PassportInfo, VisaType } from "@/types";
 
@@ -744,7 +755,7 @@ const initialState: CaseDetailState = {
   lastAnalysisAt: null,
   analyzedFileIds: [],
   // Application Phase
-  applicationPhase: "idle",
+  applicationPhase: "landing",
   formSchema: null,
   formPilotStatus: {
     totalSessions: 0,
@@ -752,6 +763,26 @@ const initialState: CaseDetailState = {
     lastRunStatus: null,
   },
   analyzedFiles: [],
+  // Application Checklist
+  applicationChecklistItems: [],
+  qualityIssues: [],
+  questionnaireAnswers: {},
+  checklistSectionExpanded: {
+    personal: true,
+    employment: true,
+    financial: false,
+    travel: false,
+    education: false,
+    family: false,
+    other: false,
+  },
+  // Enhanced Checklist Workspace State
+  enhancedChecklistItems: [],
+  enhancedQualityIssues: [],
+  selectedChecklistItemId: null,
+  selectedIssueId: null,
+  forwardModalOpen: false,
+  forwardModalIssueId: null,
 };
 
 // Helper to sync file previews from document groups
@@ -1695,7 +1726,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             newProfile.completeness = calculateCompleteness(newProfile);
 
             return {
-              applicationPhase: "completed",
+              applicationPhase: "questionnaire",
               isAnalyzingDocuments: false,
               analysisProgress: 100,
               lastAnalysisAt: new Date().toISOString(),
@@ -1743,6 +1774,736 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         // window.open('form-pilot://launch', '_blank');
       },
 
+      // Start analysis and generate questionnaire (Application workflow)
+      startAnalysisAndGenerateQuestionnaire: async () => {
+        const state = get();
+
+        // Get ready files (from reviewed groups, excluding unclassified)
+        const reviewedGroups = state.documentGroups.filter(
+          (g) => g.id !== "unclassified" && g.status === "reviewed"
+        );
+        const readyFiles = reviewedGroups.flatMap((g) =>
+          g.files.filter((f) => !f.isRemoved)
+        );
+
+        if (readyFiles.length === 0) {
+          return;
+        }
+
+        // Set analyzing phase
+        set(
+          {
+            applicationPhase: "analyzing",
+            isAnalyzingDocuments: true,
+            analysisProgress: 0,
+          },
+          false,
+          "startAnalysisAndGenerateQuestionnaire"
+        );
+
+        // Simulate analysis with progress (includes Gap Analysis)
+        const totalSteps = 5;
+        for (let i = 1; i <= totalSteps; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          set(
+            { analysisProgress: Math.round((i / totalSteps) * 100) },
+            false,
+            `analyzing:step${i}`
+          );
+        }
+
+        // Generate analyzed files summary
+        const analyzedFiles: AnalyzedFileSummary[] = reviewedGroups.flatMap((g) =>
+          g.files
+            .filter((f) => !f.isRemoved)
+            .map((f) => ({
+              id: f.id,
+              name: f.name,
+              groupTitle: g.title,
+              pages: f.pages || 1,
+              analyzedAt: new Date().toISOString(),
+            }))
+        );
+
+        const analyzedFileIds = readyFiles.map((f) => f.id);
+
+        // Mock passport extraction
+        const mockPassportInfo: PassportInfo = {
+          surname: "HARTWELL",
+          givenNames: "Oliver James",
+          nationality: "British",
+          dateOfBirth: "1988-11-23",
+          sex: "M",
+          countryOfBirth: "United Kingdom",
+          passportNumber: "533284719",
+          dateOfIssue: "2021-06-15",
+          dateOfExpiry: "2031-06-14",
+        };
+
+        const mockContactInfo = {
+          email: "oliver.hartwell@gmail.com",
+          phone: "+44 7911 234567",
+          address: "42 Kensington Gardens, London W8 4PX",
+        };
+
+        set(
+          (state) => {
+            const newProfile = {
+              ...state.clientProfile,
+              passport: mockPassportInfo,
+              contactInfo: mockContactInfo,
+            };
+            newProfile.completeness = calculateCompleteness(newProfile);
+
+            return {
+              applicationPhase: "questionnaire",
+              isAnalyzingDocuments: false,
+              analysisProgress: 100,
+              lastAnalysisAt: new Date().toISOString(),
+              analyzedFileIds,
+              analyzedFiles,
+              clientProfile: newProfile,
+              documentGroups: state.documentGroups.map((g) => ({
+                ...g,
+                files: g.files.map((f) =>
+                  analyzedFileIds.includes(f.id)
+                    ? {
+                        ...f,
+                        isAnalyzed: true,
+                        analyzedAt: new Date().toISOString(),
+                      }
+                    : f
+                ),
+              })),
+            };
+          },
+          false,
+          "analysisAndQuestionnaireComplete"
+        );
+      },
+
+      // Submit questionnaire answers and proceed to checklist
+      submitQuestionnaireAnswers: (answers: Record<string, string>) => {
+        set(
+          { questionnaireAnswers: answers },
+          false,
+          "submitQuestionnaireAnswers"
+        );
+        // Automatically generate checklist after submitting answers
+        get().generateChecklist();
+      },
+
+      // Generate checklist with mock data and quality issues
+      generateChecklist: () => {
+        const state = get();
+
+        // Mock checklist items based on visa type
+        const mockChecklistItems: ApplicationChecklistItem[] = [
+          // Personal Information
+          {
+            id: "given_names",
+            section: "personal",
+            field: "givenNames",
+            label: "Given Names",
+            value: state.clientProfile.passport?.givenNames || null,
+            source: state.clientProfile.passport?.givenNames ? "extracted" : null,
+            linkedFileIds: ["pp_2"],
+            status: state.clientProfile.passport?.givenNames ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "surname",
+            section: "personal",
+            field: "surname",
+            label: "Surname",
+            value: state.clientProfile.passport?.surname || null,
+            source: state.clientProfile.passport?.surname ? "extracted" : null,
+            linkedFileIds: ["pp_2"],
+            status: state.clientProfile.passport?.surname ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "dob",
+            section: "personal",
+            field: "dateOfBirth",
+            label: "Date of Birth",
+            value: state.clientProfile.passport?.dateOfBirth || null,
+            source: state.clientProfile.passport?.dateOfBirth ? "extracted" : null,
+            linkedFileIds: ["pp_2"],
+            status: state.clientProfile.passport?.dateOfBirth ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "passport_number",
+            section: "personal",
+            field: "passportNumber",
+            label: "Passport Number",
+            value: state.clientProfile.passport?.passportNumber || null,
+            source: state.clientProfile.passport?.passportNumber ? "extracted" : null,
+            linkedFileIds: ["pp_2"],
+            status: state.clientProfile.passport?.passportNumber ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "nationality",
+            section: "personal",
+            field: "nationality",
+            label: "Nationality",
+            value: state.clientProfile.passport?.nationality || null,
+            source: state.clientProfile.passport?.nationality ? "extracted" : null,
+            linkedFileIds: ["pp_2"],
+            status: state.clientProfile.passport?.nationality ? "complete" : "missing",
+            isRequired: true,
+          },
+          // Employment
+          {
+            id: "cos_number",
+            section: "employment",
+            field: "cosNumber",
+            label: "Certificate of Sponsorship Number",
+            value: null,
+            source: null,
+            linkedFileIds: [],
+            status: "missing",
+            isRequired: true,
+          },
+          {
+            id: "sponsor_name",
+            section: "employment",
+            field: "sponsorName",
+            label: "Sponsor Name",
+            value: "ACME Technology Ltd",
+            source: "extracted",
+            linkedFileIds: ["emp_1"],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "job_title",
+            section: "employment",
+            field: "jobTitle",
+            label: "Job Title",
+            value: "Senior Software Engineer",
+            source: "extracted",
+            linkedFileIds: ["emp_1"],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "salary",
+            section: "employment",
+            field: "annualSalary",
+            label: "Annual Salary",
+            value: "£65,000",
+            source: "extracted",
+            linkedFileIds: ["emp_1", "emp_3"],
+            status: "complete",
+            isRequired: true,
+          },
+          // Financial
+          {
+            id: "bank_balance",
+            section: "financial",
+            field: "bankBalance",
+            label: "Bank Balance",
+            value: "£28,450.00",
+            source: "extracted",
+            linkedFileIds: ["bs_12"],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "savings_evidence",
+            section: "financial",
+            field: "savingsEvidence",
+            label: "Savings Evidence (28 days)",
+            value: "Verified",
+            source: "extracted",
+            linkedFileIds: ["bs_1", "bs_12"],
+            status: "complete",
+            isRequired: true,
+          },
+          // Travel
+          {
+            id: "previous_uk_visa",
+            section: "travel",
+            field: "previousUKVisa",
+            label: "Previous UK Visa",
+            value: "Tier 4 Student (2015-2018)",
+            source: "extracted",
+            linkedFileIds: ["pp_3"],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "travel_history",
+            section: "travel",
+            field: "travelHistory",
+            label: "Travel History (Last 10 Years)",
+            value: null,
+            source: null,
+            linkedFileIds: [],
+            status: "partial",
+            isRequired: true,
+          },
+          // Education
+          {
+            id: "highest_qualification",
+            section: "education",
+            field: "highestQualification",
+            label: "Highest Qualification",
+            value: "BSc Computer Science",
+            source: "extracted",
+            linkedFileIds: ["edu_1"],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "english_test",
+            section: "education",
+            field: "englishTest",
+            label: "English Language Test",
+            value: "IELTS 7.5",
+            source: "extracted",
+            linkedFileIds: ["edu_5"],
+            status: "complete",
+            isRequired: true,
+          },
+        ];
+
+        // Mock quality issues
+        const mockQualityIssues: QualityIssue[] = [
+          {
+            id: "issue_cos",
+            type: "missing",
+            severity: "error",
+            title: "CoS Number Required",
+            description: "Certificate of Sponsorship number is missing. Please obtain from your sponsor and enter manually.",
+            linkedChecklistItemId: "cos_number",
+            isResolved: false,
+          },
+          {
+            id: "issue_travel",
+            type: "missing",
+            severity: "warning",
+            title: "Incomplete Travel History",
+            description: "Travel history for the last 10 years is incomplete. Consider uploading additional passport pages or old passports.",
+            linkedChecklistItemId: "travel_history",
+            linkedFileId: "travel_1",
+            isResolved: false,
+          },
+        ];
+
+        set(
+          {
+            applicationPhase: "checklist",
+            applicationChecklistItems: mockChecklistItems,
+            qualityIssues: mockQualityIssues,
+          },
+          false,
+          "generateChecklist"
+        );
+
+        // Also generate enhanced checklist for the new workspace UI
+        get().generateEnhancedChecklist();
+      },
+
+      // Update a checklist field value
+      updateChecklistField: (fieldId: string, value: string) => {
+        set(
+          (state) => ({
+            applicationChecklistItems: state.applicationChecklistItems.map((item) =>
+              item.id === fieldId
+                ? {
+                    ...item,
+                    value,
+                    source: "manual",
+                    status: value ? "complete" : "missing",
+                  }
+                : item
+            ),
+          }),
+          false,
+          "updateChecklistField"
+        );
+      },
+
+      // Resolve a quality issue
+      resolveIssue: (issueId: string) => {
+        set(
+          (state) => ({
+            qualityIssues: state.qualityIssues.map((issue) =>
+              issue.id === issueId ? { ...issue, isResolved: true } : issue
+            ),
+          }),
+          false,
+          "resolveIssue"
+        );
+      },
+
+      // Go back to a previous phase
+      goBackToPhase: (phase: ApplicationPhase) => {
+        set({ applicationPhase: phase }, false, "goBackToPhase");
+      },
+
+      // Toggle checklist section expansion
+      toggleChecklistSection: (sectionId: ChecklistSectionType) => {
+        set(
+          (state) => ({
+            checklistSectionExpanded: {
+              ...state.checklistSectionExpanded,
+              [sectionId]: !state.checklistSectionExpanded[sectionId],
+            },
+          }),
+          false,
+          "toggleChecklistSection"
+        );
+      },
+
+      // ============================================
+      // Enhanced Checklist Workspace Actions
+      // ============================================
+
+      // Select a checklist item (for detail panel)
+      selectChecklistItem: (itemId: string | null) => {
+        set({ selectedChecklistItemId: itemId }, false, "selectChecklistItem");
+      },
+
+      // Select an issue (for detail view)
+      selectIssue: (issueId: string | null) => {
+        set({ selectedIssueId: issueId }, false, "selectIssue");
+      },
+
+      // Update enhanced checklist field value
+      updateEnhancedChecklistField: (fieldId: string, value: string) => {
+        set(
+          (state) => ({
+            enhancedChecklistItems: state.enhancedChecklistItems.map((item) =>
+              item.id === fieldId
+                ? {
+                    ...item,
+                    value,
+                    source: "manual" as const,
+                    status: value ? "complete" as const : "missing" as const,
+                  }
+                : item
+            ),
+          }),
+          false,
+          "updateEnhancedChecklistField"
+        );
+      },
+
+      // Update issue status
+      updateIssueStatus: (issueId: string, status: IssueStatus) => {
+        const currentUser = SYSTEM_USERS[0]; // Mock current user
+        set(
+          (state) => ({
+            enhancedQualityIssues: state.enhancedQualityIssues.map((issue) => {
+              if (issue.id !== issueId) return issue;
+              const historyEntry: IssueHistoryEntry = {
+                id: `history_${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                action: "status_changed",
+                performedBy: { id: currentUser.id, name: currentUser.name },
+                previousStatus: issue.status,
+                newStatus: status,
+              };
+              return {
+                ...issue,
+                status,
+                updatedAt: new Date().toISOString(),
+                history: [...issue.history, historyEntry],
+              };
+            }),
+          }),
+          false,
+          "updateIssueStatus"
+        );
+      },
+
+      // Add a note to an issue
+      addIssueNote: (issueId: string, note: string) => {
+        const currentUser = SYSTEM_USERS[0]; // Mock current user
+        set(
+          (state) => ({
+            enhancedQualityIssues: state.enhancedQualityIssues.map((issue) => {
+              if (issue.id !== issueId) return issue;
+              const historyEntry: IssueHistoryEntry = {
+                id: `history_${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                action: "note_added",
+                performedBy: { id: currentUser.id, name: currentUser.name },
+                details: note,
+              };
+              return {
+                ...issue,
+                updatedAt: new Date().toISOString(),
+                notes: [
+                  ...issue.notes,
+                  {
+                    id: `note_${Date.now()}`,
+                    content: note,
+                    createdAt: new Date().toISOString(),
+                    createdBy: { id: currentUser.id, name: currentUser.name },
+                  },
+                ],
+                history: [...issue.history, historyEntry],
+              };
+            }),
+          }),
+          false,
+          "addIssueNote"
+        );
+      },
+
+      // Forward issue to client
+      forwardIssueToClient: (issueId: string, data: ForwardToClientData) => {
+        const currentUser = SYSTEM_USERS[0]; // Mock current user
+        set(
+          (state) => ({
+            enhancedQualityIssues: state.enhancedQualityIssues.map((issue) => {
+              if (issue.id !== issueId) return issue;
+              const historyEntry: IssueHistoryEntry = {
+                id: `history_${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                action: "forwarded",
+                performedBy: { id: currentUser.id, name: currentUser.name },
+                details: data.method === "email"
+                  ? `Forwarded via email to ${data.recipientEmail}`
+                  : "Shareable link generated",
+              };
+              return {
+                ...issue,
+                status: "forwarded" as IssueStatus,
+                updatedAt: new Date().toISOString(),
+                forwardData: data,
+                history: [...issue.history, historyEntry],
+              };
+            }),
+            forwardModalOpen: false,
+            forwardModalIssueId: null,
+          }),
+          false,
+          "forwardIssueToClient"
+        );
+      },
+
+      // Mark issue as resolved
+      markIssueResolved: (issueId: string, resolution?: string) => {
+        const currentUser = SYSTEM_USERS[0]; // Mock current user
+        set(
+          (state) => ({
+            enhancedQualityIssues: state.enhancedQualityIssues.map((issue) => {
+              if (issue.id !== issueId) return issue;
+              const historyEntry: IssueHistoryEntry = {
+                id: `history_${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                action: "resolved",
+                performedBy: { id: currentUser.id, name: currentUser.name },
+                details: resolution,
+                previousStatus: issue.status,
+                newStatus: "resolved",
+              };
+              return {
+                ...issue,
+                status: "resolved" as IssueStatus,
+                updatedAt: new Date().toISOString(),
+                resolvedAt: new Date().toISOString(),
+                resolvedBy: { id: currentUser.id, name: currentUser.name },
+                history: [...issue.history, historyEntry],
+              };
+            }),
+          }),
+          false,
+          "markIssueResolved"
+        );
+      },
+
+      // Open forward modal
+      openForwardModal: (issueId: string) => {
+        set(
+          { forwardModalOpen: true, forwardModalIssueId: issueId },
+          false,
+          "openForwardModal"
+        );
+      },
+
+      // Close forward modal
+      closeForwardModal: () => {
+        set(
+          { forwardModalOpen: false, forwardModalIssueId: null },
+          false,
+          "closeForwardModal"
+        );
+      },
+
+      // Generate enhanced checklist with linked documents and issues
+      generateEnhancedChecklist: () => {
+        const state = get();
+        const currentUser = SYSTEM_USERS[0];
+
+        // Create linked documents from analyzed files
+        const createLinkedDocument = (fileId: string): LinkedDocument | null => {
+          for (const group of state.documentGroups) {
+            const file = group.files.find((f) => f.id === fileId && !f.isRemoved);
+            if (file) {
+              return {
+                fileId: file.id,
+                fileName: file.name,
+                groupTitle: group.title,
+                pageNumbers: [1], // Mock page number
+                extractedText: `Extracted from ${file.name}`,
+              };
+            }
+          }
+          return null;
+        };
+
+        // Convert existing checklist items to enhanced format
+        const enhancedItems: EnhancedChecklistItem[] = state.applicationChecklistItems.map((item) => ({
+          id: item.id,
+          section: item.section,
+          field: item.field,
+          label: item.label,
+          value: item.value,
+          source: item.source,
+          linkedDocuments: item.linkedFileIds
+            .map(createLinkedDocument)
+            .filter((doc): doc is LinkedDocument => doc !== null),
+          status: item.status,
+          isRequired: item.isRequired,
+          isEditable: true,
+          confidenceScore: item.source === "extracted" ? 95 : undefined,
+        }));
+
+        // Convert existing quality issues to enhanced format
+        const enhancedIssues: EnhancedQualityIssue[] = state.qualityIssues.map((issue) => ({
+          id: issue.id,
+          type: issue.type,
+          severity: issue.severity,
+          status: issue.isResolved ? "resolved" as IssueStatus : "open" as IssueStatus,
+          title: issue.title,
+          description: issue.description,
+          linkedChecklistItemId: issue.linkedChecklistItemId,
+          linkedFileIds: issue.linkedFileId ? [issue.linkedFileId] : [],
+          history: [
+            {
+              id: `history_${issue.id}_created`,
+              timestamp: new Date().toISOString(),
+              action: "created" as const,
+              performedBy: { id: "system", name: "System" },
+            },
+          ],
+          notes: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+
+        set(
+          {
+            enhancedChecklistItems: enhancedItems,
+            enhancedQualityIssues: enhancedIssues,
+            // Auto-select first item if available
+            selectedChecklistItemId: enhancedItems.length > 0 ? enhancedItems[0].id : null,
+          },
+          false,
+          "generateEnhancedChecklist"
+        );
+      },
+
+      // Initialize case from CreateCaseModal data
+      // Case Notes and Passport are special documents - auto-confirmed (no need for user review)
+      initializeCaseFromCreation: (data: {
+        visaType: VisaType;
+        passport: PassportInfo;
+        caseNotesFileName: string;
+        passportFileName: string;
+        referenceNumber?: string;
+        advisorId?: string;
+        assistantId?: string;
+      }) => {
+        // Create special document groups for case notes and passport
+        // These are auto-reviewed since they were uploaded during case creation
+        const caseNotesGroup: DocumentGroup = {
+          id: "case_notes",
+          title: "Case Notes",
+          tag: "Case Notes",
+          mergedFileName: data.caseNotesFileName,
+          status: "reviewed", // Auto-confirmed - no user review needed
+          files: [
+            {
+              id: `cn_${Date.now()}`,
+              name: data.caseNotesFileName,
+              size: "1.2 MB",
+              pages: 5,
+              date: "Just now",
+              type: "pdf",
+              isNew: false, // Not marked as new since it's auto-confirmed
+              isAnalyzed: true, // Pre-analyzed during case creation
+              analyzedAt: new Date().toISOString(),
+            },
+          ],
+        };
+
+        const passportGroup: DocumentGroup = {
+          id: "passport",
+          title: "Passport",
+          tag: "Passport",
+          mergedFileName: data.passportFileName,
+          status: "reviewed", // Auto-confirmed
+          files: [
+            {
+              id: `pp_${Date.now()}`,
+              name: data.passportFileName,
+              size: "0.8 MB",
+              pages: 1,
+              date: "Just now",
+              type: "pdf",
+              isNew: false,
+              isAnalyzed: true,
+              analyzedAt: new Date().toISOString(),
+            },
+          ],
+        };
+
+        // Create empty unclassified group for future uploads
+        const unclassifiedGroup: DocumentGroup = {
+          id: "unclassified",
+          title: "Unclassified",
+          tag: "unclassified",
+          status: "pending",
+          files: [],
+        };
+
+        // Calculate profile completeness with passport
+        const newProfile = {
+          passport: data.passport,
+          completeness: 0,
+        };
+        newProfile.completeness = calculateCompleteness(newProfile);
+
+        const documentGroups = [unclassifiedGroup, caseNotesGroup, passportGroup];
+        const previews = syncFilePreviewsFromGroups(documentGroups);
+
+        set(
+          {
+            selectedVisaType: data.visaType,
+            clientProfile: newProfile,
+            caseReference: data.referenceNumber || "REF-2024-001",
+            documentGroups,
+            uploadedFilePreviews: previews,
+            // Don't set lastAnalysisAt - user needs to manually trigger analysis
+            // Documents are confirmed but not yet analyzed
+          },
+          false,
+          "initializeCaseFromCreation"
+        );
+
+        // Evolve checklist based on new data
+        get().evolveChecklist();
+      },
+
       // Reset
       reset: () => {
         set(initialState, false, "reset");
@@ -1777,6 +2538,73 @@ export const useFormPilotStatus = () =>
   useCaseDetailStore((state) => state.formPilotStatus);
 export const useAnalyzedFiles = () =>
   useCaseDetailStore((state) => state.analyzedFiles);
+export const useApplicationChecklistItems = () =>
+  useCaseDetailStore((state) => state.applicationChecklistItems);
+export const useQualityIssues = () =>
+  useCaseDetailStore((state) => state.qualityIssues);
+export const useQuestionnaireAnswers = () =>
+  useCaseDetailStore((state) => state.questionnaireAnswers);
+export const useChecklistSectionExpanded = () =>
+  useCaseDetailStore((state) => state.checklistSectionExpanded);
+
+// Enhanced Checklist Workspace Selectors
+export const useEnhancedChecklistItems = () =>
+  useCaseDetailStore((state) => state.enhancedChecklistItems);
+export const useEnhancedQualityIssues = () =>
+  useCaseDetailStore((state) => state.enhancedQualityIssues);
+export const useSelectedChecklistItemId = () =>
+  useCaseDetailStore((state) => state.selectedChecklistItemId);
+export const useSelectedIssueId = () =>
+  useCaseDetailStore((state) => state.selectedIssueId);
+export const useForwardModalOpen = () =>
+  useCaseDetailStore((state) => state.forwardModalOpen);
+export const useForwardModalIssueId = () =>
+  useCaseDetailStore((state) => state.forwardModalIssueId);
+
+// Get selected checklist item with its issues
+export const useSelectedChecklistItem = () =>
+  useCaseDetailStore((state) => {
+    if (!state.selectedChecklistItemId) return null;
+    return state.enhancedChecklistItems.find(
+      (item) => item.id === state.selectedChecklistItemId
+    ) || null;
+  });
+
+// Get issues for selected checklist item - memoized to prevent infinite loops
+export const useIssuesForSelectedItem = () => {
+  const selectedChecklistItemId = useCaseDetailStore(
+    (state) => state.selectedChecklistItemId
+  );
+  const enhancedQualityIssues = useCaseDetailStore(
+    (state) => state.enhancedQualityIssues
+  );
+
+  return useMemo(() => {
+    if (!selectedChecklistItemId) return [];
+    return enhancedQualityIssues.filter(
+      (issue) => issue.linkedChecklistItemId === selectedChecklistItemId
+    );
+  }, [selectedChecklistItemId, enhancedQualityIssues]);
+};
+
+// Get issue counts by severity - memoized to prevent infinite loops
+export const useIssueCounts = () => {
+  const enhancedQualityIssues = useCaseDetailStore(
+    (state) => state.enhancedQualityIssues
+  );
+
+  return useMemo(() => {
+    const issues = enhancedQualityIssues.filter(
+      (issue) => issue.status !== "resolved"
+    );
+    return {
+      errors: issues.filter((i) => i.severity === "error").length,
+      warnings: issues.filter((i) => i.severity === "warning").length,
+      info: issues.filter((i) => i.severity === "info").length,
+      total: issues.length,
+    };
+  }, [enhancedQualityIssues]);
+};
 
 // Selector to detect if reviewed files have changed since the last analysis
 // Like git diff: compares current ready files vs last analyzed files

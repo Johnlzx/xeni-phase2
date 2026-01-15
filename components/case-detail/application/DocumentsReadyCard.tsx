@@ -1,38 +1,45 @@
 "use client";
 
-import React from "react";
-import { motion } from "motion/react";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import {
   FileText,
   CheckCircle2,
   Clock,
   ArrowRight,
   Files,
-  AlertCircle,
+  Upload,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useDocumentGroups,
   useCaseDetailStore,
 } from "@/store/case-detail-store";
+import { CategoryReviewModal } from "../shared";
+import type { DocumentGroup } from "@/types/case-detail";
 
-// Document category badge
+// Document category badge - clickable for preview
 const CategoryBadge = ({
-  title,
-  pageCount,
-  isReady,
+  group,
+  onClick,
 }: {
-  title: string;
-  pageCount: number;
-  isReady: boolean;
+  group: DocumentGroup;
+  onClick: () => void;
 }) => {
+  const isReady = group.status === "reviewed";
+  const pageCount = group.files.filter((f) => !f.isRemoved).length;
+
   return (
-    <span
+    <button
+      onClick={onClick}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
         isReady
-          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-          : "bg-amber-50 text-amber-700 border border-amber-200",
+          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+          : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100",
       )}
     >
       {isReady ? (
@@ -40,9 +47,9 @@ const CategoryBadge = ({
       ) : (
         <Clock size={12} className="text-amber-500" />
       )}
-      <span className="truncate max-w-[80px]">{title}</span>
+      <span className="truncate max-w-[80px]">{group.title}</span>
       <span className="text-[10px] opacity-70 tabular-nums">{pageCount}p</span>
-    </span>
+    </button>
   );
 };
 
@@ -59,22 +66,34 @@ export function DocumentsReadyCard({
 }: DocumentsReadyCardProps) {
   const documentGroups = useDocumentGroups();
   const setActiveNav = useCaseDetailStore((state) => state.setActiveNav);
+  const uploadDocuments = useCaseDetailStore((state) => state.uploadDocuments);
+
+  // State for review modal
+  const [reviewGroup, setReviewGroup] = useState<DocumentGroup | null>(null);
 
   // Calculate stats
   const classifiedGroups = documentGroups.filter(
     (g) => g.id !== "unclassified",
   );
   const readyGroups = classifiedGroups.filter((g) => g.status === "reviewed");
-  const pendingGroups = classifiedGroups.filter((g) => g.status === "pending");
 
-  const totalFiles = classifiedGroups.length;
-  const totalPages = classifiedGroups.reduce(
+  // Stats only count confirmed/reviewed documents
+  const confirmedFiles = readyGroups.length;
+  const confirmedPages = readyGroups.reduce(
     (sum, g) => sum + g.files.filter((f) => !f.isRemoved).length,
     0,
   );
 
   const handleNavigateToDocuments = () => {
     setActiveNav("documents");
+  };
+
+  const handleUpload = () => {
+    uploadDocuments();
+  };
+
+  const handleOpenReview = (group: DocumentGroup) => {
+    setReviewGroup(group);
   };
 
   // Compact variant for header (button style)
@@ -89,9 +108,9 @@ export function DocumentsReadyCard({
         )}
       >
         <Files size={14} className="text-stone-500" />
-        <span className="tabular-nums">{totalFiles} files</span>
+        <span className="tabular-nums">{confirmedFiles} files</span>
         <span className="text-stone-400">·</span>
-        <span className="tabular-nums">{totalPages} pages</span>
+        <span className="tabular-nums">{confirmedPages} pages</span>
       </button>
     );
   }
@@ -122,39 +141,22 @@ export function DocumentsReadyCard({
           <div className="text-sm">
             {isAnalyzing ? (
               <span className="text-blue-700 font-medium">
-                Analyzing {totalFiles} documents...
+                Analyzing documents...
               </span>
             ) : (
               <>
                 <span className="text-stone-600">Information from </span>
                 <span className="font-medium text-stone-800 tabular-nums">
-                  {totalFiles} documents
+                  {confirmedFiles} documents
                 </span>
                 <span className="text-stone-400 mx-1.5">·</span>
                 <span className="font-medium text-stone-800 tabular-nums">
-                  {totalPages} pages
+                  {confirmedPages} pages
                 </span>
               </>
             )}
           </div>
         </div>
-
-        {!isAnalyzing && (
-          <div className="flex items-center gap-2">
-            {readyGroups.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">
-                <CheckCircle2 size={10} />
-                {readyGroups.length} verified
-              </span>
-            )}
-            {pendingGroups.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700">
-                <Clock size={10} />
-                {pendingGroups.length} pending
-              </span>
-            )}
-          </div>
-        )}
 
         {isAnalyzing ? (
           <span className="ml-auto text-xs text-blue-600">
@@ -173,124 +175,129 @@ export function DocumentsReadyCard({
   }
 
   // Full variant for landing page
-  const hasDocuments = totalFiles > 0;
-  const allReady = pendingGroups.length === 0 && readyGroups.length > 0;
+  const hasDocuments = classifiedGroups.length > 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className={cn(
-        "bg-white rounded-xl border shadow-sm overflow-hidden",
-        allReady ? "border-emerald-200" : "border-stone-200",
-        className,
-      )}
-    >
-      {/* Header */}
-      <div className="px-5 py-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "p-2 rounded-lg",
-                hasDocuments ? "bg-[#0E4268]/10" : "bg-stone-100",
-              )}
-            >
-              <FileText
-                size={18}
-                className={hasDocuments ? "text-[#0E4268]" : "text-stone-400"}
-              />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-stone-800 text-balance">
-                {hasDocuments
-                  ? "Your documents are ready"
-                  : "Upload your documents"}
-              </h3>
-              <p className="text-xs text-stone-500 mt-0.5 text-pretty">
-                {hasDocuments ? (
-                  <>
-                    We'll extract information from{" "}
-                    <span className="font-medium text-stone-700 tabular-nums">
-                      {totalPages} pages
-                    </span>{" "}
-                    across{" "}
-                    <span className="font-medium text-stone-700 tabular-nums">
-                      {totalFiles} documents
-                    </span>{" "}
-                    to auto-fill your application
-                  </>
-                ) : (
-                  "Add documents to speed up your application with auto-fill"
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={cn(
+          "bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden",
+          className,
+        )}
+      >
+        {/* Header */}
+        <div className="px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div
+                className={cn(
+                  "p-2 rounded-lg",
+                  hasDocuments ? "bg-[#0E4268]/10" : "bg-stone-100",
                 )}
-              </p>
+              >
+                <FileText
+                  size={18}
+                  className={hasDocuments ? "text-[#0E4268]" : "text-stone-400"}
+                />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-stone-800 text-balance">
+                  {hasDocuments
+                    ? "Your documents are ready"
+                    : "Upload your documents"}
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5 text-pretty">
+                  {hasDocuments ? (
+                    confirmedFiles > 0 ? (
+                      <>
+                        We'll extract information from{" "}
+                        <span className="font-medium text-stone-700 tabular-nums">
+                          {confirmedPages} pages
+                        </span>{" "}
+                        across{" "}
+                        <span className="font-medium text-stone-700 tabular-nums">
+                          {confirmedFiles} confirmed documents
+                        </span>{" "}
+                        to auto-fill your application
+                      </>
+                    ) : (
+                      "Review and confirm your documents to proceed"
+                    )
+                  ) : (
+                    "Add documents to speed up your application with Form Pilot"
+                  )}
+                </p>
+              </div>
             </div>
+
+            {/* Upload button when no documents */}
+            {!hasDocuments && (
+              <div className="shrink-0">
+                <button
+                  onClick={handleUpload}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-900 text-white hover:bg-stone-800 transition-colors"
+                >
+                  <Upload size={12} />
+                  Upload
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Status summary */}
+          {/* Category badges - clickable for preview */}
           {hasDocuments && (
-            <div className="flex items-center gap-2 shrink-0">
-              {allReady ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <CheckCircle2 size={12} />
-                  All verified
-                </span>
-              ) : (
-                <>
-                  {readyGroups.length > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                      <CheckCircle2 size={12} />
-                      {readyGroups.length} ready
-                    </span>
-                  )}
-                  {pendingGroups.length > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
-                      <AlertCircle size={12} />
-                      {pendingGroups.length} need review
-                    </span>
-                  )}
-                </>
-              )}
+            <div className="flex flex-wrap gap-2 mt-4">
+              {classifiedGroups.map((group) => (
+                <CategoryBadge
+                  key={group.id}
+                  group={group}
+                  onClick={() => handleOpenReview(group)}
+                />
+              ))}
+              {/* Add more button */}
+              <button
+                onClick={handleUpload}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-stone-500 bg-stone-100 hover:bg-stone-200 transition-colors"
+              >
+                <Plus size={12} />
+                Add
+              </button>
             </div>
           )}
         </div>
 
-        {/* Category badges */}
-        {hasDocuments && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {classifiedGroups.slice(0, 5).map((group) => (
-              <CategoryBadge
-                key={group.id}
-                title={group.title}
-                pageCount={group.files.filter((f) => !f.isRemoved).length}
-                isReady={group.status === "reviewed"}
-              />
-            ))}
-            {classifiedGroups.length > 5 && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs text-stone-500 bg-stone-100">
-                +{classifiedGroups.length - 5} more
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+        {/* Footer - Link to Documents */}
+        <div className="px-5 py-3 bg-stone-50 border-t border-stone-100">
+          <button
+            onClick={handleNavigateToDocuments}
+            className="group flex items-center gap-1.5 text-sm font-medium text-[#0E4268] hover:text-[#0a3555] transition-colors"
+          >
+            <span>
+              {hasDocuments ? "Manage all documents" : "Go to Documents"}
+            </span>
+            <ArrowRight
+              size={14}
+              className="transition-transform group-hover:translate-x-0.5"
+            />
+          </button>
+        </div>
+      </motion.div>
 
-      {/* Footer - Link to Documents */}
-      <div className="px-5 py-3 bg-stone-50 border-t border-stone-100">
-        <button
-          onClick={handleNavigateToDocuments}
-          className="group flex items-center gap-1.5 text-sm font-medium text-[#0E4268] hover:text-[#0a3555] transition-colors"
-        >
-          <span>
-            {hasDocuments ? "Add or review documents" : "Go to Documents"}
-          </span>
-          <ArrowRight
-            size={14}
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </button>
-      </div>
-    </motion.div>
+      {/* Category Review Modal - wrapped in DndProvider for drag-drop support */}
+      <AnimatePresence>
+        {reviewGroup && (
+          <DndProvider backend={HTML5Backend}>
+            <CategoryReviewModal
+              group={reviewGroup}
+              allGroups={documentGroups}
+              onClose={() => setReviewGroup(null)}
+            />
+          </DndProvider>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

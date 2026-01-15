@@ -1,40 +1,25 @@
 "use client";
 
-import { FileText, ExternalLink } from "lucide-react";
+import { FileText, ArrowRight } from "lucide-react";
 import { useCaseDetailStore, useAnalyzedFiles } from "@/store/case-detail-store";
-import { cn } from "@/lib/utils";
 
 // Skeleton loading state
 function AnalyzedFilesCardSkeleton() {
   return (
-    <div className="flex flex-col h-full rounded-lg border border-stone-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50/50">
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
+      <div className="px-3 py-2 border-b border-stone-100 bg-stone-50/50">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-stone-100 flex items-center justify-center">
-            <FileText className="size-3.5 text-stone-400" />
+          <div className="size-5 rounded bg-stone-100 flex items-center justify-center">
+            <FileText className="size-3 text-stone-400" />
           </div>
-          <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
             Source Files
           </span>
         </div>
       </div>
-
-      {/* Content - Skeleton */}
-      <div className="flex-1 p-3">
-        <div className="space-y-2">
-          <div className="h-7 w-12 bg-stone-100 rounded animate-pulse" />
-          <div className="h-4 w-28 bg-stone-100 rounded animate-pulse" />
-        </div>
-        <div className="mt-4 space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-4 bg-stone-100 rounded animate-pulse"
-              style={{ width: `${80 - i * 10}%` }}
-            />
-          ))}
-        </div>
+      <div className="p-3">
+        <div className="h-6 w-8 bg-stone-100 rounded animate-pulse mb-1" />
+        <div className="h-3 w-20 bg-stone-100 rounded animate-pulse" />
       </div>
     </div>
   );
@@ -43,27 +28,19 @@ function AnalyzedFilesCardSkeleton() {
 // Empty state
 function AnalyzedFilesCardEmpty() {
   return (
-    <div className="flex flex-col h-full rounded-lg border border-stone-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50/50">
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
+      <div className="px-3 py-2 border-b border-stone-100 bg-stone-50/50">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-stone-100 flex items-center justify-center">
-            <FileText className="size-3.5 text-stone-400" />
+          <div className="size-5 rounded bg-stone-100 flex items-center justify-center">
+            <FileText className="size-3 text-stone-400" />
           </div>
-          <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
             Source Files
           </span>
         </div>
       </div>
-
-      {/* Content - Empty */}
-      <div className="flex-1 p-3 flex flex-col items-center justify-center text-center">
-        <div className="size-10 rounded-lg bg-stone-100 flex items-center justify-center mb-2">
-          <FileText className="size-5 text-stone-400" />
-        </div>
-        <p className="text-xs text-stone-400 text-pretty">
-          Run analysis to see results
-        </p>
+      <div className="p-3 flex items-center justify-center">
+        <p className="text-xs text-stone-400">No files analyzed</p>
       </div>
     </div>
   );
@@ -76,12 +53,10 @@ export function AnalyzedFilesCard() {
   const analyzedFiles = useAnalyzedFiles();
   const setActiveNav = useCaseDetailStore((state) => state.setActiveNav);
 
-  // Loading state
   if (isAnalyzing) {
     return <AnalyzedFilesCardSkeleton />;
   }
 
-  // Empty state
   if (analyzedFiles.length === 0) {
     return <AnalyzedFilesCardEmpty />;
   }
@@ -99,8 +74,7 @@ export function AnalyzedFilesCard() {
     {} as Record<string, { pages: number; count: number }>,
   );
 
-  const groups = Object.entries(groupedFiles);
-  const totalDocuments = groups.length;
+  const totalDocuments = Object.keys(groupedFiles).length;
   const totalPages = analyzedFiles.reduce((sum, f) => sum + f.pages, 0);
 
   const handleViewAll = () => {
@@ -108,57 +82,35 @@ export function AnalyzedFilesCard() {
   };
 
   return (
-    <div className="flex flex-col h-full rounded-lg border border-stone-200 bg-white overflow-hidden">
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 bg-stone-50/50">
+      <div className="px-3 py-2 border-b border-stone-100 bg-stone-50/50">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-stone-100 flex items-center justify-center">
-            <FileText className="size-3.5 text-stone-600" />
+          <div className="size-5 rounded bg-stone-100 flex items-center justify-center">
+            <FileText className="size-3 text-stone-600" />
           </div>
-          <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
             Source Files
           </span>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-3 overflow-y-auto">
-        {/* Summary */}
-        <div className="mb-3">
-          <p className="text-xl font-semibold text-stone-800 tabular-nums">
+      <div className="p-3 flex items-center justify-between">
+        <div>
+          <p className="text-lg font-semibold text-stone-800 tabular-nums leading-none">
             {totalDocuments}
           </p>
-          <p className="text-xs text-stone-500">
+          <p className="text-[11px] text-stone-500 mt-1">
             documents · {totalPages} pages
           </p>
         </div>
-
-        {/* File List */}
-        <div className="space-y-1.5">
-          {groups.slice(0, 5).map(([title, data]) => (
-            <div key={title} className="flex items-center justify-between py-1">
-              <span className="text-xs text-stone-700 truncate">{title}</span>
-              <span className="text-xs text-stone-400 tabular-nums shrink-0 ml-2">
-                {data.pages}p
-              </span>
-            </div>
-          ))}
-          {groups.length > 5 && (
-            <div className="text-xs text-stone-400 pt-1">
-              +{groups.length - 5} more
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-3 py-2 border-t border-stone-100">
         <button
           onClick={handleViewAll}
-          className="w-full text-xs text-[#0E4268] hover:text-[#0a3555] flex items-center justify-center gap-1"
+          className="size-7 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+          aria-label="View all files"
         >
-          View all
-          <ExternalLink className="size-3" />
+          <ArrowRight className="size-4" />
         </button>
       </div>
     </div>

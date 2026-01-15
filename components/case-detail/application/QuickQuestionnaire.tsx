@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VisaType } from "@/types";
+import { useCaseDetailStore } from "@/store/case-detail-store";
 
 // Question types
 type QuestionType = "single" | "multi" | "text" | "date" | "confirm";
@@ -52,8 +53,8 @@ interface AnalyzedDocument {
 
 interface QuickQuestionnaireProps {
   visaType: VisaType;
-  onComplete: (answers: Record<string, unknown>) => void;
-  onClose: () => void;
+  onComplete?: (answers: Record<string, unknown>) => void;
+  onClose?: () => void;
   onNavigateToDocuments?: () => void;
   analyzedDocuments?: AnalyzedDocument[];
   isInline?: boolean;
@@ -527,6 +528,11 @@ export function QuickQuestionnaire({
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Store actions
+  const submitQuestionnaireAnswers = useCaseDetailStore(
+    (state) => state.submitQuestionnaireAnswers,
+  );
+
   // Count answered questions
   const answeredCount = Object.keys(answers).length;
   const totalCount = questions.length;
@@ -539,9 +545,19 @@ export function QuickQuestionnaire({
   const handleSubmit = () => {
     if (allAnswered) {
       setIsGenerating(true);
+      // Convert answers to string format for store
+      const stringAnswers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(answers)) {
+        stringAnswers[key] = String(value);
+      }
       setTimeout(() => {
-        onComplete(answers);
-      }, 4000);
+        // Use store action if no custom callback provided
+        if (onComplete) {
+          onComplete(answers);
+        } else {
+          submitQuestionnaireAnswers(stringAnswers);
+        }
+      }, 2000);
     }
   };
 

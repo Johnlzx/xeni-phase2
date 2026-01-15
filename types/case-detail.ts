@@ -118,12 +118,163 @@ export interface DocumentGroup {
   files: DocumentFile[];
 }
 
-// Application Phase (state machine)
+// Application Phase (5-stage state machine)
 export type ApplicationPhase =
-  | "idle" // No visa selected, show visa selection UI
-  | "visa_selected" // Visa chosen, show files ready for analysis
-  | "analyzing" // Document analysis in progress
-  | "completed"; // Analysis done, show three info cards
+  | "landing" // Select Visa Type
+  | "analyzing" // Document analysis in progress (includes Gap Analysis)
+  | "questionnaire" // Quick questionnaire
+  | "checklist" // Main checklist interface
+  | "form_pilot"; // Form Pilot launch screen
+
+// Checklist Section Types
+export type ChecklistSectionType =
+  | "personal"
+  | "employment"
+  | "financial"
+  | "travel"
+  | "education"
+  | "family"
+  | "other";
+
+// Application Checklist Item (for the main Application checklist)
+export interface ApplicationChecklistItem {
+  id: string;
+  section: ChecklistSectionType;
+  field: string; // Field key
+  label: string; // Display label
+  value: string | null;
+  source: "extracted" | "questionnaire" | "manual" | null;
+  linkedFileIds: string[]; // Associated source files
+  status: "complete" | "partial" | "missing";
+  isRequired: boolean;
+}
+
+// Quality Issue Types
+export type QualityIssueType = "validity" | "clarity" | "consistency" | "missing";
+export type QualityIssueSeverity = "error" | "warning" | "info";
+
+// Quality Issue (displayed inline with checklist items)
+export interface QualityIssue {
+  id: string;
+  type: QualityIssueType;
+  severity: QualityIssueSeverity;
+  title: string;
+  description: string;
+  linkedChecklistItemId: string; // Associated field ID
+  linkedFileId?: string;
+  isResolved: boolean;
+}
+
+// ============================================
+// Enhanced Issue Workflow Types
+// ============================================
+
+// Issue Status - Full workflow support
+export type IssueStatus =
+  | "open" // Newly identified
+  | "in_progress" // Being worked on
+  | "forwarded" // Sent to client
+  | "pending_review" // Client responded, awaiting review
+  | "resolved"; // Completed
+
+// Issue History Entry
+export interface IssueHistoryEntry {
+  id: string;
+  timestamp: string;
+  action: "created" | "note_added" | "forwarded" | "status_changed" | "resolved";
+  performedBy: {
+    id: string;
+    name: string;
+  };
+  details?: string;
+  previousStatus?: IssueStatus;
+  newStatus?: IssueStatus;
+}
+
+// Issue Note
+export interface IssueNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  createdBy: {
+    id: string;
+    name: string;
+  };
+}
+
+// Forward to Client Data
+export interface ForwardToClientData {
+  method: "link" | "email";
+  recipientEmail?: string;
+  message?: string;
+  shareableLink?: string;
+  expiresAt?: string;
+  sentAt: string;
+}
+
+// Enhanced Quality Issue (with full workflow support)
+export interface EnhancedQualityIssue {
+  id: string;
+  type: QualityIssueType;
+  severity: QualityIssueSeverity;
+  status: IssueStatus;
+  title: string;
+  description: string;
+  suggestedAction?: string;
+  linkedChecklistItemId: string;
+  linkedFileIds: string[]; // Multiple source documents
+  linkedPageNumbers?: Record<string, number[]>; // fileId -> page numbers
+  history: IssueHistoryEntry[];
+  forwardData?: ForwardToClientData;
+  notes: IssueNote[];
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  resolvedBy?: {
+    id: string;
+    name: string;
+  };
+}
+
+// ============================================
+// Enhanced Checklist Item Types
+// ============================================
+
+// Linked Document Reference
+export interface LinkedDocument {
+  fileId: string;
+  fileName: string;
+  groupTitle: string;
+  pageNumbers: number[];
+  extractedText?: string;
+  thumbnailUrl?: string;
+}
+
+// Enhanced Checklist Item (with document references)
+export interface EnhancedChecklistItem {
+  id: string;
+  section: ChecklistSectionType;
+  field: string;
+  label: string;
+  description?: string;
+  value: string | null;
+  source: "extracted" | "questionnaire" | "manual" | null;
+  linkedDocuments: LinkedDocument[];
+  status: "complete" | "partial" | "missing";
+  isRequired: boolean;
+  isEditable: boolean;
+  confidenceScore?: number; // 0-100 for extracted values
+}
+
+// Checklist Section (group of related fields)
+export interface ChecklistSection {
+  id: ChecklistSectionType;
+  title: string;
+  fields: ApplicationChecklistItem[];
+  completedCount: number;
+  totalCount: number;
+  isExpanded: boolean;
+}
 
 // Form Schema Status
 export interface FormSchemaStatus {
@@ -192,7 +343,7 @@ export interface CaseDetailState {
   lastAnalysisAt: string | null; // ISO timestamp of last analysis
   analyzedFileIds: string[]; // IDs of files included in last analysis
 
-  // Application Phase (state machine)
+  // Application Phase (5-stage state machine)
   applicationPhase: ApplicationPhase;
 
   // Form Schema (visa-specific schema once visa is selected)
@@ -203,6 +354,38 @@ export interface CaseDetailState {
 
   // Analyzed Files Summary (populated after analysis)
   analyzedFiles: AnalyzedFileSummary[];
+
+  // Application Checklist (main checklist items)
+  applicationChecklistItems: ApplicationChecklistItem[];
+
+  // Quality Issues (inline with checklist)
+  qualityIssues: QualityIssue[];
+
+  // Questionnaire Answers (stored for back navigation)
+  questionnaireAnswers: Record<string, string>;
+
+  // Checklist Section Expansion State
+  checklistSectionExpanded: Record<ChecklistSectionType, boolean>;
+
+  // ============================================
+  // Enhanced Checklist Workspace State
+  // ============================================
+
+  // Enhanced Checklist Items (with linked documents)
+  enhancedChecklistItems: EnhancedChecklistItem[];
+
+  // Enhanced Quality Issues (with full workflow)
+  enhancedQualityIssues: EnhancedQualityIssue[];
+
+  // Selected item in checklist workspace
+  selectedChecklistItemId: string | null;
+
+  // Selected issue for detail view
+  selectedIssueId: string | null;
+
+  // Forward to Client Modal state
+  forwardModalOpen: boolean;
+  forwardModalIssueId: string | null;
 }
 
 // Case Detail Store Actions
@@ -269,6 +452,51 @@ export interface CaseDetailActions {
   startAnalysis: () => Promise<void>;
   initFormSchema: (visaType: VisaType) => void;
   launchFormPilot: () => void;
+
+  // Application Checklist Actions
+  startAnalysisAndGenerateQuestionnaire: () => Promise<void>;
+  submitQuestionnaireAnswers: (answers: Record<string, string>) => void;
+  generateChecklist: () => void;
+  updateChecklistField: (fieldId: string, value: string) => void;
+  resolveIssue: (issueId: string) => void;
+  goBackToPhase: (phase: ApplicationPhase) => void;
+  toggleChecklistSection: (sectionId: ChecklistSectionType) => void;
+
+  // ============================================
+  // Enhanced Checklist Workspace Actions
+  // ============================================
+
+  // Checklist Item Selection
+  selectChecklistItem: (itemId: string | null) => void;
+  selectIssue: (issueId: string | null) => void;
+
+  // Enhanced Checklist Field Update
+  updateEnhancedChecklistField: (fieldId: string, value: string) => void;
+
+  // Issue Workflow Actions
+  updateIssueStatus: (issueId: string, status: IssueStatus) => void;
+  addIssueNote: (issueId: string, note: string) => void;
+  forwardIssueToClient: (issueId: string, data: ForwardToClientData) => void;
+  markIssueResolved: (issueId: string, resolution?: string) => void;
+
+  // Forward Modal Actions
+  openForwardModal: (issueId: string) => void;
+  closeForwardModal: () => void;
+
+  // Generate Enhanced Checklist (called after questionnaire)
+  generateEnhancedChecklist: () => void;
+
+  // Initialize case from CreateCaseModal
+  // Case Notes and Passport are special documents - auto-confirmed
+  initializeCaseFromCreation: (data: {
+    visaType: VisaType;
+    passport: PassportInfo;
+    caseNotesFileName: string;
+    passportFileName: string;
+    referenceNumber?: string;
+    advisorId?: string;
+    assistantId?: string;
+  }) => void;
 
   // Reset
   reset: () => void;
