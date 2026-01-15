@@ -14,8 +14,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "PDF Merge",
-  description: "PDF document management application",
+  title: "Xeni Prototype",
+  description: "Immigration case management application",
 };
 
 export default function RootLayout({
