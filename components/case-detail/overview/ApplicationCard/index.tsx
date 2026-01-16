@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChevronRight, Loader2, FileSearch, Sparkles, RefreshCw, Play } from "lucide-react";
 import { useCaseDetailStore, useHasNewFilesAfterAnalysis } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import { getVisaConfig } from "./VisaTypeDialog";
 import { AnalyzedFilesCard } from "./cards/AnalyzedFilesCard";
 import { FormSchemaCard } from "./cards/FormSchemaCard";
 import { FormPilotCard } from "./cards/FormPilotCard";
+import { AnalysisPreviewDialog } from "./AnalysisPreviewDialog";
 
 interface ApplicationCardProps {
   className?: string;
@@ -25,6 +27,8 @@ function ApplicationHeader({
 }: {
   onOpenVisaDialog: () => void;
 }) {
+  const [showAnalysisPreview, setShowAnalysisPreview] = useState(false);
+
   const selectedVisaType = useCaseDetailStore(
     (state) => state.selectedVisaType,
   );
@@ -61,26 +65,36 @@ function ApplicationHeader({
     return "";
   };
 
+  // Handle opening analysis preview
+  const handleOpenAnalysisPreview = () => {
+    setShowAnalysisPreview(true);
+  };
+
+  // Handle confirming analysis
+  const handleConfirmAnalysis = () => {
+    startAnalysis();
+  };
+
   // State: No visa type selected
   if (!selectedVisaType) {
     return (
       <div className="shrink-0 h-14 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
         <div>
           <h3 className="text-sm font-semibold text-stone-800">Application</h3>
-          <p className="text-[10px] text-stone-400">
+          <p className="text-xs text-stone-400">
             Select visa type to begin
           </p>
         </div>
         <button
           onClick={onOpenVisaDialog}
           className={cn(
-            "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
+            "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
             "bg-[#0E4268] text-white hover:bg-[#0a3555]",
             "flex items-center gap-1.5",
           )}
         >
           Select Visa Type
-          <ChevronRight className="size-3.5" />
+          <ChevronRight className="size-4" />
         </button>
       </div>
     );
@@ -105,8 +119,8 @@ function ApplicationHeader({
                 <h3 className="text-sm font-semibold text-stone-800">
                   {visaConfig.shortName}
                 </h3>
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <Loader2 className="size-3 animate-spin text-[#0E4268]" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Loader2 className="size-3.5 animate-spin text-[#0E4268]" />
                   <span className="text-[#0E4268]">Analyzing... {analysisProgress}%</span>
                 </div>
               </div>
@@ -136,8 +150,8 @@ function ApplicationHeader({
                 <h3 className="text-sm font-semibold text-stone-800">
                   {visaConfig.shortName}
                 </h3>
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <div className="size-1.5 rounded-full bg-amber-500" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="size-2 rounded-full bg-amber-500" />
                   <span className="text-amber-600">Update available</span>
                 </div>
               </div>
@@ -145,17 +159,25 @@ function ApplicationHeader({
           )}
         </div>
         <button
-          onClick={() => startAnalysis()}
+          onClick={handleOpenAnalysisPreview}
           className={cn(
-            "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
+            "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
             "border border-[#0E4268] text-[#0E4268] bg-transparent",
             "hover:bg-[#0E4268]/5",
             "flex items-center gap-1.5",
           )}
         >
           Re-analyze
-          <RefreshCw className="size-3.5" />
+          <RefreshCw className="size-4" />
         </button>
+
+        {/* Analysis Preview Dialog */}
+        <AnalysisPreviewDialog
+          open={showAnalysisPreview}
+          onOpenChange={setShowAnalysisPreview}
+          documentGroups={documentGroups}
+          onConfirm={handleConfirmAnalysis}
+        />
       </div>
     );
   }
@@ -179,8 +201,8 @@ function ApplicationHeader({
                 <h3 className="text-sm font-semibold text-stone-800">
                   {visaConfig.shortName}
                 </h3>
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <div className="size-1.5 rounded-full bg-emerald-500" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="size-2 rounded-full bg-emerald-500" />
                   <span className="text-emerald-600">Ready</span>
                 </div>
               </div>
@@ -210,13 +232,13 @@ function ApplicationHeader({
                 {visaConfig.shortName}
               </h3>
               {isLoadingDocuments ? (
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <Loader2 className="size-3 animate-spin text-stone-400" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Loader2 className="size-3.5 animate-spin text-stone-400" />
                   <span className="text-stone-500">Processing documents...</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 text-[10px]">
-                  <div className="size-1.5 rounded-full bg-stone-400" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="size-2 rounded-full bg-stone-400" />
                   <span className="text-stone-500">Ready to analyze</span>
                 </div>
               )}
@@ -229,27 +251,35 @@ function ApplicationHeader({
           <TooltipTrigger asChild>
             <span>
               <button
-                onClick={() => startAnalysis()}
+                onClick={handleOpenAnalysisPreview}
                 disabled={isRunAnalysisDisabled}
                 className={cn(
-                  "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5",
+                  "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5",
                   isRunAnalysisDisabled
                     ? "bg-stone-100 text-stone-400 cursor-not-allowed"
                     : "bg-[#0E4268] text-white hover:bg-[#0a3555]",
                 )}
               >
-                <Play className="size-3.5" />
+                <Play className="size-4" />
                 Run Analysis
               </button>
             </span>
           </TooltipTrigger>
           {isRunAnalysisDisabled && (
             <TooltipContent side="bottom">
-              <p className="text-xs">{getDisabledReason()}</p>
+              <p className="text-sm">{getDisabledReason()}</p>
             </TooltipContent>
           )}
         </Tooltip>
       </TooltipProvider>
+
+      {/* Analysis Preview Dialog */}
+      <AnalysisPreviewDialog
+        open={showAnalysisPreview}
+        onOpenChange={setShowAnalysisPreview}
+        documentGroups={documentGroups}
+        onConfirm={handleConfirmAnalysis}
+      />
     </div>
   );
 }
@@ -270,13 +300,13 @@ function ApplicationEmptyState() {
   if (!selectedVisaType) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="size-14 rounded-2xl bg-stone-100 flex items-center justify-center mb-4">
-          <FileSearch className="size-7 text-stone-400" />
+        <div className="size-16 rounded-2xl bg-stone-100 flex items-center justify-center mb-4">
+          <FileSearch className="size-8 text-stone-400" />
         </div>
-        <h4 className="text-sm font-medium text-stone-700 mb-1.5 text-balance text-center">
+        <h4 className="text-base font-medium text-stone-700 mb-2 text-balance text-center">
           Ready to Build Your Application
         </h4>
-        <p className="text-xs text-stone-500 text-center text-pretty max-w-sm">
+        <p className="text-sm text-stone-500 text-center text-pretty max-w-sm">
           Select a visa type from the button above to start analyzing your documents and auto-fill the application form.
         </p>
       </div>
@@ -287,13 +317,13 @@ function ApplicationEmptyState() {
   if (!hasReviewedDocs) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="size-14 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
-          <FileSearch className="size-7 text-amber-500" />
+        <div className="size-16 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
+          <FileSearch className="size-8 text-amber-500" />
         </div>
-        <h4 className="text-sm font-medium text-stone-700 mb-1.5 text-balance text-center">
+        <h4 className="text-base font-medium text-stone-700 mb-2 text-balance text-center">
           Review Documents First
         </h4>
-        <p className="text-xs text-stone-500 text-center text-pretty max-w-sm">
+        <p className="text-sm text-stone-500 text-center text-pretty max-w-sm">
           Review and confirm your uploaded documents in File Hub before running the analysis.
         </p>
       </div>
@@ -303,13 +333,13 @@ function ApplicationEmptyState() {
   // Visa selected and has reviewed docs - ready to analyze
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6">
-      <div className="size-14 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4">
-        <Sparkles className="size-7 text-emerald-500" />
+      <div className="size-16 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4">
+        <Sparkles className="size-8 text-emerald-500" />
       </div>
-      <h4 className="text-sm font-medium text-stone-700 mb-1.5 text-balance text-center">
+      <h4 className="text-base font-medium text-stone-700 mb-2 text-balance text-center">
         Documents Ready for Analysis
       </h4>
-      <p className="text-xs text-stone-500 text-center text-pretty max-w-sm">
+      <p className="text-sm text-stone-500 text-center text-pretty max-w-sm">
         Your documents are reviewed. Click "Run Analysis" above to extract information and auto-fill the application form.
       </p>
     </div>

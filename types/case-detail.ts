@@ -116,6 +116,7 @@ export interface DocumentGroup {
   status: "pending" | "reviewed";
   hasChanges?: boolean;
   files: DocumentFile[];
+  isSpecial?: boolean; // Special documents like Case Notes - auto-confirmed, no review needed
 }
 
 // Application Phase (5-stage state machine)

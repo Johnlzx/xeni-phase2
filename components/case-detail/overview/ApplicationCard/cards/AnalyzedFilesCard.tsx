@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, ArrowRight } from "lucide-react";
+import { FileText, ExternalLink } from "lucide-react";
 import { useCaseDetailStore, useAnalyzedFiles } from "@/store/case-detail-store";
 
 // Skeleton loading state
@@ -13,7 +13,7 @@ function AnalyzedFilesCardSkeleton() {
             <FileText className="size-3 text-stone-400" />
           </div>
           <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-            Source Files
+            Source Documents
           </span>
         </div>
       </div>
@@ -35,12 +35,12 @@ function AnalyzedFilesCardEmpty() {
             <FileText className="size-3 text-stone-400" />
           </div>
           <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-            Source Files
+            Source Documents
           </span>
         </div>
       </div>
       <div className="p-3 flex items-center justify-center">
-        <p className="text-xs text-stone-400">No files analyzed</p>
+        <p className="text-xs text-stone-400">No documents analyzed</p>
       </div>
     </div>
   );
@@ -61,21 +61,9 @@ export function AnalyzedFilesCard() {
     return <AnalyzedFilesCardEmpty />;
   }
 
-  // Group files by category
-  const groupedFiles = analyzedFiles.reduce(
-    (acc, file) => {
-      if (!acc[file.groupTitle]) {
-        acc[file.groupTitle] = { pages: 0, count: 0 };
-      }
-      acc[file.groupTitle].pages += file.pages;
-      acc[file.groupTitle].count += 1;
-      return acc;
-    },
-    {} as Record<string, { pages: number; count: number }>,
-  );
-
-  const totalDocuments = Object.keys(groupedFiles).length;
-  const totalPages = analyzedFiles.reduce((sum, f) => sum + f.pages, 0);
+  // Count unique document groups
+  const uniqueGroups = new Set(analyzedFiles.map((f) => f.groupTitle));
+  const totalDocuments = uniqueGroups.size;
 
   const handleViewAll = () => {
     setActiveNav("documents");
@@ -90,7 +78,7 @@ export function AnalyzedFilesCard() {
             <FileText className="size-3 text-stone-600" />
           </div>
           <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-            Source Files
+            Source Documents
           </span>
         </div>
       </div>
@@ -102,15 +90,15 @@ export function AnalyzedFilesCard() {
             {totalDocuments}
           </p>
           <p className="text-[11px] text-stone-500 mt-1">
-            documents · {totalPages} pages
+            documents analyzed
           </p>
         </div>
         <button
           onClick={handleViewAll}
           className="size-7 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
-          aria-label="View all files"
+          aria-label="View source documents"
         >
-          <ArrowRight className="size-4" />
+          <ExternalLink className="size-3.5" />
         </button>
       </div>
     </div>

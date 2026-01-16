@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -170,14 +170,14 @@ function ExtractedDataCard({ passport }: { passport: PassportInfo }) {
   );
 }
 
-// Compact upload slot component
+// Compact upload slot component - click to simulate upload
 function UploadSlot({
   label,
   icon: Icon,
   file,
   isAnalyzing,
   isComplete,
-  accept,
+  mockFileName,
   onUpload,
   onRemove,
 }: {
@@ -186,21 +186,16 @@ function UploadSlot({
   file: File | null;
   isAnalyzing: boolean;
   isComplete: boolean;
-  accept: string;
+  mockFileName: string;
   onUpload: (file: File) => void;
   onRemove: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) onUpload(droppedFile);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) onUpload(selectedFile);
+  // Click to simulate upload with mock file
+  const handleClick = () => {
+    const mockFile = new File(["mock content"], mockFileName, {
+      type: "application/pdf",
+    });
+    onUpload(mockFile);
   };
 
   // Analyzing state
@@ -248,18 +243,11 @@ function UploadSlot({
 
   // Upload state
   return (
-    <label
-      className="flex-1 border border-dashed border-stone-300 rounded-xl p-3 cursor-pointer hover:border-stone-400 hover:bg-stone-50 transition-colors"
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={handleDrop}
+    <button
+      type="button"
+      onClick={handleClick}
+      className="flex-1 border border-dashed border-stone-300 rounded-xl p-3 cursor-pointer hover:border-stone-400 hover:bg-stone-50 transition-colors text-left"
     >
-      <input
-        ref={inputRef}
-        type="file"
-        className="sr-only"
-        accept={accept}
-        onChange={handleChange}
-      />
       <div className="flex items-center gap-2.5">
         <div className="size-9 rounded-lg bg-stone-100 flex items-center justify-center">
           <Icon className="size-4 text-stone-400" />
@@ -269,7 +257,7 @@ function UploadSlot({
           <p className="text-[11px] text-rose-500">* Required</p>
         </div>
       </div>
-    </label>
+    </button>
   );
 }
 
@@ -487,7 +475,7 @@ export function CreateCaseModal({
                 )}
               </AnimatePresence>
 
-              {/* Upload slots - always visible */}
+              {/* Upload slots - always visible, click to simulate */}
               <div className="flex gap-3">
                 <UploadSlot
                   label="Case Notes"
@@ -495,7 +483,7 @@ export function CreateCaseModal({
                   file={caseNotesFile}
                   isAnalyzing={caseNotesAnalyzing}
                   isComplete={!!caseNotesFile && !caseNotesAnalyzing}
-                  accept=".pdf,.doc,.docx,.txt"
+                  mockFileName="Case_Notes_Bob_Brown.pdf"
                   onUpload={handleCaseNotesUpload}
                   onRemove={handleCaseNotesRemove}
                 />
@@ -505,7 +493,7 @@ export function CreateCaseModal({
                   file={passportFile}
                   isAnalyzing={passportAnalyzing}
                   isComplete={!!passportData}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  mockFileName="Passport_Bob_Brown.pdf"
                   onUpload={handlePassportUpload}
                   onRemove={handlePassportRemove}
                 />

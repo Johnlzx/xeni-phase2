@@ -71,7 +71,7 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
                 <h2 className="text-sm font-semibold text-stone-400">
                   Case Profile
                 </h2>
-                <p className="text-[10px] text-stone-400">
+                <p className="text-xs text-stone-400">
                   Upload passport to auto-fill
                 </p>
               </>
@@ -80,9 +80,9 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
                 <h2 className="text-sm font-semibold text-stone-800 truncate">
                   {passport.givenNames} {passport.surname}
                 </h2>
-                <p className="text-[10px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   <span className="font-mono">{passport.passportNumber}</span>
-                  <span className="mx-1 text-stone-300">·</span>
+                  <span className="mx-1.5 text-stone-300">·</span>
                   <span>{passport.nationality}</span>
                 </p>
               </>
@@ -91,7 +91,7 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
         </div>
         {/* Reference badge */}
         {isEditingRef ? (
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <input
               ref={refInputRef}
               type="text"
@@ -99,14 +99,14 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
               onChange={(e) => setRefValue(e.target.value)}
               onBlur={handleRefSave}
               onKeyDown={handleRefKeyDown}
-              className="w-24 font-mono text-[10px] text-stone-600 bg-white border border-stone-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0E4268]"
+              className="w-28 font-mono text-xs text-stone-600 bg-white border border-stone-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0E4268]"
             />
             <button
               onClick={handleRefSave}
-              className="size-6 rounded flex items-center justify-center text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+              className="size-7 rounded flex items-center justify-center text-stone-500 hover:text-stone-700 hover:bg-stone-100"
               aria-label="Save reference"
             >
-              <Check className="size-3.5" />
+              <Check className="size-4" />
             </button>
           </div>
         ) : (
@@ -115,25 +115,25 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
               setRefValue(caseReference);
               setIsEditingRef(true);
             }}
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 hover:bg-stone-200 transition-colors group shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-stone-100 hover:bg-stone-200 transition-colors group shrink-0"
           >
-            <span className="font-mono text-[10px] text-stone-600">
+            <span className="font-mono text-xs text-stone-600">
               {caseReference}
             </span>
-            <Pencil className="size-3 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Pencil className="size-3.5 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         )}
       </div>
 
       {/* Content - compact layout */}
-      <div className="flex-1 px-4 py-3 overflow-y-auto scrollbar-hide">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+      <div className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           {/* Row 1: DOB & Sex */}
           <div>
-            <p className="text-[10px] text-stone-400 mb-0.5">Date of Birth</p>
+            <p className="text-xs text-stone-500 mb-1">Date of Birth</p>
             <p
               className={cn(
-                "text-xs tabular-nums",
+                "text-sm tabular-nums",
                 isEmpty ? "text-stone-400" : "text-stone-800",
               )}
             >
@@ -141,10 +141,10 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
             </p>
           </div>
           <div>
-            <p className="text-[10px] text-stone-400 mb-0.5">Sex</p>
+            <p className="text-xs text-stone-500 mb-1">Sex</p>
             <p
               className={cn(
-                "text-xs",
+                "text-sm",
                 isEmpty ? "text-stone-400" : "text-stone-800",
               )}
             >
@@ -160,10 +160,10 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
 
           {/* Row 2: Email & Phone */}
           <div>
-            <p className="text-[10px] text-stone-400 mb-0.5">Email</p>
+            <p className="text-xs text-stone-500 mb-1">Email</p>
             <p
               className={cn(
-                "text-xs truncate",
+                "text-sm truncate",
                 isEmpty || !contactInfo?.email
                   ? "text-stone-400"
                   : "text-stone-800",
@@ -173,10 +173,10 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
             </p>
           </div>
           <div>
-            <p className="text-[10px] text-stone-400 mb-0.5">Phone</p>
+            <p className="text-xs text-stone-500 mb-1">Phone</p>
             <p
               className={cn(
-                "text-xs tabular-nums truncate",
+                "text-sm tabular-nums truncate",
                 isEmpty || !contactInfo?.phone
                   ? "text-stone-400"
                   : "text-stone-800",
@@ -188,7 +188,7 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
 
           {/* Row 3: Visa & Lawyer */}
           <div>
-            <p className="text-[10px] text-stone-400 mb-0.5">Visa Type</p>
+            <p className="text-xs text-stone-500 mb-1">Visa Type</p>
             <button
               onClick={onOpenVisaDialog}
               className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
@@ -203,17 +203,17 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
                   >
                     <visaConfig.icon size={12} className={visaConfig.color} />
                   </div>
-                  <span className="text-xs text-stone-800">
+                  <span className="text-sm text-stone-800">
                     {visaConfig.shortName}
                   </span>
                 </>
               ) : (
-                <span className="text-xs text-stone-400">Not selected</span>
+                <span className="text-sm text-stone-400">Not selected</span>
               )}
             </button>
           </div>
           <div>
-            <p className="text-[10px] text-stone-400 mb-0.5">Lawyer</p>
+            <p className="text-xs text-stone-500 mb-1">Lawyer</p>
             <TeamMemberEditor
               member={caseTeam.lawyer}
               isCurrentUser={caseTeam.lawyer?.id === "john-001"}
@@ -224,7 +224,7 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
 
           {/* Row 4: Assistant */}
           <div className="col-span-2">
-            <p className="text-[10px] text-stone-400 mb-0.5">Assistant</p>
+            <p className="text-xs text-stone-500 mb-1">Assistant</p>
             <TeamMemberEditor
               member={caseTeam.assistant}
               emptyText="Not assigned"

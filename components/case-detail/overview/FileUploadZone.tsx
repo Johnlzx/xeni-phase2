@@ -11,6 +11,7 @@ import {
   ExternalLink,
   CheckCircle2,
   Clock,
+  Check,
 } from "lucide-react";
 import {
   useCaseDetailStore,
@@ -33,8 +34,12 @@ export function FileUploadZone() {
   // Filter out unclassified for display
   const classifiedGroups = groups.filter((g) => g.id !== "unclassified");
 
+  // Reviewable groups (exclude special documents like Case Notes)
+  const reviewableGroups = classifiedGroups.filter((g) => !g.isSpecial);
+  const specialGroups = classifiedGroups.filter((g) => g.isSpecial);
+
   const totalFiles = groups.reduce((sum, g) => sum + g.files.length, 0);
-  const reviewedGroups = classifiedGroups.filter(
+  const reviewedGroups = reviewableGroups.filter(
     (g) => g.status === "reviewed",
   ).length;
 
@@ -66,7 +71,7 @@ export function FileUploadZone() {
               Documents
             </h3>
             {totalFiles > 0 && (
-              <p className="text-[10px] text-stone-500">
+              <p className="text-xs text-stone-500">
                 {classifiedGroups.length} documents
               </p>
             )}
@@ -99,10 +104,10 @@ export function FileUploadZone() {
               <Upload className="size-5 text-stone-500" />
             </div>
             <div className="text-center">
-              <p className="text-xs font-medium text-stone-600 text-balance">
+              <p className="text-sm font-medium text-stone-600 text-balance">
                 Upload Documents
               </p>
-              <p className="text-[10px] text-stone-400 text-pretty">
+              <p className="text-xs text-stone-400 text-pretty">
                 Click to simulate
               </p>
             </div>
@@ -115,31 +120,38 @@ export function FileUploadZone() {
               <div className="grid grid-cols-4 gap-2">
                 {classifiedGroups.map((group) => {
                   const isReviewed = group.status === "reviewed";
+                  const isSpecial = group.isSpecial;
 
                   return (
                     <button
                       key={group.id}
                       onClick={() => handleOpenReview(group)}
-                      title={group.title}
-                      className="flex flex-col items-center gap-1.5 p-2 rounded-lg hover:bg-stone-50 transition-colors"
+                      title={isSpecial ? `${group.title} (Auto-confirmed)` : group.title}
+                      className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors hover:bg-stone-50"
                     >
                       {/* File icon with status badge */}
                       <div className="relative">
                         <FileText className="size-8 text-stone-400" />
                         {/* Status badge - bottom right */}
                         <div className={cn(
-                          "absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full flex items-center justify-center",
-                          isReviewed ? "bg-emerald-500" : "bg-amber-500",
+                          "absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center",
+                          isSpecial
+                            ? "bg-stone-500"
+                            : isReviewed
+                              ? "bg-emerald-500"
+                              : "bg-amber-500",
                         )}>
-                          {isReviewed ? (
+                          {isSpecial ? (
+                            <Check className="size-2.5 text-white" strokeWidth={3} />
+                          ) : isReviewed ? (
                             <CheckCircle2 className="size-2.5 text-white" strokeWidth={3} />
                           ) : (
-                            <Clock className="size-2 text-white" strokeWidth={3} />
+                            <Clock className="size-2.5 text-white" strokeWidth={3} />
                           )}
                         </div>
                       </div>
                       {/* File name */}
-                      <span className="text-[10px] font-medium text-stone-600 truncate max-w-[64px] text-center">
+                      <span className="text-xs font-medium text-stone-600 truncate max-w-[72px] text-center">
                         {group.title}
                       </span>
                     </button>
@@ -150,20 +162,20 @@ export function FileUploadZone() {
 
             {/* Review status - always at bottom */}
             <div className="pt-2 mt-2 border-t border-stone-100 shrink-0">
-              {reviewedGroups < classifiedGroups.length ? (
+              {reviewableGroups.length > 0 && reviewedGroups < reviewableGroups.length ? (
                 // Pending review
-                <div className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-amber-600 font-medium">
-                    {classifiedGroups.length - reviewedGroups} need review
+                    {reviewableGroups.length - reviewedGroups} need review
                   </span>
                   <span className="text-stone-400 tabular-nums">
-                    {reviewedGroups}/{classifiedGroups.length} ready
+                    {reviewedGroups + specialGroups.length}/{classifiedGroups.length} ready
                   </span>
                 </div>
               ) : (
                 // All reviewed
-                <div className="flex items-center justify-center gap-1.5 text-[10px]">
-                  <CheckCircle2 className="size-3 text-emerald-500" />
+                <div className="flex items-center justify-center gap-1.5 text-xs">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" />
                   <span className="font-medium text-emerald-600">
                     All {classifiedGroups.length} documents ready
                   </span>

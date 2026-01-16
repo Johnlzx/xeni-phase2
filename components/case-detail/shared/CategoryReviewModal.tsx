@@ -684,9 +684,9 @@ export function CategoryReviewModal({
                       {isPending && (
                         <button
                           onClick={handleConfirm}
-                          className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                          className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/30 border border-emerald-500 transition-all"
                         >
-                          <Check size={14} />
+                          <Check size={16} strokeWidth={2.5} />
                           Confirm Review
                         </button>
                       )}
@@ -837,9 +837,9 @@ export function CategoryReviewModal({
                   {isPending && (
                     <button
                       onClick={handleConfirm}
-                      className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/30 border border-emerald-500 transition-all"
                     >
-                      <Check size={14} />
+                      <Check size={16} strokeWidth={2.5} />
                       Confirm Review
                     </button>
                   )}

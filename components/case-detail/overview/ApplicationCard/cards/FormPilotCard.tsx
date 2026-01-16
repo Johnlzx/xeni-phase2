@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, ArrowRight, Pause, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Play, ExternalLink, Pause, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCaseDetailStore, useFormPilotStatus } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
 
@@ -160,9 +160,9 @@ export function FormPilotCard() {
         <button
           onClick={handleLaunch}
           className="size-7 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
-          aria-label="Open Form Pilot"
+          aria-label="Launch Form Pilot"
         >
-          <ArrowRight className="size-4" />
+          <ExternalLink className="size-3.5" />
         </button>
       </div>
     </div>

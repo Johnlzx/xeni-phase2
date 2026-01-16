@@ -2,17 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Globe,
-  MoreVertical,
-  Trash2,
-  Settings,
-  X,
-  Plus,
-  Search,
-  ChevronDown,
-  Filter,
-} from "lucide-react";
+import { Globe, MoreVertical, Trash2, Settings, X, Plus } from "lucide-react";
 import { XeniLogo } from "@/components/case-detail/XeniLogo";
 import { CreateCaseModal } from "@/components/case-hub/CreateCaseModal";
 import { useCaseDetailStore } from "@/store/case-detail-store";
@@ -20,43 +10,13 @@ import { MOCK_CASES } from "@/data/cases";
 import { VISA_TYPES, CASE_STATUSES, ROUTES } from "@/data/constants";
 import { formatDate, cn } from "@/lib/utils";
 import Link from "next/link";
-import type { Case, VisaType, CaseStatus, PassportInfo } from "@/types";
+import type { Case, VisaType, PassportInfo } from "@/types";
 
 export default function CasesPage() {
   const router = useRouter();
   const [cases, setCases] = useState<Case[]>(MOCK_CASES);
   const [settingsCase, setSettingsCase] = useState<Case | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<CaseStatus | "all">("all");
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  // Filter cases based on search and status
-  const filteredCases = cases.filter((c) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      `${c.applicant.passport.givenNames} ${c.applicant.passport.surname}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      c.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Close filter menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        filterRef.current &&
-        !filterRef.current.contains(event.target as Node)
-      ) {
-        setShowFilterMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const handleOpenCreateModal = useCallback(() => {
     setShowCreateModal(true);
@@ -64,7 +24,7 @@ export default function CasesPage() {
 
   // Get store initialization function
   const initializeCaseFromCreation = useCaseDetailStore(
-    (state) => state.initializeCaseFromCreation
+    (state) => state.initializeCaseFromCreation,
   );
 
   const handleCreateCase = useCallback(
@@ -105,13 +65,13 @@ export default function CasesPage() {
       };
       sessionStorage.setItem(
         `new-case-${newCaseId}`,
-        JSON.stringify(newCaseData)
+        JSON.stringify(newCaseData),
       );
 
       // Navigate to the case overview
       router.push(ROUTES.CASE_DETAIL(newCaseId));
     },
-    [router, initializeCaseFromCreation]
+    [router, initializeCaseFromCreation],
   );
 
   const handleDeleteCase = (caseId: string) => {
@@ -131,12 +91,6 @@ export default function CasesPage() {
     console.log("Saving settings for case:", caseId, data);
     setSettingsCase(null);
   };
-
-  // Stats
-  const totalCases = cases.length;
-  const intakeCases = cases.filter(
-    (c) => c.status === "intake" || c.status === "review",
-  ).length;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -160,140 +114,48 @@ export default function CasesPage() {
       </header>
 
       {/* Action Bar */}
-      <div className="sticky top-16 z-10 bg-[#F8FAFC] border-b border-gray-100">
+      <div className="sticky top-14 z-10 bg-[#F8FAFC] border-b border-gray-100">
         <div className="px-8 py-4">
-          <div className="flex items-center justify-between gap-6">
-            {/* Left: Title & Stats */}
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold text-gray-900">Cases</h1>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 bg-stone-100 text-stone-600 text-sm font-medium rounded-full">
-                  {totalCases} total
-                </span>
-                {intakeCases > 0 && (
-                  <span className="px-2.5 py-1 bg-amber-50 text-amber-600 text-sm font-medium rounded-full">
-                    {intakeCases} in progress
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="flex items-center justify-between">
+            {/* Left: Title */}
+            <h1 className="text-xl font-semibold text-gray-900">Cases</h1>
 
-            {/* Center: Search */}
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Search by name or reference..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#0E4369]/20 focus:border-[#0E4369] transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Right: Filter & New Case Button */}
-            <div className="flex items-center gap-3">
-              {/* Status Filter */}
-              <div className="relative" ref={filterRef}>
-                <button
-                  onClick={() => setShowFilterMenu(!showFilterMenu)}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors",
-                    statusFilter !== "all"
-                      ? "bg-[#0E4369]/5 border-[#0E4369]/20 text-[#0E4369]"
-                      : "bg-white border-stone-200 text-stone-600 hover:border-stone-300",
-                  )}
-                >
-                  <Filter className="w-4 h-4" />
-                  <span>
-                    {statusFilter === "all"
-                      ? "All Status"
-                      : CASE_STATUSES[statusFilter].label}
-                  </span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-
-                {showFilterMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-stone-100 py-1 z-50">
-                    <button
-                      onClick={() => {
-                        setStatusFilter("all");
-                        setShowFilterMenu(false);
-                      }}
-                      className={cn(
-                        "w-full px-4 py-2.5 text-left text-sm transition-colors",
-                        statusFilter === "all"
-                          ? "bg-stone-50 text-[#0E4369] font-medium"
-                          : "text-stone-700 hover:bg-stone-50",
-                      )}
-                    >
-                      All Status
-                    </button>
-                    {Object.entries(CASE_STATUSES).map(([key, config]) => (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          setStatusFilter(key as CaseStatus);
-                          setShowFilterMenu(false);
-                        }}
-                        className={cn(
-                          "w-full px-4 py-2.5 text-left text-sm transition-colors",
-                          statusFilter === key
-                            ? "bg-stone-50 text-[#0E4369] font-medium"
-                            : "text-stone-700 hover:bg-stone-50",
-                        )}
-                      >
-                        {config.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* New Case Button */}
-              <button
-                onClick={handleOpenCreateModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                New Case
-              </button>
-            </div>
+            {/* Right: New Case Button */}
+            <button
+              onClick={handleOpenCreateModal}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Case
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <main className="p-8">
-        {filteredCases.length === 0 ? (
+        {cases.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4">
               <Globe className="w-8 h-8 text-stone-400" />
             </div>
             <h3 className="text-lg font-medium text-stone-800 mb-2">
-              {searchQuery || statusFilter !== "all"
-                ? "No cases found"
-                : "No cases yet"}
+              No cases yet
             </h3>
             <p className="text-sm text-stone-500 mb-6 max-w-sm">
-              {searchQuery || statusFilter !== "all"
-                ? "Try adjusting your search or filter criteria."
-                : "Create your first case to get started with visa applications."}
+              Create your first case to get started with visa applications.
             </p>
-            {!searchQuery && statusFilter === "all" && (
-              <button
-                onClick={handleOpenCreateModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Create First Case
-              </button>
-            )}
+            <button
+              onClick={handleOpenCreateModal}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create First Case
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCases.map((caseItem) => (
+            {cases.map((caseItem) => (
               <CaseCard
                 key={caseItem.id}
                 caseData={caseItem}

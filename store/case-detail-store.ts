@@ -2424,13 +2424,15 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         assistantId?: string;
       }) => {
         // Create special document groups for case notes and passport
-        // These are auto-reviewed since they were uploaded during case creation
+        // Case Notes is special - auto-confirmed, no review needed
+        // Passport still needs user review
         const caseNotesGroup: DocumentGroup = {
           id: "case_notes",
           title: "Case Notes",
           tag: "Case Notes",
           mergedFileName: data.caseNotesFileName,
           status: "reviewed", // Auto-confirmed - no user review needed
+          isSpecial: true, // Special document - always ready
           files: [
             {
               id: `cn_${Date.now()}`,
@@ -2439,8 +2441,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               pages: 5,
               date: "Just now",
               type: "pdf",
-              isNew: false, // Not marked as new since it's auto-confirmed
-              isAnalyzed: true, // Pre-analyzed during case creation
+              isNew: false,
+              isAnalyzed: true,
               analyzedAt: new Date().toISOString(),
             },
           ],
@@ -2451,7 +2453,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           title: "Passport",
           tag: "Passport",
           mergedFileName: data.passportFileName,
-          status: "reviewed", // Auto-confirmed
+          status: "pending", // Needs user review
           files: [
             {
               id: `pp_${Date.now()}`,
@@ -2460,9 +2462,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               pages: 1,
               date: "Just now",
               type: "pdf",
-              isNew: false,
-              isAnalyzed: true,
-              analyzedAt: new Date().toISOString(),
+              isNew: true, // Mark as new so user knows to review
             },
           ],
         };
@@ -2499,6 +2499,9 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           false,
           "initializeCaseFromCreation"
         );
+
+        // Initialize form schema for the selected visa type
+        get().initFormSchema(data.visaType);
 
         // Evolve checklist based on new data
         get().evolveChecklist();
@@ -2606,8 +2609,8 @@ export const useIssueCounts = () => {
   }, [enhancedQualityIssues]);
 };
 
-// Selector to detect if reviewed files have changed since the last analysis
-// Like git diff: compares current ready files vs last analyzed files
+// Selector to detect if there are new ready files since the last analysis
+// Only triggers when NEW files are confirmed (ready), not when files become pending
 export const useHasNewFilesAfterAnalysis = () =>
   useCaseDetailStore((state) => {
     // Only check if analysis has been completed
@@ -2620,15 +2623,11 @@ export const useHasNewFilesAfterAnalysis = () =>
 
     const analyzedFileIds = state.analyzedFileIds;
 
-    // Check if any file was added (in current but not in analyzed)
-    const hasAdditions = currentReviewedFileIds.some(
+    // Only check for NEW ready files - files that are reviewed but weren't analyzed
+    // Don't trigger for removals (e.g., when a group goes from reviewed to pending)
+    const hasNewReadyFiles = currentReviewedFileIds.some(
       (id) => !analyzedFileIds.includes(id)
     );
 
-    // Check if any file was removed (in analyzed but not in current)
-    const hasRemovals = analyzedFileIds.some(
-      (id) => !currentReviewedFileIds.includes(id)
-    );
-
-    return hasAdditions || hasRemovals;
+    return hasNewReadyFiles;
   });
