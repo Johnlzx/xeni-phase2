@@ -147,7 +147,7 @@ function FieldInput({
               : "border-stone-300 bg-white"
           )}
         >
-          {value && <Check className="size-3" strokeWidth={3} />}
+          {Boolean(value) && <Check className="size-3" strokeWidth={3} />}
         </button>
       )}
 
