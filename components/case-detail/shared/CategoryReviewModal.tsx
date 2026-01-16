@@ -379,6 +379,7 @@ export function CategoryReviewModal({
     new Set(),
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(
     null,
   );
@@ -393,6 +394,9 @@ export function CategoryReviewModal({
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const markFileForDeletion = useCaseDetailStore(
     (state) => state.markFileForDeletion,
+  );
+  const deleteDocumentGroup = useCaseDetailStore(
+    (state) => state.deleteDocumentGroup,
   );
 
   // Clear hasChanges flag when modal opens
@@ -700,7 +704,16 @@ export function CategoryReviewModal({
                       size={48}
                       className="mx-auto mb-4 text-stone-300"
                     />
-                    <p className="text-sm text-stone-500">No pages</p>
+                    <p className="text-sm text-stone-500 mb-4">No pages in this category</p>
+                    {!group.isSpecial && (
+                      <button
+                        onClick={() => setShowDeleteCategoryConfirm(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="size-4" />
+                        Remove Category
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -888,6 +901,54 @@ export function CategoryReviewModal({
                     className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
                   >
                     Delete
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Delete Category Confirmation Dialog */}
+        <AnimatePresence>
+          {showDeleteCategoryConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 z-10 flex items-center justify-center bg-black/40"
+              onClick={() => setShowDeleteCategoryConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold text-stone-800 mb-2 text-balance">
+                  Remove "{group.title}" category?
+                </h3>
+                <p className="text-sm text-stone-500 mb-6 text-pretty">
+                  This empty category will be removed from your document list.
+                  You can always create a new category later.
+                </p>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setShowDeleteCategoryConfirm(false)}
+                    className="px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      deleteDocumentGroup(group.id);
+                      onClose();
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
+                  >
+                    Remove
                   </button>
                 </div>
               </motion.div>
