@@ -2597,8 +2597,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       },
 
       // Initialize case from CreateCaseModal data
-      // Case Notes and Passport are uploaded but NOT analyzed yet
-      // Analysis must be run manually to extract data
+      // Passport is parsed immediately at case creation (not dependent on analysis)
+      // Case Notes is auto-confirmed, Passport requires confirm review
       initializeCaseFromCreation: (data: {
         visaType: VisaType;
         passport: PassportInfo;
@@ -2616,7 +2616,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           extractedAt: new Date().toISOString(),
         };
 
-        // Create document groups - case notes is special (auto-confirmed), others pending review
+        // Create document groups - case notes is special (auto-confirmed), passport requires review
         const caseNotesGroup: DocumentGroup = {
           id: "case_notes",
           title: "Case Notes",
@@ -2637,12 +2637,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           ],
         };
 
+        // Passport document requires confirm review (not isSpecial)
         const passportGroup: DocumentGroup = {
           id: "passport",
           title: "Passport",
           tag: "Passport",
           mergedFileName: data.passportFileName,
-          status: "pending", // Needs user review
+          status: "pending", // Requires confirm review
           files: [
             {
               id: `pp_${Date.now()}`,
@@ -2652,7 +2653,6 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               date: "Just now",
               type: "pdf",
               isNew: true,
-              // NOT analyzed - will be analyzed when user runs analysis
             },
           ],
         };
@@ -2666,11 +2666,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           files: [],
         };
 
-        // Client profile starts EMPTY - will be populated after analysis
-        const emptyProfile = {
+        // Client profile includes passport data parsed at creation time
+        // Passport parsing is immediate, not dependent on analysis
+        const profileWithPassport = {
+          passport: data.passport,
           completeness: 0,
-          // passport data will be extracted and filled during analysis
         };
+        profileWithPassport.completeness = calculateCompleteness(profileWithPassport);
 
         const documentGroups = [unclassifiedGroup, caseNotesGroup, passportGroup];
         const previews = syncFilePreviewsFromGroups(documentGroups);
@@ -2678,12 +2680,12 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         set(
           {
             selectedVisaType: data.visaType,
-            clientProfile: emptyProfile,
+            clientProfile: profileWithPassport,
             caseReference: data.referenceNumber || "REF-2024-001",
             caseNotesSummary: mockCaseNotesSummary,
             documentGroups,
             uploadedFilePreviews: previews,
-            // Reset analysis state - nothing analyzed yet
+            // Reset analysis state
             lastAnalysisAt: null,
             analyzedFileIds: [],
             analyzedFiles: [],

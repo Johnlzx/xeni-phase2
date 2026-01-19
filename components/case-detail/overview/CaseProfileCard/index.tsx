@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Pencil, Check, FileText, Users, BookOpen } from "lucide-react";
-import { useCaseDetailStore, useCaseNotesSummary, useClientProfile } from "@/store/case-detail-store";
+import { Pencil, Check, FileText, Users, BookOpen, AlertCircle } from "lucide-react";
+import { useCaseDetailStore, useCaseNotesSummary, useClientProfile, useDocumentGroups } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
 import { TeamMemberEditor } from "./TeamMemberEditor";
 import { PassportPreviewModal } from "./PassportPreviewModal";
@@ -14,6 +14,7 @@ interface CaseProfileCardProps {
 export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
   const caseNotesSummary = useCaseNotesSummary();
   const clientProfile = useClientProfile();
+  const documentGroups = useDocumentGroups();
   const caseTeam = useCaseDetailStore((state) => state.caseTeam);
   const caseReference = useCaseDetailStore((state) => state.caseReference);
   const setCaseReference = useCaseDetailStore(
@@ -25,6 +26,10 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
   const [isEditingRef, setIsEditingRef] = useState(false);
   const [refValue, setRefValue] = useState(caseReference);
   const [passportModalOpen, setPassportModalOpen] = useState(false);
+
+  // Check if passport document has been reviewed
+  const passportGroup = documentGroups.find((g) => g.id === "passport");
+  const isPassportReviewed = passportGroup?.status === "reviewed";
   const refInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -73,15 +78,27 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
               clientProfile.passport
-                ? "bg-gradient-to-r from-[#1a365d] to-[#0f2744] text-white shadow-sm hover:shadow-md hover:scale-[1.02]"
+                ? isPassportReviewed
+                  ? "bg-gradient-to-r from-[#0E4268] to-[#1a5a8a] text-white shadow-sm hover:shadow-md hover:scale-[1.02]"
+                  : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
                 : "bg-stone-100 text-stone-400 hover:bg-stone-200"
             )}
-            title={clientProfile.passport ? "View passport details" : "No passport data"}
+            title={
+              clientProfile.passport
+                ? isPassportReviewed
+                  ? "View passport details"
+                  : "Passport pending review"
+                : "No passport data"
+            }
           >
             <BookOpen className="size-3.5" />
             <span>Passport</span>
             {clientProfile.passport && (
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              isPassportReviewed ? (
+                <span className="size-1.5 rounded-full bg-emerald-400" />
+              ) : (
+                <AlertCircle className="size-3.5 text-amber-500" />
+              )
             )}
           </button>
 
@@ -190,6 +207,7 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
         open={passportModalOpen}
         onOpenChange={setPassportModalOpen}
         passport={clientProfile.passport}
+        isReviewed={isPassportReviewed}
       />
     </div>
   );

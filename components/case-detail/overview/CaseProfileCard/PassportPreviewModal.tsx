@@ -18,6 +18,7 @@ interface PassportPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   passport: PassportInfo | undefined;
+  isReviewed?: boolean;
 }
 
 // Format date from ISO to display format (DD MMM YYYY)
@@ -95,6 +96,7 @@ export function PassportPreviewModal({
   open,
   onOpenChange,
   passport,
+  isReviewed = false,
 }: PassportPreviewModalProps) {
   if (!open) return null;
 
@@ -134,10 +136,17 @@ export function PassportPreviewModal({
                         <Globe className="size-3" />
                         {passport.nationality}
                       </span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px] font-medium text-emerald-300">
-                        <ShieldCheck className="size-3" />
-                        Verified
-                      </span>
+                      {isReviewed ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px] font-medium text-emerald-300">
+                          <ShieldCheck className="size-3" />
+                          Confirmed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-[10px] font-medium text-amber-300">
+                          <Calendar className="size-3" />
+                          Pending Review
+                        </span>
+                      )}
                     </div>
                   </>
                 ) : (
