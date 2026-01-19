@@ -119,9 +119,9 @@ export interface DocumentGroup {
   isSpecial?: boolean; // Special documents like Case Notes - auto-confirmed, no review needed
 }
 
-// Application Phase (5-stage state machine)
+// Application Phase (4-stage state machine)
+// Note: Visa type is now selected at case creation, so "landing" stage is removed
 export type ApplicationPhase =
-  | "landing" // Select Visa Type
   | "analyzing" // Document analysis in progress (includes Gap Analysis)
   | "questionnaire" // Quick questionnaire
   | "checklist" // Main checklist interface
@@ -304,6 +304,14 @@ export interface AnalyzedFileSummary {
   analyzedAt: string;
 }
 
+// Case Notes Summary (extracted from case notes during creation)
+export interface CaseNotesSummary {
+  summary: string; // Brief summary of the case
+  clientBackground?: string; // Client background info
+  keyDates?: string[]; // Important dates mentioned
+  extractedAt?: string; // When the summary was extracted
+}
+
 // Case Detail Store State
 export interface CaseDetailState {
   // Current case ID
@@ -311,6 +319,9 @@ export interface CaseDetailState {
 
   // Case Reference
   caseReference: string;
+
+  // Case Notes Summary
+  caseNotesSummary: CaseNotesSummary | null;
 
   // Case Team
   caseTeam: CaseTeam;
@@ -321,7 +332,7 @@ export interface CaseDetailState {
   // Client Profile
   clientProfile: ClientProfile;
 
-  // Visa Type Selection
+  // Visa Type - set at case creation, always has a value after case is created
   selectedVisaType: VisaType | null;
 
   // Checklist
@@ -401,6 +412,9 @@ export interface CaseDetailActions {
   // Case Team
   setLawyer: (lawyer: CaseTeamMember) => void;
   setAssistant: (assistant: CaseTeamMember | undefined) => void;
+
+  // Case Notes Summary
+  setCaseNotesSummary: (summary: CaseNotesSummary | null) => void;
 
   // Client Profile
   updateClientProfile: (updates: Partial<ClientProfile>) => void;

@@ -1,21 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Pencil, Check, User } from "lucide-react";
-import { useCaseDetailStore } from "@/store/case-detail-store";
+import { Pencil, Check, FileText, Users, BookOpen } from "lucide-react";
+import { useCaseDetailStore, useCaseNotesSummary, useClientProfile } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
 import { TeamMemberEditor } from "./TeamMemberEditor";
-import { getVisaConfig } from "../ApplicationCard/VisaTypeDialog";
+import { PassportPreviewModal } from "./PassportPreviewModal";
 
 interface CaseProfileCardProps {
   onOpenVisaDialog?: () => void;
 }
 
 export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
-  const clientProfile = useCaseDetailStore((state) => state.clientProfile);
-  const selectedVisaType = useCaseDetailStore(
-    (state) => state.selectedVisaType,
-  );
+  const caseNotesSummary = useCaseNotesSummary();
+  const clientProfile = useClientProfile();
   const caseTeam = useCaseDetailStore((state) => state.caseTeam);
   const caseReference = useCaseDetailStore((state) => state.caseReference);
   const setCaseReference = useCaseDetailStore(
@@ -26,11 +24,8 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
 
   const [isEditingRef, setIsEditingRef] = useState(false);
   const [refValue, setRefValue] = useState(caseReference);
+  const [passportModalOpen, setPassportModalOpen] = useState(false);
   const refInputRef = useRef<HTMLInputElement>(null);
-
-  const { passport, contactInfo } = clientProfile;
-  const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
-  const isEmpty = !passport;
 
   useEffect(() => {
     if (isEditingRef && refInputRef.current) {
@@ -59,38 +54,39 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
 
   return (
     <div className="h-full rounded-xl border border-stone-200 bg-white flex flex-col overflow-hidden">
-      {/* Header - unified height h-14 */}
+      {/* Header */}
       <div className="shrink-0 h-14 px-4 flex items-center justify-between gap-3 bg-stone-50 border-b border-stone-200">
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-lg border border-stone-300 bg-white flex items-center justify-center">
-            <User className="size-4 text-stone-500" />
+            <FileText className="size-4 text-stone-500" />
           </div>
           <div className="min-w-0">
-            {isEmpty ? (
-              <>
-                <h2 className="text-sm font-semibold text-stone-400">
-                  Case Profile
-                </h2>
-                <p className="text-xs text-stone-400">
-                  Upload passport to auto-fill
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 className="text-sm font-semibold text-stone-800 truncate">
-                  {passport.givenNames} {passport.surname}
-                </h2>
-                <p className="text-xs text-stone-500">
-                  <span className="font-mono">{passport.passportNumber}</span>
-                  <span className="mx-1.5 text-stone-300">·</span>
-                  <span>{passport.nationality}</span>
-                </p>
-              </>
-            )}
+            <h2 className="text-sm font-semibold text-stone-800">Case Notes</h2>
+            <p className="text-xs text-stone-500">Summary & Configuration</p>
           </div>
         </div>
-        {/* Reference badge */}
-        {isEditingRef ? (
+
+        <div className="flex items-center gap-2">
+          {/* Passport Preview Button */}
+          <button
+            onClick={() => setPassportModalOpen(true)}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
+              clientProfile.passport
+                ? "bg-gradient-to-r from-[#1a365d] to-[#0f2744] text-white shadow-sm hover:shadow-md hover:scale-[1.02]"
+                : "bg-stone-100 text-stone-400 hover:bg-stone-200"
+            )}
+            title={clientProfile.passport ? "View passport details" : "No passport data"}
+          >
+            <BookOpen className="size-3.5" />
+            <span>Passport</span>
+            {clientProfile.passport && (
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
+
+          {/* Reference badge */}
+          {isEditingRef ? (
           <div className="flex items-center gap-1.5 shrink-0">
             <input
               ref={refInputRef}
@@ -123,118 +119,78 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
             <Pencil className="size-3.5 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         )}
+        </div>
       </div>
 
-      {/* Content - compact layout */}
-      <div className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          {/* Row 1: DOB & Sex */}
-          <div>
-            <p className="text-xs text-stone-500 mb-1">Date of Birth</p>
-            <p
-              className={cn(
-                "text-sm tabular-nums",
-                isEmpty ? "text-stone-400" : "text-stone-800",
-              )}
-            >
-              {isEmpty ? "—" : passport.dateOfBirth}
+      {/* Content */}
+      <div className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide flex flex-col gap-4">
+        {/* Case Notes Summary */}
+        <div className="flex-1">
+          <div className="flex items-center gap-1.5 mb-2">
+            <FileText className="size-3.5 text-stone-400" />
+            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider">
+              Summary
             </p>
           </div>
-          <div>
-            <p className="text-xs text-stone-500 mb-1">Sex</p>
-            <p
-              className={cn(
-                "text-sm",
-                isEmpty ? "text-stone-400" : "text-stone-800",
-              )}
-            >
-              {isEmpty
-                ? "—"
-                : passport.sex === "M"
-                  ? "Male"
-                  : passport.sex === "F"
-                    ? "Female"
-                    : "Other"}
+          {caseNotesSummary ? (
+            <p className="text-sm text-stone-700 leading-relaxed">
+              {caseNotesSummary.summary}
             </p>
-          </div>
+          ) : (
+            <p className="text-sm text-stone-400 italic">
+              Upload case notes to generate summary
+            </p>
+          )}
+        </div>
 
-          {/* Row 2: Email & Phone */}
-          <div>
-            <p className="text-xs text-stone-500 mb-1">Email</p>
-            <p
-              className={cn(
-                "text-sm truncate",
-                isEmpty || !contactInfo?.email
-                  ? "text-stone-400"
-                  : "text-stone-800",
-              )}
-            >
-              {contactInfo?.email || "—"}
+        {/* Divider */}
+        <div className="border-t border-stone-100" />
+
+        {/* Team Configuration */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-3">
+            <Users className="size-3.5 text-stone-400" />
+            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider">
+              Case Team
             </p>
           </div>
-          <div>
-            <p className="text-xs text-stone-500 mb-1">Phone</p>
-            <p
-              className={cn(
-                "text-sm tabular-nums truncate",
-                isEmpty || !contactInfo?.phone
-                  ? "text-stone-400"
-                  : "text-stone-800",
-              )}
-            >
-              {contactInfo?.phone || "—"}
-            </p>
-          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Lawyer */}
+            <div className="bg-stone-50 rounded-lg px-3 py-2.5">
+              <p className="text-[10px] text-stone-500 uppercase tracking-wider mb-1">
+                Lawyer
+              </p>
+              <TeamMemberEditor
+                member={caseTeam.lawyer}
+                isCurrentUser={caseTeam.lawyer?.id === "john-001"}
+                onSave={setLawyer}
+                compact
+              />
+            </div>
 
-          {/* Row 3: Visa & Lawyer */}
-          <div>
-            <p className="text-xs text-stone-500 mb-1">Visa Type</p>
-            <button
-              onClick={onOpenVisaDialog}
-              className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
-            >
-              {visaConfig ? (
-                <>
-                  <div
-                    className={cn(
-                      "size-5 rounded flex items-center justify-center shrink-0",
-                      visaConfig.bgColor,
-                    )}
-                  >
-                    <visaConfig.icon size={12} className={visaConfig.color} />
-                  </div>
-                  <span className="text-sm text-stone-800">
-                    {visaConfig.shortName}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-stone-400">Not selected</span>
-              )}
-            </button>
-          </div>
-          <div>
-            <p className="text-xs text-stone-500 mb-1">Lawyer</p>
-            <TeamMemberEditor
-              member={caseTeam.lawyer}
-              isCurrentUser={caseTeam.lawyer?.id === "john-001"}
-              onSave={setLawyer}
-              compact
-            />
-          </div>
-
-          {/* Row 4: Assistant */}
-          <div className="col-span-2">
-            <p className="text-xs text-stone-500 mb-1">Assistant</p>
-            <TeamMemberEditor
-              member={caseTeam.assistant}
-              emptyText="Not assigned"
-              onSave={setAssistant}
-              onClear={() => setAssistant(undefined)}
-              compact
-            />
+            {/* Assistant */}
+            <div className="bg-stone-50 rounded-lg px-3 py-2.5">
+              <p className="text-[10px] text-stone-500 uppercase tracking-wider mb-1">
+                Assistant
+              </p>
+              <TeamMemberEditor
+                member={caseTeam.assistant}
+                emptyText="Not assigned"
+                onSave={setAssistant}
+                onClear={() => setAssistant(undefined)}
+                compact
+              />
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Passport Preview Modal */}
+      <PassportPreviewModal
+        open={passportModalOpen}
+        onOpenChange={setPassportModalOpen}
+        passport={clientProfile.passport}
+      />
     </div>
   );
 }

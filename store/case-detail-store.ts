@@ -19,6 +19,7 @@ import {
   ApplicationChecklistItem,
   QualityIssue,
   ChecklistSectionType,
+  CaseNotesSummary,
   // Enhanced types for checklist workspace
   EnhancedChecklistItem,
   EnhancedQualityIssue,
@@ -728,6 +729,7 @@ const initialChecklistItems: ChecklistItem[] = [
 const initialState: CaseDetailState = {
   caseId: null,
   caseReference: "REF-2024-001",
+  caseNotesSummary: null,
   caseTeam: {
     lawyer: { id: "john-001", name: "John", email: "john@example.com" },
   },
@@ -754,8 +756,8 @@ const initialState: CaseDetailState = {
   analysisProgress: 0,
   lastAnalysisAt: null,
   analyzedFileIds: [],
-  // Application Phase
-  applicationPhase: "landing",
+  // Application Phase - starts at analyzing since visa type is set at case creation
+  applicationPhase: "analyzing",
   formSchema: null,
   formPilotStatus: {
     totalSessions: 0,
@@ -877,6 +879,11 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           false,
           "setAssistant"
         );
+      },
+
+      // Case Notes Summary
+      setCaseNotesSummary: (summary: CaseNotesSummary | null) => {
+        set({ caseNotesSummary: summary }, false, "setCaseNotesSummary");
       },
 
       // Client Profile
@@ -2601,13 +2608,22 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         advisorId?: string;
         assistantId?: string;
       }) => {
-        // Create document groups - all pending review, nothing analyzed yet
+        // Mock case notes summary (would be extracted from uploaded case notes)
+        const mockCaseNotesSummary: CaseNotesSummary = {
+          summary: "Client seeking Skilled Worker visa for a Senior Software Engineer position at ACME Technology Ltd. Has previous UK visa history (Tier 4 Student, 2015-2018). Strong financial background with verified savings. Main concern is ensuring CoS documentation is complete.",
+          clientBackground: "British national currently residing in London. Has worked in tech industry for 8+ years.",
+          keyDates: ["CoS expected: Feb 2024", "Target application: Mar 2024"],
+          extractedAt: new Date().toISOString(),
+        };
+
+        // Create document groups - case notes is special (auto-confirmed), others pending review
         const caseNotesGroup: DocumentGroup = {
           id: "case_notes",
           title: "Case Notes",
           tag: "Case Notes",
           mergedFileName: data.caseNotesFileName,
-          status: "pending", // Needs review like other documents
+          status: "reviewed", // Auto-confirmed, no review needed
+          isSpecial: true, // Special document - doesn't require manual review
           files: [
             {
               id: `cn_${Date.now()}`,
@@ -2616,8 +2632,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               pages: 5,
               date: "Just now",
               type: "pdf",
-              isNew: true,
-              // NOT analyzed - will be analyzed when user runs analysis
+              isNew: false, // Not marked as new since it's auto-confirmed
             },
           ],
         };
@@ -2665,6 +2680,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             selectedVisaType: data.visaType,
             clientProfile: emptyProfile,
             caseReference: data.referenceNumber || "REF-2024-001",
+            caseNotesSummary: mockCaseNotesSummary,
             documentGroups,
             uploadedFilePreviews: previews,
             // Reset analysis state - nothing analyzed yet
@@ -2673,8 +2689,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             analyzedFiles: [],
             isAnalyzingDocuments: false,
             analysisProgress: 0,
-            // Reset application phase to landing
-            applicationPhase: "landing",
+            // Reset application phase to analyzing (ready to start analysis)
+            applicationPhase: "analyzing",
             formSchema: null,
           },
           false,
@@ -2702,6 +2718,8 @@ export const useActiveNav = () =>
   useCaseDetailStore((state) => state.activeNav);
 export const useClientProfile = () =>
   useCaseDetailStore((state) => state.clientProfile);
+export const useCaseNotesSummary = () =>
+  useCaseDetailStore((state) => state.caseNotesSummary);
 export const useSelectedVisaType = () =>
   useCaseDetailStore((state) => state.selectedVisaType);
 export const useChecklist = () =>
