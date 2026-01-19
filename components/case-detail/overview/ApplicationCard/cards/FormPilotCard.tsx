@@ -105,10 +105,14 @@ export function FormPilotCard() {
     return <FormPilotCardEmpty />;
   }
 
-  const { totalSessions, lastRunStatus } = formPilotStatus;
+  const { totalSessions, lastRunStatus, lastRunAt } = formPilotStatus;
 
   // Determine current task status
   const getTaskStatus = (): TaskStatus => {
+    // null status with recent lastRunAt means running
+    if (lastRunStatus === null && lastRunAt) {
+      return "running";
+    }
     if (!lastRunStatus) return "idle";
     if (lastRunStatus === "success") return "completed";
     if (lastRunStatus === "cancelled") return "paused";

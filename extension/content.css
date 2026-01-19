@@ -1,0 +1,39 @@
+/* Form Pilot Content Script Styles */
+
+/* Filling animation */
+.form-pilot-filling {
+  outline: 2px solid #3B82F6 !important;
+  outline-offset: 2px !important;
+  background-color: #EFF6FF !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Filled state */
+.form-pilot-filled {
+  outline: 2px solid #10B981 !important;
+  outline-offset: 2px !important;
+  background-color: #ECFDF5 !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Radio button container when filling/filled */
+label:has(.form-pilot-filling),
+label:has(.form-pilot-filled) {
+  outline: 2px solid #10B981;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Pulse animation for filling state */
+@keyframes form-pilot-pulse {
+  0%, 100% {
+    outline-color: #3B82F6;
+  }
+  50% {
+    outline-color: #93C5FD;
+  }
+}
+
+.form-pilot-filling {
+  animation: form-pilot-pulse 0.6s ease-in-out infinite;
+}

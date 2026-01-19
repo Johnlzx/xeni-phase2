@@ -437,6 +437,7 @@ export interface CaseDetailActions {
   confirmGroupReview: (groupId: string) => void;
   uploadDocuments: () => Promise<void>;
   uploadToGroup: (groupId: string, fileCount?: number) => void;
+  uploadAndAutoClassify: (totalPages?: number) => void;
 
   // Demo Controls
   advanceDemoStage: () => void;

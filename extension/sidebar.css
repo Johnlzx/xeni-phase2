@@ -1,0 +1,446 @@
+/* Xeni Sidebar Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e5e5;
+  background: #fff;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo {
+  width: 24px;
+  height: 24px;
+  background: #1a1a1a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.app-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a1a;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Icon Buttons */
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.icon-btn:hover {
+  background: #f5f5f5;
+  color: #1a1a1a;
+}
+
+.icon-btn-small {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #999;
+  transition: all 0.15s;
+}
+
+.icon-btn-small:hover {
+  background: #f5f5f5;
+  color: #666;
+}
+
+/* Case Header */
+.case-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.back-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.back-btn:hover {
+  background: #f5f5f5;
+  color: #1a1a1a;
+}
+
+.case-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.case-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  background: #f0f0f0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+/* Tags */
+.tags {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tag-primary {
+  background: #e8f4fc;
+  color: #0E4268;
+  border: 1px solid #b8d4e8;
+}
+
+.tag-secondary {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #e5e5e5;
+}
+
+/* Client Card */
+.client-card {
+  margin: 0 16px;
+  padding: 16px;
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+}
+
+.client-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #666;
+}
+
+.client-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.client-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-label {
+  font-size: 11px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: 13px;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+/* Workflow Section */
+.workflow-section {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.section-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* Workflow Item */
+.workflow-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.workflow-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workflow-status {
+  color: #999;
+}
+
+.workflow-status.active {
+  color: #3b82f6;
+}
+
+.workflow-status.completed {
+  color: #10b981;
+}
+
+.workflow-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workflow-title {
+  font-weight: 500;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.workflow-subtitle {
+  font-size: 12px;
+  color: #999;
+}
+
+.workflow-item-right {
+  display: flex;
+  gap: 4px;
+}
+
+/* Activities Section */
+.activities-section {
+  margin-bottom: 16px;
+}
+
+.activities-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.activities-toggle:hover {
+  background: #fafafa;
+}
+
+.activities-content {
+  display: none;
+  padding: 12px;
+  border: 1px solid #e5e5e5;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  margin-top: -1px;
+}
+
+.activities-content.open {
+  display: block;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.activity-status {
+  font-size: 12px;
+  color: #666;
+}
+
+.activity-status.filling {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.activity-status.completed {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.activity-progress {
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+}
+
+/* Run Button */
+.run-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: #0E4268;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 16px;
+}
+
+.run-btn:hover {
+  background: #0a3352;
+}
+
+.run-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.run-btn.running {
+  background: #3b82f6;
+}
+
+.run-btn.completed {
+  background: #10b981;
+}
+
+/* Show More */
+.show-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.show-more:hover {
+  color: #1a1a1a;
+}
+
+/* Animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulsing {
+  animation: pulse 1.5s ease-in-out infinite;
+}

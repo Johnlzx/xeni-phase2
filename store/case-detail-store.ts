@@ -1109,17 +1109,9 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               status: "pending",
               files: [],
             };
-            const unclassifiedIndex = state.documentGroups.findIndex(
-              (g) => g.id === "unclassified",
-            );
-            let newGroups: DocumentGroup[];
-            if (unclassifiedIndex === -1) {
-              newGroups = [newGroup, ...state.documentGroups];
-            } else {
-              newGroups = [...state.documentGroups];
-              newGroups.splice(unclassifiedIndex, 0, newGroup);
-            }
-            return { documentGroups: newGroups };
+            // Append new category to the end of the array
+            // The grid filters out "unclassified" so new categories appear at the end
+            return { documentGroups: [...state.documentGroups, newGroup] };
           },
           false,
           "addDocumentGroup",
@@ -1374,6 +1366,166 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           },
           false,
           "uploadToGroup",
+        );
+      },
+
+      // Upload and auto-classify documents (simulates AI classification)
+      uploadAndAutoClassify: (totalPages: number = 8) => {
+        set(
+          (state) => {
+            const timestamp = Date.now();
+
+            // Helper to normalize names for comparison (remove spaces, hyphens, lowercase)
+            const normalize = (str: string) =>
+              str.toLowerCase().replace(/[\s\-_]/g, "");
+
+            // Categories to potentially create (simulating AI classification results)
+            // Always create at least one NEW category that doesn't exist yet
+            const allPossibleCategories = [
+              { category: "Passport", pages: 2 },
+              { category: "Bank Statement", pages: 3 },
+              { category: "Employment Letter", pages: 2 },
+              { category: "Utility Bill", pages: 2 },
+              { category: "Tax Documents", pages: 2 },
+              { category: "Education Certificate", pages: 1 },
+              { category: "Travel History", pages: 2 },
+              { category: "Medical Records", pages: 2 },
+              { category: "Marriage Certificate", pages: 1 },
+              { category: "Birth Certificate", pages: 1 },
+            ];
+
+            // Find categories that don't exist yet
+            const existingNormalizedTitles = state.documentGroups
+              .filter((g) => g.id !== "unclassified")
+              .map((g) => normalize(g.title));
+
+            const newCategories = allPossibleCategories.filter(
+              (c) => !existingNormalizedTitles.includes(normalize(c.category))
+            );
+
+            // Select 1-2 NEW categories to create
+            const numNewCategories = Math.min(
+              Math.floor(Math.random() * 2) + 1,
+              newCategories.length
+            );
+            const selectedNewCategories = newCategories
+              .sort(() => Math.random() - 0.5)
+              .slice(0, numNewCategories);
+
+            // Also add files to 0-1 existing categories (if any exist)
+            const existingClassifiedGroups = state.documentGroups.filter(
+              (g) => g.id !== "unclassified" && g.id !== "case_notes"
+            );
+            const selectedExistingGroup =
+              existingClassifiedGroups.length > 0 && Math.random() > 0.3
+                ? existingClassifiedGroups[
+                    Math.floor(Math.random() * existingClassifiedGroups.length)
+                  ]
+                : null;
+
+            // Calculate pages distribution
+            const newCategoryPages = selectedNewCategories.reduce(
+              (sum, c) => sum + c.pages,
+              0
+            );
+            const existingGroupPages = selectedExistingGroup ? 2 : 0;
+            const classifiedPages = newCategoryPages + existingGroupPages;
+            const unclassifiedPages = Math.max(2, totalPages - classifiedPages);
+
+            let newGroups = [...state.documentGroups];
+
+            // Create NEW category groups with files
+            selectedNewCategories.forEach((result, catIndex) => {
+              const newFiles: DocumentFile[] = [];
+              for (let i = 0; i < result.pages; i++) {
+                newFiles.push({
+                  id: `classified_${timestamp}_${catIndex}_${i}`,
+                  name: `${result.category.replace(/\s+/g, "_")}_Page_${i + 1}.pdf`,
+                  size: "0.5 MB",
+                  pages: 1,
+                  date: "Just now",
+                  type: "pdf",
+                  isNew: true,
+                });
+              }
+
+              const newGroup: DocumentGroup = {
+                id: `group_${timestamp}_${catIndex}`,
+                title: result.category,
+                tag: result.category,
+                mergedFileName: `${result.category.replace(/\s+/g, "_")}.pdf`,
+                status: "pending",
+                hasChanges: true,
+                files: newFiles,
+              };
+              newGroups.push(newGroup);
+            });
+
+            // Add files to an existing group (if selected)
+            if (selectedExistingGroup) {
+              const newFiles: DocumentFile[] = [];
+              for (let i = 0; i < existingGroupPages; i++) {
+                newFiles.push({
+                  id: `existing_${timestamp}_${i}`,
+                  name: `${selectedExistingGroup.title.replace(/\s+/g, "_")}_New_${i + 1}.pdf`,
+                  size: "0.5 MB",
+                  pages: 1,
+                  date: "Just now",
+                  type: "pdf",
+                  isNew: true,
+                });
+              }
+              newGroups = newGroups.map((g) =>
+                g.id === selectedExistingGroup.id
+                  ? {
+                      ...g,
+                      files: [...g.files, ...newFiles],
+                      status: "pending" as const,
+                      hasChanges: true,
+                    }
+                  : g
+              );
+            }
+
+            // Add remaining pages to unclassified
+            const unclassifiedGroup = newGroups.find(
+              (g) => g.id === "unclassified"
+            );
+            if (unclassifiedGroup && unclassifiedPages > 0) {
+              const existingUnclassifiedCount = unclassifiedGroup.files.filter(
+                (f) => !f.isRemoved
+              ).length;
+              const unclassifiedFiles: DocumentFile[] = [];
+              for (let i = 0; i < unclassifiedPages; i++) {
+                unclassifiedFiles.push({
+                  id: `unclassified_${timestamp}_${i}`,
+                  name: `Scan_Page_${String(existingUnclassifiedCount + i + 1).padStart(3, "0")}.pdf`,
+                  size: "0.5 MB",
+                  pages: 1,
+                  date: "Just now",
+                  type: "pdf",
+                  isNew: true,
+                });
+              }
+              newGroups = newGroups.map((g) =>
+                g.id === "unclassified"
+                  ? {
+                      ...g,
+                      files: [...g.files, ...unclassifiedFiles],
+                      hasChanges: true,
+                    }
+                  : g
+              );
+            }
+
+            const previews = syncFilePreviewsFromGroups(newGroups);
+            return {
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "uploadAndAutoClassify",
         );
       },
 
@@ -1755,23 +1907,48 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         get().evolveChecklist();
       },
 
-      // Launch Form Pilot (opens external tool)
+      // Launch Form Pilot (opens mock form with auto-fill)
       launchFormPilot: () => {
+        const state = get();
+
+        // Import and use the bridge dynamically to avoid SSR issues
+        import("@/lib/form-pilot-bridge").then(({ launchFormPilotDemo, listenForCompletion }) => {
+          // Launch the form pilot demo
+          const { cleanup } = launchFormPilotDemo();
+
+          // Listen for completion
+          const removeListener = listenForCompletion((result) => {
+            set(
+              (currentState) => ({
+                formPilotStatus: {
+                  ...currentState.formPilotStatus,
+                  totalSessions: currentState.formPilotStatus.totalSessions + 1,
+                  lastRunAt: new Date().toISOString(),
+                  lastRunStatus: result.status === "success" ? "success" : "error",
+                },
+              }),
+              false,
+              "formPilotComplete"
+            );
+
+            // Cleanup
+            removeListener();
+            cleanup();
+          });
+        });
+
+        // Update status immediately to show "running"
         set(
-          (state) => ({
+          (currentState) => ({
             formPilotStatus: {
-              ...state.formPilotStatus,
-              totalSessions: state.formPilotStatus.totalSessions + 1,
+              ...currentState.formPilotStatus,
               lastRunAt: new Date().toISOString(),
-              lastRunStatus: "success",
+              lastRunStatus: null, // null indicates running/in-progress
             },
           }),
           false,
           "launchFormPilot"
         );
-
-        // In real implementation, this would open the external Form Pilot tool
-        // window.open('form-pilot://launch', '_blank');
       },
 
       // Start analysis and generate questionnaire (Application workflow)
@@ -2413,7 +2590,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       },
 
       // Initialize case from CreateCaseModal data
-      // Case Notes and Passport are special documents - auto-confirmed (no need for user review)
+      // Case Notes and Passport are uploaded but NOT analyzed yet
+      // Analysis must be run manually to extract data
       initializeCaseFromCreation: (data: {
         visaType: VisaType;
         passport: PassportInfo;
@@ -2423,16 +2601,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         advisorId?: string;
         assistantId?: string;
       }) => {
-        // Create special document groups for case notes and passport
-        // Case Notes is special - auto-confirmed, no review needed
-        // Passport still needs user review
+        // Create document groups - all pending review, nothing analyzed yet
         const caseNotesGroup: DocumentGroup = {
           id: "case_notes",
           title: "Case Notes",
           tag: "Case Notes",
           mergedFileName: data.caseNotesFileName,
-          status: "reviewed", // Auto-confirmed - no user review needed
-          isSpecial: true, // Special document - always ready
+          status: "pending", // Needs review like other documents
           files: [
             {
               id: `cn_${Date.now()}`,
@@ -2441,9 +2616,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               pages: 5,
               date: "Just now",
               type: "pdf",
-              isNew: false,
-              isAnalyzed: true,
-              analyzedAt: new Date().toISOString(),
+              isNew: true,
+              // NOT analyzed - will be analyzed when user runs analysis
             },
           ],
         };
@@ -2462,7 +2636,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               pages: 1,
               date: "Just now",
               type: "pdf",
-              isNew: true, // Mark as new so user knows to review
+              isNew: true,
+              // NOT analyzed - will be analyzed when user runs analysis
             },
           ],
         };
@@ -2476,12 +2651,11 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           files: [],
         };
 
-        // Calculate profile completeness with passport
-        const newProfile = {
-          passport: data.passport,
+        // Client profile starts EMPTY - will be populated after analysis
+        const emptyProfile = {
           completeness: 0,
+          // passport data will be extracted and filled during analysis
         };
-        newProfile.completeness = calculateCompleteness(newProfile);
 
         const documentGroups = [unclassifiedGroup, caseNotesGroup, passportGroup];
         const previews = syncFilePreviewsFromGroups(documentGroups);
@@ -2489,12 +2663,19 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         set(
           {
             selectedVisaType: data.visaType,
-            clientProfile: newProfile,
+            clientProfile: emptyProfile,
             caseReference: data.referenceNumber || "REF-2024-001",
             documentGroups,
             uploadedFilePreviews: previews,
-            // Don't set lastAnalysisAt - user needs to manually trigger analysis
-            // Documents are confirmed but not yet analyzed
+            // Reset analysis state - nothing analyzed yet
+            lastAnalysisAt: null,
+            analyzedFileIds: [],
+            analyzedFiles: [],
+            isAnalyzingDocuments: false,
+            analysisProgress: 0,
+            // Reset application phase to landing
+            applicationPhase: "landing",
+            formSchema: null,
           },
           false,
           "initializeCaseFromCreation"

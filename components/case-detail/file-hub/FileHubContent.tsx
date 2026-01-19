@@ -143,11 +143,11 @@ const Sidebar = ({
   const [processingStage, setProcessingStage] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
-  const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
+  const uploadAndAutoClassify = useCaseDetailStore((state) => state.uploadAndAutoClassify);
 
   const isProcessing = processingStage !== null;
 
-  // Run processing workflow
+  // Run processing workflow with auto-classification
   const runProcessingWorkflow = async () => {
     for (let i = 0; i < PROCESSING_STAGES.length; i++) {
       setProcessingStage(i);
@@ -156,8 +156,9 @@ const Sidebar = ({
       );
     }
     setProcessingStage(null);
-    const pageCount = Math.floor(Math.random() * 4) + 3;
-    uploadToGroup("unclassified", pageCount);
+    // Auto-classify uploaded documents into categories
+    const pageCount = Math.floor(Math.random() * 4) + 6; // 6-9 pages
+    uploadAndAutoClassify(pageCount);
   };
 
   // Drop target for internal page drags
@@ -1018,10 +1019,14 @@ const CategoryCard = ({
             </motion.button>
           </>
         ) : (
-          <div className="text-center">
-            <Inbox size={18} className="mx-auto mb-1 text-stone-300" />
-            <p className="text-[10px] text-stone-400">No files</p>
-            <p className="text-[9px] text-stone-300 mt-0.5">Drop files here</p>
+          <div className="w-full h-full p-2 flex items-center justify-center">
+            <div className="h-full aspect-[1/1.414] rounded border border-dashed border-stone-200 p-2 relative bg-white flex items-center justify-center">
+              <div className="text-center">
+                <Inbox size={18} className="mx-auto mb-1 text-stone-300" />
+                <p className="text-[10px] text-stone-400">No files</p>
+                <p className="text-[9px] text-stone-300 mt-0.5">Drop files here</p>
+              </div>
+            </div>
           </div>
         )}
 
