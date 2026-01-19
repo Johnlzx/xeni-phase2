@@ -2679,6 +2679,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         set(
           {
+            // Navigation - always land on overview page after case creation
+            activeNav: "overview",
             selectedVisaType: data.visaType,
             clientProfile: profileWithPassport,
             caseReference: data.referenceNumber || "REF-2024-001",
