@@ -1,11 +1,9 @@
 // Visa types available in the system
 export type VisaType =
   | 'skilled-worker'
-  | 'global-talent'
-  | 'student'
-  | 'family'
+  | 'naturalisation'
   | 'visitor'
-  | 'innovator';
+  | 'partner-spouse';
 
 // Case status types
 export type CaseStatus =

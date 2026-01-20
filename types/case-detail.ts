@@ -328,6 +328,7 @@ export interface CaseDetailState {
 
   // Navigation
   activeNav: CaseDetailNavItem;
+  highlightedGroupId: string | null;
 
   // Client Profile
   clientProfile: ClientProfile;
@@ -404,6 +405,8 @@ export interface CaseDetailState {
 export interface CaseDetailActions {
   // Navigation
   setActiveNav: (nav: CaseDetailNavItem) => void;
+  navigateToDocumentGroup: (groupId: string) => void;
+  clearHighlightedGroup: () => void;
 
   // Case
   setCaseId: (caseId: string) => void;

@@ -3,34 +3,24 @@ import type { VisaType, CaseStatus } from '@/types';
 // Visa type configuration
 export const VISA_TYPES: Record<VisaType, { label: string; description: string; color: string }> = {
   'skilled-worker': {
-    label: 'Skilled Worker',
+    label: 'Skilled Worker Visa',
     description: 'For individuals with a job offer from a licensed UK employer',
     color: '#3B82F6',
   },
-  'global-talent': {
-    label: 'Global Talent',
-    description: 'For leaders or potential leaders in academia, arts, or technology',
+  'naturalisation': {
+    label: 'Naturalisation',
+    description: 'For applying for British citizenship through naturalisation',
     color: '#8B5CF6',
   },
-  'student': {
-    label: 'Student',
-    description: 'For individuals accepted on a course at a licensed institution',
-    color: '#10B981',
-  },
-  'family': {
-    label: 'Family',
-    description: 'For family members of British citizens or settled persons',
-    color: '#F59E0B',
-  },
   'visitor': {
-    label: 'Visitor',
+    label: 'Visitor Visa',
     description: 'For short-term visits for tourism, business, or study',
     color: '#6B7280',
   },
-  'innovator': {
-    label: 'Innovator Founder',
-    description: 'For experienced business people seeking to establish a business',
-    color: '#EC4899',
+  'partner-spouse': {
+    label: 'Partner/Spouse Visa (outside the UK)',
+    description: 'For partners or spouses of British citizens applying from outside the UK',
+    color: '#F59E0B',
   },
 };
 

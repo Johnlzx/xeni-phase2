@@ -10,6 +10,7 @@ import {
   Users,
   FileText,
   ShieldCheck,
+  FileStack,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PassportInfo } from "@/types";
@@ -19,6 +20,7 @@ interface PassportPreviewModalProps {
   onOpenChange: (open: boolean) => void;
   passport: PassportInfo | undefined;
   isReviewed?: boolean;
+  onViewFullPassport?: () => void;
 }
 
 // Format date from ISO to display format (DD MMM YYYY)
@@ -97,6 +99,7 @@ export function PassportPreviewModal({
   onOpenChange,
   passport,
   isReviewed = false,
+  onViewFullPassport,
 }: PassportPreviewModalProps) {
   if (!open) return null;
 
@@ -241,16 +244,27 @@ export function PassportPreviewModal({
               Machine Readable Zone
             </p>
             {mrz && (
-              <div className="bg-stone-900 rounded-lg px-3 py-2.5 font-mono text-[11px] text-stone-300 leading-relaxed overflow-x-auto">
+              <div className="bg-stone-100 rounded-lg px-3 py-2.5 font-mono text-[11px] text-stone-600 leading-relaxed overflow-x-auto">
                 <p className="whitespace-nowrap">{mrz.line1}</p>
                 <p className="whitespace-nowrap">{mrz.line2}</p>
               </div>
             )}
 
             {/* Footer */}
-            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center gap-2 text-xs text-stone-400">
-              <FileText className="size-3.5" />
-              <span>Data extracted from uploaded passport document</span>
+            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-stone-400">
+                <FileText className="size-3.5" />
+                <span>Data extracted from uploaded passport document</span>
+              </div>
+              {onViewFullPassport && (
+                <button
+                  onClick={onViewFullPassport}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 transition-colors"
+                >
+                  <FileStack className="size-3" />
+                  <span>View Full Passport</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { Pencil, Check, FileText, Users, BookOpen, AlertCircle } from "lucide-react";
 import { useCaseDetailStore, useCaseNotesSummary, useClientProfile, useDocumentGroups } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
 import { TeamMemberEditor } from "./TeamMemberEditor";
 import { PassportPreviewModal } from "./PassportPreviewModal";
+import { CategoryReviewModal } from "../../shared";
 
 interface CaseProfileCardProps {
   onOpenVisaDialog?: () => void;
@@ -26,10 +29,18 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
   const [isEditingRef, setIsEditingRef] = useState(false);
   const [refValue, setRefValue] = useState(caseReference);
   const [passportModalOpen, setPassportModalOpen] = useState(false);
+  const [passportReviewModalOpen, setPassportReviewModalOpen] = useState(false);
 
   // Check if passport document has been reviewed
   const passportGroup = documentGroups.find((g) => g.id === "passport");
   const isPassportReviewed = passportGroup?.status === "reviewed";
+
+  const handleViewFullPassport = () => {
+    setPassportModalOpen(false);
+    if (passportGroup) {
+      setPassportReviewModalOpen(true);
+    }
+  };
   const refInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -208,7 +219,19 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
         onOpenChange={setPassportModalOpen}
         passport={clientProfile.passport}
         isReviewed={isPassportReviewed}
+        onViewFullPassport={passportGroup ? handleViewFullPassport : undefined}
       />
+
+      {/* Passport Review Modal (Full Document View) - wrapped in DndProvider for drag-drop support */}
+      {passportReviewModalOpen && passportGroup && (
+        <DndProvider backend={HTML5Backend}>
+          <CategoryReviewModal
+            group={passportGroup}
+            allGroups={documentGroups}
+            onClose={() => setPassportReviewModalOpen(false)}
+          />
+        </DndProvider>
+      )}
     </div>
   );
 }

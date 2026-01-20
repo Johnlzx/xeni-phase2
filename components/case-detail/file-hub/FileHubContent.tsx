@@ -25,6 +25,7 @@ import {
   useCaseDetailStore,
   useDocumentGroups,
   useIsLoadingDocuments,
+  useHighlightedGroupId,
 } from "@/store/case-detail-store";
 import {
   DropdownMenu,
@@ -740,17 +741,38 @@ const CategoryCard = ({
   group,
   allGroups,
   onReview,
+  isHighlighted,
+  onHighlightComplete,
 }: {
   group: DocumentGroup;
   allGroups: DocumentGroup[];
   onReview: () => void;
+  isHighlighted?: boolean;
+  onHighlightComplete?: () => void;
 }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(group.title);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const [showHighlight, setShowHighlight] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Handle highlight animation and scroll into view
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      // Scroll the card into view
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Show highlight effect
+      setShowHighlight(true);
+      // Clear highlight after animation
+      const timer = setTimeout(() => {
+        setShowHighlight(false);
+        onHighlightComplete?.();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isHighlighted, onHighlightComplete]);
 
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const confirmGroupReview = useCaseDetailStore(
@@ -887,7 +909,9 @@ const CategoryCard = ({
         "bg-white rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer",
         isOver || isFileDragOver
           ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 scale-[1.02]"
-          : "border-stone-200 hover:border-stone-300 hover:shadow-md",
+          : showHighlight
+            ? "border-[#0E4268] ring-2 ring-[#0E4268]/30 shadow-lg shadow-[#0E4268]/10"
+            : "border-stone-200 hover:border-stone-300 hover:shadow-md",
       )}
       onClick={onReview}
       onMouseEnter={() => setIsHovered(true)}
@@ -1496,9 +1520,13 @@ const LoadingState = () => {
 export function FileHubContent() {
   const groups = useDocumentGroups();
   const isLoading = useIsLoadingDocuments();
+  const highlightedGroupId = useHighlightedGroupId();
   const uploadDocuments = useCaseDetailStore((state) => state.uploadDocuments);
   const addDocumentGroup = useCaseDetailStore(
     (state) => state.addDocumentGroup,
+  );
+  const clearHighlightedGroup = useCaseDetailStore(
+    (state) => state.clearHighlightedGroup,
   );
 
   const [reviewGroup, setReviewGroup] = useState<DocumentGroup | null>(null);
@@ -1565,6 +1593,8 @@ export function FileHubContent() {
             group={group}
             allGroups={groups}
             onReview={() => setReviewGroup(group)}
+            isHighlighted={highlightedGroupId === group.id}
+            onHighlightComplete={clearHighlightedGroup}
           />
         ))}
 

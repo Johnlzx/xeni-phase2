@@ -11,7 +11,6 @@ import {
   FileText,
   User,
   Briefcase,
-  GraduationCap,
   Plane,
   CreditCard,
   Clock,
@@ -289,71 +288,6 @@ const generateChecklist = (
           value: "5 pages uploaded",
           source: "extracted",
           sourceDocument: "Employment Letter",
-          required: true,
-        },
-      ],
-    });
-  }
-
-  if (visaType === "student") {
-    sections.push({
-      id: "education",
-      title: "Course & Institution",
-      icon: GraduationCap,
-      description: "University and course details",
-      progress: answers.cas_received === "yes" ? 70 : 20,
-      items: [
-        {
-          id: "cas_number",
-          label: "CAS Number",
-          status: answers.cas_received === "yes" ? "complete" : "pending",
-          value:
-            answers.cas_received === "yes"
-              ? "CAS received"
-              : "Awaiting from institution",
-          source: "questionnaire",
-          required: true,
-        },
-        {
-          id: "institution",
-          label: "Institution Name",
-          status: "pending",
-          required: true,
-          editable: true,
-        },
-        {
-          id: "course_name",
-          label: "Course Name",
-          status: "pending",
-          required: true,
-          editable: true,
-        },
-        {
-          id: "course_level",
-          label: "Course Level",
-          status: "complete",
-          value:
-            answers.course_level === "undergraduate"
-              ? "Undergraduate"
-              : answers.course_level === "postgraduate"
-                ? "Postgraduate"
-                : answers.course_level === "phd"
-                  ? "PhD/Doctorate"
-                  : "Other",
-          source: "questionnaire",
-          required: true,
-        },
-        {
-          id: "course_start",
-          label: "Course Start Date",
-          status: "partial",
-          value:
-            answers.course_start === "within_month"
-              ? "Within 1 month"
-              : answers.course_start === "1_3_months"
-                ? "1-3 months"
-                : "3+ months",
-          source: "questionnaire",
           required: true,
         },
       ],

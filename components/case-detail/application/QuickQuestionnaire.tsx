@@ -148,119 +148,42 @@ const getQuestionsForVisa = (visaType: VisaType): Question[] => {
         required: true,
       },
     ],
-    "global-talent": [
+    naturalisation: [
       {
-        id: "endorsement",
-        question: "Has your client received their endorsement?",
+        id: "residency_period",
+        question: "Has your client lived in the UK for the required period?",
         description:
-          "Stage 1 endorsement from the relevant endorsing body is required",
+          "Generally 5 years for ILR holders, 3 years if married to a British citizen",
         type: "single",
         options: [
-          { id: "yes", label: "Yes, endorsement granted" },
-          { id: "pending", label: "Stage 1 application pending" },
-          { id: "no", label: "Endorsement not yet applied for" },
+          { id: "5_years", label: "Yes, 5+ years continuous residence" },
+          { id: "3_years_spouse", label: "3+ years (married to British citizen)" },
+          { id: "no", label: "Not yet met residency requirement" },
         ],
         required: true,
       },
       {
-        id: "talent_field",
-        question: "Which endorsing body route applies to your client?",
-        type: "single",
-        options: [
-          {
-            id: "tech",
-            label: "Tech Nation - Digital Technology",
-            icon: Building2,
-          },
-          {
-            id: "arts",
-            label: "Arts Council England - Arts & Culture",
-            icon: Heart,
-          },
-          {
-            id: "academia",
-            label: "UKRI / British Academy - Academia & Research",
-            icon: GraduationCap,
-          },
-        ],
-        required: true,
-      },
-    ],
-    student: [
-      {
-        id: "cas_received",
-        question: "Has the education provider issued a CAS?",
+        id: "ilr_status",
+        question: "Does your client have Indefinite Leave to Remain (ILR)?",
         description:
-          "Confirmation of Acceptance for Studies must be assigned before applying",
+          "ILR or settled status is typically required before naturalisation",
         type: "single",
         options: [
-          { id: "yes", label: "Yes, CAS has been issued" },
-          { id: "pending", label: "Awaiting CAS from institution" },
-          { id: "no", label: "Offer accepted, CAS not yet requested" },
+          { id: "yes", label: "Yes, ILR/Settled status granted" },
+          { id: "pending", label: "ILR application pending" },
+          { id: "no", label: "Not yet eligible for ILR" },
         ],
         required: true,
       },
       {
-        id: "course_level",
-        question: "What level is the course of study?",
-        description: "Course level affects maintenance funds and work rights",
+        id: "life_in_uk_test",
+        question: "Has your client passed the Life in the UK test?",
+        description: "Required for naturalisation applications",
         type: "single",
         options: [
-          { id: "undergraduate", label: "Undergraduate (RQF 6)" },
-          { id: "postgraduate", label: "Postgraduate (RQF 7)" },
-          { id: "phd", label: "Doctoral (RQF 8)" },
-          { id: "other", label: "Other / Pre-sessional" },
-        ],
-        required: true,
-      },
-      {
-        id: "course_start",
-        question: "When does the course commence?",
-        description:
-          "Student visa applications can be submitted up to 6 months before course start",
-        type: "single",
-        options: [
-          { id: "within_month", label: "Within 1 month" },
-          { id: "1_3_months", label: "1-3 months from now" },
-          { id: "3_plus_months", label: "More than 3 months away" },
-        ],
-        required: true,
-      },
-    ],
-    family: [
-      {
-        id: "sponsor_status",
-        question: "What is the sponsor's immigration status in the UK?",
-        description:
-          "The UK-based family member who will sponsor the application",
-        type: "single",
-        options: [
-          { id: "british", label: "British Citizen" },
-          { id: "settled", label: "Indefinite Leave to Remain (ILR)" },
-          { id: "refugee", label: "Refugee or Humanitarian Protection" },
-          { id: "other", label: "Other visa category" },
-        ],
-        required: true,
-      },
-      {
-        id: "relationship",
-        question:
-          "What is the relationship between your client and the sponsor?",
-        description: "This determines which family route applies",
-        type: "single",
-        options: [
-          { id: "spouse", label: "Spouse or Civil Partner", icon: Heart },
-          {
-            id: "unmarried",
-            label: "Unmarried Partner (2+ years cohabitation)",
-            icon: Heart,
-          },
-          { id: "child", label: "Child under 18", icon: User },
-          {
-            id: "adult_dependent",
-            label: "Adult Dependent Relative",
-            icon: User,
-          },
+          { id: "yes", label: "Yes, test passed" },
+          { id: "booked", label: "Test booked" },
+          { id: "no", label: "Not yet taken" },
         ],
         required: true,
       },
@@ -298,30 +221,47 @@ const getQuestionsForVisa = (visaType: VisaType): Question[] => {
         required: true,
       },
     ],
-    innovator: [
+    "partner-spouse": [
       {
-        id: "endorsement_body",
-        question: "Has your client secured endorsement from an approved body?",
+        id: "sponsor_status",
+        question: "What is the sponsor's immigration status in the UK?",
         description:
-          "Innovator Founder visa requires endorsement for a genuine, innovative business",
+          "The UK-based partner who will sponsor the application",
         type: "single",
         options: [
-          { id: "yes", label: "Yes, endorsement confirmed" },
-          { id: "pending", label: "Endorsement application in progress" },
-          { id: "no", label: "Not yet approached endorsing bodies" },
+          { id: "british", label: "British Citizen" },
+          { id: "settled", label: "Indefinite Leave to Remain (ILR)" },
+          { id: "refugee", label: "Refugee or Humanitarian Protection" },
+          { id: "other", label: "Other visa category" },
         ],
         required: true,
       },
       {
-        id: "investment_ready",
+        id: "relationship",
         question:
-          "Does your client have access to the required investment funds?",
-        description: "Minimum £50,000 investment funds must be evidenced",
+          "What is the relationship between your client and the sponsor?",
+        description: "This determines which route applies",
         type: "single",
         options: [
-          { id: "yes", label: "Yes, £50,000+ available and documented" },
-          { id: "partial", label: "Partial funds secured" },
-          { id: "no", label: "Funding not yet arranged" },
+          { id: "spouse", label: "Spouse or Civil Partner", icon: Heart },
+          {
+            id: "unmarried",
+            label: "Unmarried Partner (2+ years cohabitation)",
+            icon: Heart,
+          },
+          { id: "fiance", label: "Fiancé(e) or Proposed Civil Partner", icon: Heart },
+        ],
+        required: true,
+      },
+      {
+        id: "financial_requirement",
+        question: "Can the sponsor meet the financial requirement?",
+        description: "Minimum income of £29,000 (increasing to £38,700)",
+        type: "single",
+        options: [
+          { id: "yes", label: "Yes, meets income threshold" },
+          { id: "savings", label: "Using savings to meet requirement" },
+          { id: "unsure", label: "Need to verify income/savings" },
         ],
         required: true,
       },

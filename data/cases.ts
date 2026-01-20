@@ -39,7 +39,7 @@ export const MOCK_CASES: Case[] = [
   {
     id: 'case-002',
     referenceNumber: 'XEN-2024-002',
-    visaType: 'global-talent',
+    visaType: 'naturalisation',
     status: 'intake',
     applicant: {
       id: 'applicant-002',
@@ -69,7 +69,7 @@ export const MOCK_CASES: Case[] = [
   {
     id: 'case-003',
     referenceNumber: 'XEN-2024-003',
-    visaType: 'student',
+    visaType: 'visitor',
     status: 'ready',
     applicant: {
       id: 'applicant-003',

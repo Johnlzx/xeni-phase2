@@ -734,6 +734,7 @@ const initialState: CaseDetailState = {
     lawyer: { id: "john-001", name: "John", email: "john@example.com" },
   },
   activeNav: "overview",
+  highlightedGroupId: null,
   clientProfile: {
     completeness: 0,
   },
@@ -849,6 +850,18 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       // Navigation
       setActiveNav: (nav: CaseDetailNavItem) => {
         set({ activeNav: nav }, false, "setActiveNav");
+      },
+
+      navigateToDocumentGroup: (groupId: string) => {
+        set(
+          { activeNav: "documents", highlightedGroupId: groupId },
+          false,
+          "navigateToDocumentGroup"
+        );
+      },
+
+      clearHighlightedGroup: () => {
+        set({ highlightedGroupId: null }, false, "clearHighlightedGroup");
       },
 
       // Case
@@ -1712,45 +1725,21 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               "TB test certificate",
             ],
           },
-          "global-talent": {
-            schemaName: "Global Talent Visa Application",
+          naturalisation: {
+            schemaName: "Naturalisation Application",
             schemaVersion: "2024.1",
-            totalFields: 45,
+            totalFields: 55,
             emptyRequiredFields: [
-              "Endorsement reference",
-              "Endorsing body",
-              "Talent field",
-              "Evidence of achievements",
-              "Previous UK visas",
-            ],
-          },
-          "student": {
-            schemaName: "Student Visa Application",
-            schemaVersion: "2024.1",
-            totalFields: 52,
-            emptyRequiredFields: [
-              "CAS number",
-              "Course name",
-              "Institution name",
-              "Course start date",
-              "Course end date",
-              "Tuition fees",
-              "Accommodation costs",
-            ],
-          },
-          "family": {
-            schemaName: "Family Visa Application",
-            schemaVersion: "2024.1",
-            totalFields: 62,
-            emptyRequiredFields: [
-              "Sponsor relationship",
-              "Sponsor immigration status",
-              "Accommodation details",
-              "Financial evidence",
+              "Current immigration status",
+              "Date ILR granted",
+              "Residency period details",
+              "Life in the UK test pass date",
               "English language proof",
+              "Good character declaration",
+              "Referee details",
             ],
           },
-          "visitor": {
+          visitor: {
             schemaName: "Visitor Visa Application",
             schemaVersion: "2024.1",
             totalFields: 38,
@@ -1762,16 +1751,17 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               "Ties to home country",
             ],
           },
-          "innovator": {
-            schemaName: "Innovator Founder Visa Application",
+          "partner-spouse": {
+            schemaName: "Partner/Spouse Visa Application",
             schemaVersion: "2024.1",
-            totalFields: 48,
+            totalFields: 62,
             emptyRequiredFields: [
-              "Endorsement reference",
-              "Business plan summary",
-              "Investment funds proof",
-              "Innovation evidence",
-              "Scalability evidence",
+              "Sponsor relationship",
+              "Sponsor immigration status",
+              "Accommodation details",
+              "Financial evidence",
+              "English language proof",
+              "Relationship evidence",
             ],
           },
         };
@@ -2720,6 +2710,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 // Selector hooks for optimized re-renders
 export const useActiveNav = () =>
   useCaseDetailStore((state) => state.activeNav);
+export const useHighlightedGroupId = () =>
+  useCaseDetailStore((state) => state.highlightedGroupId);
 export const useClientProfile = () =>
   useCaseDetailStore((state) => state.clientProfile);
 export const useCaseNotesSummary = () =>
