@@ -1,73 +1,8 @@
 "use client";
 
-import { Play, ExternalLink, Pause, Loader2, CheckCircle2, AlertCircle, Clock, Search, FileText } from "lucide-react";
+import { Play, ExternalLink, Loader2, CheckCircle2, History } from "lucide-react";
 import { useCaseDetailStore, useFormPilotStatus } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
-
-// Form filling status type
-type FormFillingStatus = "idle" | "analyzing" | "waiting" | "on_hold" | "filling" | "completed" | "error";
-
-// Task execution status
-type TaskExecutionStatus = "idle" | "running" | "paused";
-
-// Form filling status config
-const FORM_STATUS_CONFIG: Record<FormFillingStatus, {
-  label: string;
-  labelZh: string;
-  icon: typeof Play;
-  color: string;
-  bgColor: string;
-}> = {
-  idle: {
-    label: "Ready",
-    labelZh: "Ready",
-    icon: Play,
-    color: "text-stone-600",
-    bgColor: "bg-stone-100",
-  },
-  analyzing: {
-    label: "Analyzing",
-    labelZh: "Analyzing",
-    icon: Search,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-  },
-  waiting: {
-    label: "Waiting",
-    labelZh: "Waiting",
-    icon: Clock,
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
-  },
-  on_hold: {
-    label: "On Hold",
-    labelZh: "On Hold",
-    icon: Pause,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-  },
-  filling: {
-    label: "Filling",
-    labelZh: "Filling",
-    icon: FileText,
-    color: "text-indigo-600",
-    bgColor: "bg-indigo-50",
-  },
-  completed: {
-    label: "Completed",
-    labelZh: "Completed",
-    icon: CheckCircle2,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50",
-  },
-  error: {
-    label: "Error",
-    labelZh: "Error",
-    icon: AlertCircle,
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-  },
-};
 
 // Skeleton loading state
 function FormPilotCardSkeleton() {
@@ -91,7 +26,7 @@ function FormPilotCardSkeleton() {
   );
 }
 
-// Empty state
+// Empty state - analysis not done yet
 function FormPilotCardEmpty() {
   return (
     <div className="flex flex-col rounded-lg border border-stone-200 bg-white overflow-hidden">
@@ -106,7 +41,7 @@ function FormPilotCardEmpty() {
         </div>
       </div>
       <div className="p-3 flex items-center justify-center">
-        <p className="text-xs text-stone-400">Not started</p>
+        <p className="text-xs text-stone-400 text-pretty">Run analysis first</p>
       </div>
     </div>
   );
@@ -130,28 +65,10 @@ export function FormPilotCard() {
 
   const { lastRunStatus, lastRunAt } = formPilotStatus;
 
-  // Determine form filling status
-  const getFormFillingStatus = (): FormFillingStatus => {
-    if (!lastRunStatus && !lastRunAt) return "idle";
-    if (lastRunStatus === "success") return "completed";
-    if (lastRunStatus === "error") return "error";
-    // Simulate different states based on context
-    if (lastRunStatus === "cancelled") return "on_hold";
-    if (lastRunAt && !lastRunStatus) return "filling";
-    return "idle";
-  };
-
-  // Determine task execution status
-  const getTaskExecutionStatus = (): TaskExecutionStatus => {
-    if (lastRunStatus === null && lastRunAt) return "running";
-    if (lastRunStatus === "cancelled") return "paused";
-    return "idle";
-  };
-
-  const formStatus = getFormFillingStatus();
-  const executionStatus = getTaskExecutionStatus();
-  const statusConfig = FORM_STATUS_CONFIG[formStatus];
-  const StatusIcon = statusConfig.icon;
+  // Has run before?
+  const hasRunBefore = lastRunAt !== null;
+  // Currently running (lastRunAt set but no status yet)
+  const isRunning = lastRunAt !== null && lastRunStatus === null;
 
   const handleLaunch = () => {
     launchFormPilot();
@@ -172,42 +89,55 @@ export function FormPilotCard() {
       </div>
 
       {/* Content */}
-      <div className="p-3 flex items-center justify-between">
-        <div>
-          {/* Form filling status badge */}
-          <div className={cn(
-            "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-            statusConfig.bgColor,
-            statusConfig.color
-          )}>
-            <StatusIcon className="size-3.5" />
-            <span>{statusConfig.label}</span>
-          </div>
-
-          {/* Execution status indicator */}
-          <div className="flex items-center gap-1.5 mt-1.5">
-            {executionStatus === "running" ? (
-              <>
-                <Loader2 className="size-3 text-blue-500 animate-spin" />
-                <span className="text-[11px] text-blue-600">Running</span>
-              </>
-            ) : executionStatus === "paused" ? (
-              <>
-                <Pause className="size-3 text-amber-500" />
-                <span className="text-[11px] text-amber-600">Paused</span>
-              </>
-            ) : (
-              <span className="text-[11px] text-stone-400">Idle</span>
-            )}
-          </div>
+      <div className="p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {isRunning ? (
+            // Running state
+            <div className="flex items-center gap-2">
+              <Loader2 className="size-4 text-blue-500 animate-spin shrink-0" />
+              <span className="text-sm font-medium text-blue-600">Running</span>
+            </div>
+          ) : hasRunBefore ? (
+            // Has run before - show completion status
+            <div className="flex items-center gap-2">
+              {lastRunStatus === "success" ? (
+                <>
+                  <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                  <span className="text-sm font-medium text-emerald-600">Completed</span>
+                </>
+              ) : lastRunStatus === "cancelled" ? (
+                <>
+                  <History className="size-4 text-stone-400 shrink-0" />
+                  <span className="text-sm text-stone-500">Paused</span>
+                </>
+              ) : (
+                <>
+                  <History className="size-4 text-stone-400 shrink-0" />
+                  <span className="text-sm text-stone-500">View History</span>
+                </>
+              )}
+            </div>
+          ) : (
+            // Ready to launch
+            <div>
+              <p className="text-sm font-medium text-stone-700 text-balance">Ready</p>
+              <p className="text-[11px] text-stone-400 text-pretty">Click to launch</p>
+            </div>
+          )}
         </div>
 
         <button
           onClick={handleLaunch}
-          className="size-7 flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+          disabled={isRunning}
+          className={cn(
+            "size-8 flex items-center justify-center rounded-lg transition-colors",
+            isRunning
+              ? "text-stone-300 cursor-not-allowed"
+              : "text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+          )}
           aria-label="Launch Form Pilot"
         >
-          <ExternalLink className="size-3.5" />
+          <ExternalLink className="size-4" />
         </button>
       </div>
     </div>
