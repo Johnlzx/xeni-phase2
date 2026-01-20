@@ -89,16 +89,19 @@ export function FormPilotCard() {
       </div>
 
       {/* Content */}
-      <div className="p-3 flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          {isRunning ? (
-            // Running state
-            <div className="flex items-center gap-2">
-              <Loader2 className="size-4 text-blue-500 animate-spin shrink-0" />
-              <span className="text-sm font-medium text-blue-600">Running</span>
-            </div>
-          ) : hasRunBefore ? (
-            // Has run before - show completion status
+      <div className="p-3">
+        {isRunning ? (
+          // Running state - not clickable
+          <div className="flex items-center gap-2">
+            <Loader2 className="size-4 text-blue-500 animate-spin shrink-0" />
+            <span className="text-sm font-medium text-blue-600">Running</span>
+          </div>
+        ) : hasRunBefore ? (
+          // Has run before - clickable to view history
+          <button
+            onClick={handleLaunch}
+            className="w-full flex items-center justify-between gap-2 group"
+          >
             <div className="flex items-center gap-2">
               {lastRunStatus === "success" ? (
                 <>
@@ -117,28 +120,21 @@ export function FormPilotCard() {
                 </>
               )}
             </div>
-          ) : (
-            // Ready to launch
+            <ExternalLink className="size-4 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+        ) : (
+          // Ready to launch - clickable
+          <button
+            onClick={handleLaunch}
+            className="w-full flex items-center justify-between gap-2 group"
+          >
             <div>
-              <p className="text-sm font-medium text-stone-700 text-balance">Ready</p>
-              <p className="text-[11px] text-stone-400 text-pretty">Click to launch</p>
+              <p className="text-sm font-medium text-stone-700 text-balance text-left">Ready</p>
+              <p className="text-[11px] text-stone-400 text-pretty text-left">Click to launch</p>
             </div>
-          )}
-        </div>
-
-        <button
-          onClick={handleLaunch}
-          disabled={isRunning}
-          className={cn(
-            "size-8 flex items-center justify-center rounded-lg transition-colors",
-            isRunning
-              ? "text-stone-300 cursor-not-allowed"
-              : "text-stone-500 hover:text-stone-700 hover:bg-stone-100"
-          )}
-          aria-label="Launch Form Pilot"
-        >
-          <ExternalLink className="size-4" />
-        </button>
+            <ExternalLink className="size-4 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+        )}
       </div>
     </div>
   );
