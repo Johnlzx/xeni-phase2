@@ -8,11 +8,17 @@ import {
   X,
   CheckCircle2,
   Upload,
-  ChevronLeft,
-  ChevronRight,
   FolderOpen,
   HardDrive,
   Plus,
+  Eye,
+  ListFilter,
+  AlertCircle,
+  CircleDashed,
+  Sparkles,
+  PanelRight,
+  Columns3,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCaseDetailStore, useDocumentGroups } from "@/store/case-detail-store";
@@ -21,8 +27,8 @@ import {
   EnhancedQualityIssue,
   RequiredEvidence,
   DocumentGroup,
+  LinkedDocument,
 } from "@/types/case-detail";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,16 +44,51 @@ interface ChecklistDetailPanelProps {
   issues: EnhancedQualityIssue[];
 }
 
-// Source badge component
-function SourceBadge({ source, documentName }: { source: "extracted" | "questionnaire" | "manual" | null; documentName?: string }) {
+// Clickable Source badge component - opens document preview on click
+function SourceBadge({
+  source,
+  documentName,
+  linkedDocument,
+  documentGroups,
+}: {
+  source: "extracted" | "questionnaire" | "manual" | null;
+  documentName?: string;
+  linkedDocument?: LinkedDocument;
+  documentGroups: DocumentGroup[];
+}) {
+  const [showPreview, setShowPreview] = useState(false);
+
   if (!source) return null;
+
+  // Find the linked group for preview
+  const linkedGroup = linkedDocument
+    ? documentGroups.find((g) => g.files.some((f) => f.id === linkedDocument.fileId))
+    : undefined;
 
   if (source === "extracted") {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded">
-        <FileText className="size-2.5" />
-        {documentName || "Extracted"}
-      </span>
+      <>
+        <button
+          onClick={() => linkedGroup && setShowPreview(true)}
+          className={cn(
+            "inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded transition-colors",
+            linkedGroup && "hover:bg-blue-100 hover:border-blue-200 cursor-pointer"
+          )}
+        >
+          <FileText className="size-2.5" />
+          {documentName || "Extracted"}
+          {linkedGroup && <Eye className="size-2.5 ml-0.5 opacity-60" />}
+        </button>
+
+        {/* Preview Modal */}
+        {showPreview && linkedGroup && (
+          <CategoryReviewModal
+            group={linkedGroup}
+            allGroups={documentGroups}
+            onClose={() => setShowPreview(false)}
+          />
+        )}
+      </>
     );
   }
 
@@ -69,62 +110,6 @@ function SourceBadge({ source, documentName }: { source: "extracted" | "question
   }
 
   return null;
-}
-
-// Form field component with source indicator
-function FormField({
-  item,
-  editValue,
-  onValueChange,
-  isEdited,
-}: {
-  item: EnhancedChecklistItem;
-  editValue: string;
-  onValueChange: (value: string) => void;
-  isEdited: boolean;
-}) {
-  const hasValue = !!editValue;
-  const isComplete = item.status === "complete" || hasValue;
-
-  // Determine display source - show "Edited" if value changed from original
-  const displaySource = isEdited ? "manual" : item.source;
-  const sourceDocName = item.linkedDocuments.length > 0 ? item.linkedDocuments[0].groupTitle : undefined;
-
-  return (
-    <div className={cn(
-      "group py-3 px-3 rounded-lg transition-colors",
-      !hasValue && item.isRequired && "bg-amber-50/30"
-    )}>
-      {/* Label row with status and source badge */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className={cn(
-            "shrink-0 size-1.5 rounded-full",
-            isComplete ? "bg-emerald-500" : item.isRequired ? "bg-amber-400" : "bg-stone-300"
-          )} />
-          <label className="text-[11px] font-medium text-stone-600 leading-tight truncate">
-            {item.label}
-          </label>
-        </div>
-        {hasValue && (
-          <SourceBadge source={displaySource} documentName={displaySource === "extracted" ? sourceDocName : undefined} />
-        )}
-      </div>
-
-      {/* Input field */}
-      <input
-        type="text"
-        value={editValue}
-        onChange={(e) => onValueChange(e.target.value)}
-        placeholder={item.isRequired ? "Required" : "Optional"}
-        className={cn(
-          "w-full px-3 py-2 text-sm border rounded-md transition-colors",
-          "focus:outline-none focus:ring-2 focus:ring-[#0E4268]/20 focus:border-[#0E4268]",
-          hasValue ? "border-stone-200 bg-white" : "border-stone-200 bg-stone-50"
-        )}
-      />
-    </div>
-  );
 }
 
 // Document Preview Content - Simulates scanned document appearance
@@ -246,8 +231,8 @@ function FileHubPickerModal({
   );
 }
 
-// Supporting Document Card - A4 ratio card with preview/review
-function SupportingDocumentCard({
+// Evidence Card - for sidebar display
+function EvidenceCard({
   evidence,
   linkedGroup,
   allGroups,
@@ -256,8 +241,6 @@ function SupportingDocumentCard({
   linkedGroup?: DocumentGroup;
   allGroups: DocumentGroup[];
 }) {
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
   const [showFileHubPicker, setShowFileHubPicker] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
@@ -265,19 +248,8 @@ function SupportingDocumentCard({
   const linkEvidenceToGroup = useCaseDetailStore((state) => state.linkEvidenceToGroup);
   const confirmGroupReview = useCaseDetailStore((state) => state.confirmGroupReview);
 
-  const activeFiles = linkedGroup?.files.filter((f) => !f.isRemoved) || [];
-  const totalPages = activeFiles.length;
-  const isPendingReview = linkedGroup?.status === "pending" && totalPages > 0;
-
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentPageIndex((prev) => Math.max(0, prev - 1));
-  };
-
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentPageIndex((prev) => Math.min(totalPages - 1, prev + 1));
-  };
+  const isUploaded = evidence.isUploaded;
+  const isPendingReview = linkedGroup?.status === "pending";
 
   const handleUploadLocal = () => {
     uploadForEvidence(evidence.id, evidence.name);
@@ -289,7 +261,7 @@ function SupportingDocumentCard({
   };
 
   const handleCardClick = () => {
-    if (evidence.isUploaded && linkedGroup) {
+    if (isUploaded && linkedGroup) {
       setShowReviewModal(true);
     }
   };
@@ -303,105 +275,71 @@ function SupportingDocumentCard({
 
   return (
     <>
-      {/* A4 Ratio Card Container */}
       <div
-        className={cn(
-          "bg-white rounded-lg border overflow-hidden flex flex-col transition-all aspect-[1/1.414]",
-          evidence.isUploaded && linkedGroup
-            ? isPendingReview
-              ? "border-amber-300 hover:border-amber-400 hover:shadow-md cursor-pointer"
-              : "border-stone-200 hover:border-stone-300 hover:shadow-md cursor-pointer"
-            : "border-dashed border-stone-300"
-        )}
         onClick={handleCardClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        className={cn(
+          "rounded-lg border overflow-hidden transition-colors",
+          isUploaded
+            ? isPendingReview
+              ? "border-amber-300 bg-amber-50/30 cursor-pointer hover:border-amber-400"
+              : "border-emerald-200 bg-emerald-50/30 cursor-pointer hover:border-emerald-300"
+            : "border-dashed border-stone-300 bg-stone-50/50"
+        )}
       >
-        {evidence.isUploaded && linkedGroup && totalPages > 0 ? (
-          /* Has document - show preview */
+        {isUploaded ? (
           <>
-            {/* Preview area - fills most of the card */}
-            <div className="flex-1 relative bg-stone-50 p-1.5 overflow-hidden">
-              <div className="w-full h-full relative bg-white rounded border border-stone-200 shadow-sm p-1.5">
+            {/* Preview area */}
+            <div className="aspect-[4/3] p-2 flex items-center justify-center relative bg-white/50">
+              <div className="h-full aspect-[1/1.414] bg-white rounded border border-stone-200 p-1.5 shadow-sm">
                 <DocumentPreviewContent size="sm" />
-
-                {/* Page indicator */}
-                <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[7px] font-medium text-stone-500 bg-white/90 px-1 py-0.5 rounded tabular-nums">
-                  {currentPageIndex + 1}/{totalPages}
-                </div>
               </div>
-
-              {/* Navigation arrows - only show on hover when multiple pages */}
-              {totalPages > 1 && isHovered && (
-                <>
+              {/* Status indicator */}
+              <div className="absolute top-1.5 right-1.5">
+                {isPendingReview ? (
                   <button
-                    onClick={handlePrev}
-                    disabled={currentPageIndex === 0}
-                    className={cn(
-                      "absolute left-0 top-1/2 -translate-y-1/2 p-0.5 rounded bg-white/90 shadow-sm transition-all z-10",
-                      currentPageIndex === 0
-                        ? "opacity-0 pointer-events-none"
-                        : "opacity-100 text-stone-500 hover:text-stone-700 hover:bg-white"
-                    )}
-                    aria-label="Previous page"
+                    onClick={handleConfirmReview}
+                    className="text-[8px] font-semibold text-amber-600 bg-white px-1.5 py-0.5 rounded shadow-sm hover:bg-amber-50 transition-colors"
                   >
-                    <ChevronLeft size={10} />
+                    Review
                   </button>
-                  <button
-                    onClick={handleNext}
-                    disabled={currentPageIndex >= totalPages - 1}
-                    className={cn(
-                      "absolute right-0 top-1/2 -translate-y-1/2 p-0.5 rounded bg-white/90 shadow-sm transition-all z-10",
-                      currentPageIndex >= totalPages - 1
-                        ? "opacity-0 pointer-events-none"
-                        : "opacity-100 text-stone-500 hover:text-stone-700 hover:bg-white"
-                    )}
-                    aria-label="Next page"
-                  >
-                    <ChevronRight size={10} />
-                  </button>
-                </>
-              )}
+                ) : (
+                  <CheckCircle2 className="size-4 text-emerald-500" />
+                )}
+              </div>
             </div>
-
-            {/* Footer with title and status */}
-            <div className="shrink-0 px-1.5 py-1 border-t border-stone-100 bg-white">
-              <p className="text-[8px] font-medium text-stone-700 truncate mb-0.5" title={evidence.name}>
+            {/* Title */}
+            <div className={cn(
+              "px-2 py-1.5 border-t",
+              isPendingReview ? "bg-amber-50 border-amber-100" : "bg-emerald-50 border-emerald-100"
+            )}>
+              <p className={cn(
+                "text-[10px] font-medium truncate",
+                isPendingReview ? "text-amber-700" : "text-emerald-700"
+              )} title={evidence.name}>
                 {evidence.name}
               </p>
-              {isPendingReview ? (
-                <button
-                  onClick={handleConfirmReview}
-                  className="text-[7px] font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-0.5 transition-colors"
-                >
-                  <Check size={8} strokeWidth={3} />
-                  Review
-                </button>
-              ) : (
-                <span className="text-[7px] font-medium text-emerald-600 flex items-center gap-0.5">
-                  <Check size={8} strokeWidth={3} />
-                  Ready
-                </span>
-              )}
+              <p className="text-[9px] text-stone-400">
+                {isPendingReview ? "Pending review" : "Ready"}
+              </p>
             </div>
           </>
         ) : (
           /* Empty state - needs upload */
-          <div className="flex-1 flex flex-col items-center justify-center p-2">
-            <Upload size={14} className="text-stone-300 mb-1" />
-            <p className="text-[8px] font-medium text-stone-500 text-center mb-0.5 truncate w-full px-1" title={evidence.name}>
+          <div className="p-3 flex flex-col items-center justify-center min-h-[100px]">
+            <Upload size={16} className="text-stone-300 mb-1.5" />
+            <p className="text-[10px] font-medium text-stone-600 text-center mb-0.5 truncate w-full" title={evidence.name}>
               {evidence.name}
             </p>
-            <p className="text-[7px] text-stone-400 mb-2">
+            <p className="text-[9px] text-stone-400 mb-2">
               {evidence.isMandatory ? "Required" : "Optional"}
             </p>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center justify-center gap-0.5 px-2 py-1 rounded text-[8px] font-medium text-white bg-[#0E4268] hover:bg-[#0a3555] transition-colors"
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded text-[9px] font-medium text-stone-600 bg-white border border-stone-300 hover:bg-stone-50 hover:border-stone-400 transition-colors"
                 >
-                  <Plus size={9} />
+                  <Plus size={10} />
                   Add
                 </button>
               </DropdownMenuTrigger>
@@ -441,7 +379,686 @@ function SupportingDocumentCard({
   );
 }
 
-// Main Detail Panel - Form Data & Supporting Documents tabs
+// Simplified Field Card - only field info with clickable source badge
+function FieldCard({
+  item,
+  editValue,
+  onValueChange,
+  isEdited,
+  documentGroups,
+}: {
+  item: EnhancedChecklistItem;
+  editValue: string;
+  onValueChange: (value: string) => void;
+  isEdited: boolean;
+  documentGroups: DocumentGroup[];
+}) {
+  const hasValue = !!editValue;
+  const isComplete = item.status === "complete" || hasValue;
+
+  // Determine display source - show "Edited" if value changed from original
+  const displaySource = isEdited ? "manual" : item.source;
+  const sourceDocName = item.linkedDocuments.length > 0 ? item.linkedDocuments[0].groupTitle : undefined;
+  const firstLinkedDoc = item.linkedDocuments.length > 0 ? item.linkedDocuments[0] : undefined;
+
+  return (
+    <div className={cn(
+      "border rounded-lg p-4 transition-colors",
+      !hasValue && item.isRequired
+        ? "border-amber-200 bg-amber-50/20"
+        : "border-stone-200 hover:border-stone-300 bg-white"
+    )}>
+      {/* Label row with status and source badge */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={cn(
+            "shrink-0 size-2 rounded-full",
+            isComplete ? "bg-emerald-500" : item.isRequired ? "bg-amber-400" : "bg-stone-300"
+          )} />
+          <label className="text-sm font-medium text-stone-700 truncate">
+            {item.label}
+          </label>
+        </div>
+        {hasValue && (
+          <SourceBadge
+            source={displaySource}
+            documentName={displaySource === "extracted" ? sourceDocName : undefined}
+            linkedDocument={displaySource === "extracted" ? firstLinkedDoc : undefined}
+            documentGroups={documentGroups}
+          />
+        )}
+      </div>
+
+      {/* Input field */}
+      <input
+        type="text"
+        value={editValue}
+        onChange={(e) => onValueChange(e.target.value)}
+        placeholder={item.isRequired ? "Required" : "Optional"}
+        className={cn(
+          "w-full px-3 py-2 text-sm border rounded-md transition-colors",
+          "focus:outline-none focus:ring-2 focus:ring-[#0E4268]/20 focus:border-[#0E4268]",
+          hasValue ? "border-stone-200 bg-white" : "border-stone-200 bg-stone-50"
+        )}
+      />
+    </div>
+  );
+}
+
+// Filter type for field list - based on data source and status
+type FieldFilterKey = "missing" | "extracted" | "manual" | "questionnaire" | "low_confidence";
+
+// Filter configuration
+const filterOptions: { key: FieldFilterKey; label: string; icon: React.ElementType }[] = [
+  { key: "missing", label: "Missing", icon: CircleDashed },
+  { key: "extracted", label: "AI Extracted", icon: Sparkles },
+  { key: "manual", label: "Manual Entry", icon: Edit3 },
+  { key: "questionnaire", label: "Questionnaire", icon: FileText },
+  { key: "low_confidence", label: "Needs Review", icon: AlertCircle },
+];
+
+// Field Filter Dropdown - Multi-select filter
+function FieldFilterDropdown({
+  items,
+  activeFilters,
+  onFilterChange,
+}: {
+  items: EnhancedChecklistItem[];
+  activeFilters: Set<FieldFilterKey>;
+  onFilterChange: (filters: Set<FieldFilterKey>) => void;
+}) {
+  // Calculate counts for each filter
+  const counts = useMemo(() => {
+    return {
+      missing: items.filter((item) => item.isRequired && !item.value).length,
+      extracted: items.filter((item) => item.source === "extracted").length,
+      manual: items.filter((item) => item.source === "manual").length,
+      questionnaire: items.filter((item) => item.source === "questionnaire").length,
+      low_confidence: items.filter(
+        (item) => item.source === "extracted" && item.confidenceScore !== undefined && item.confidenceScore < 80
+      ).length,
+    };
+  }, [items]);
+
+  // Only show filter options with count > 0
+  const availableFilters = filterOptions.filter((opt) => counts[opt.key] > 0);
+
+  if (availableFilters.length === 0) {
+    return null;
+  }
+
+  const isFiltered = activeFilters.size > 0;
+  const selectedCount = activeFilters.size;
+
+  const handleToggle = (key: FieldFilterKey) => {
+    const newFilters = new Set(activeFilters);
+    if (newFilters.has(key)) {
+      newFilters.delete(key);
+    } else {
+      newFilters.add(key);
+    }
+    onFilterChange(newFilters);
+  };
+
+  const handleClear = () => {
+    onFilterChange(new Set());
+  };
+
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors",
+              isFiltered
+                ? "bg-stone-100 text-stone-800 border-stone-300"
+                : "bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50"
+            )}
+          >
+            <ListFilter className="size-3.5" />
+            <span>Filter</span>
+            {isFiltered && (
+              <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-stone-200 text-stone-700 rounded tabular-nums">
+                {selectedCount}
+              </span>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44 p-1">
+          {availableFilters.map((filter) => {
+            const Icon = filter.icon;
+            const isSelected = activeFilters.has(filter.key);
+
+            return (
+              <button
+                key={filter.key}
+                onClick={() => handleToggle(filter.key)}
+                className={cn(
+                  "w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded transition-colors text-left",
+                  isSelected
+                    ? "bg-stone-100 text-stone-800"
+                    : "text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                {/* Checkbox indicator */}
+                <div className={cn(
+                  "size-3.5 rounded border flex items-center justify-center shrink-0",
+                  isSelected ? "bg-stone-700 border-stone-700" : "border-stone-300"
+                )}>
+                  {isSelected && <Check className="size-2.5 text-white" strokeWidth={3} />}
+                </div>
+                <Icon className="size-3.5 text-stone-400 shrink-0" />
+                <span className="flex-1 truncate">{filter.label}</span>
+                <span className="tabular-nums text-stone-400">{counts[filter.key]}</span>
+              </button>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Active filter tags */}
+      {isFiltered && (
+        <div className="flex items-center gap-1.5">
+          {Array.from(activeFilters).map((key) => {
+            const filter = filterOptions.find((f) => f.key === key);
+            if (!filter) return null;
+
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-stone-600 bg-stone-100 border border-stone-200 rounded"
+              >
+                {filter.label}
+                <button
+                  onClick={() => handleToggle(key)}
+                  className="text-stone-400 hover:text-stone-600"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </span>
+            );
+          })}
+          {selectedCount > 1 && (
+            <button
+              onClick={handleClear}
+              className="text-[10px] font-medium text-stone-500 hover:text-stone-700 hover:underline"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Panel mode type - only two modes now
+type DocumentPanelMode = "default" | "expanded";
+
+// Unified Evidence Slot - consistent style for both modes
+function EvidenceSlot({
+  evidence,
+  linkedGroup,
+  isLinking,
+  onStartLink,
+  onCancelLink,
+  allGroups,
+}: {
+  evidence: RequiredEvidence;
+  linkedGroup?: DocumentGroup;
+  isLinking: boolean;
+  onStartLink: () => void;
+  onCancelLink: () => void;
+  allGroups: DocumentGroup[];
+}) {
+  const [showFileHubPicker, setShowFileHubPicker] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const uploadForEvidence = useCaseDetailStore((state) => state.uploadForEvidence);
+  const linkEvidenceToGroup = useCaseDetailStore((state) => state.linkEvidenceToGroup);
+  const unlinkEvidence = useCaseDetailStore((state) => state.unlinkEvidence);
+
+  const handleUploadLocal = () => {
+    uploadForEvidence(evidence.id, evidence.name);
+  };
+
+  const handleSelectFromPicker = (groupId: string) => {
+    linkEvidenceToGroup(evidence.id, groupId);
+    setShowFileHubPicker(false);
+  };
+
+  const handleCardClick = () => {
+    if (evidence.isUploaded && linkedGroup) {
+      setShowReviewModal(true);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    if (evidence.isUploaded) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "link";
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (evidence.isUploaded) return;
+
+    const groupId = e.dataTransfer.getData("application/x-document-group-id");
+    if (groupId) {
+      linkEvidenceToGroup(evidence.id, groupId);
+    }
+  };
+
+  return (
+    <>
+      <div
+        onClick={handleCardClick}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          "rounded-lg border p-2.5 transition-colors",
+          evidence.isUploaded
+            ? "border-emerald-200 bg-emerald-50/50 cursor-pointer hover:border-emerald-300"
+            : isDragOver
+              ? "border-blue-400 border-solid bg-blue-50 ring-1 ring-blue-200"
+              : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400"
+        )}
+      >
+        <div className="flex items-start gap-2">
+          {evidence.isUploaded ? (
+            <CheckCircle2 className="size-4 text-emerald-500 mt-0.5 shrink-0" />
+          ) : (
+            <CircleDashed className={cn(
+              "size-4 mt-0.5 shrink-0",
+              evidence.isMandatory ? "text-amber-500" : "text-stone-400"
+            )} />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-stone-700 truncate">{evidence.name}</p>
+            {linkedGroup ? (
+              <p className="text-[10px] text-emerald-600 truncate mt-0.5">
+                Linked: {linkedGroup.title}
+              </p>
+            ) : (
+              <p className="text-[10px] text-stone-400 mt-0.5">
+                {evidence.isMandatory ? "Required" : "Optional"}
+              </p>
+            )}
+          </div>
+          {/* Unlink button for linked evidence */}
+          {evidence.isUploaded && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                unlinkEvidence(evidence.id);
+              }}
+              className="shrink-0 p-1 rounded text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Unlink"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Action buttons for unlinked evidence */}
+        {!evidence.isUploaded && (
+          <div className="mt-2 flex gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium text-stone-600 bg-white border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-colors"
+                >
+                  <Plus size={12} />
+                  Add
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onClick={handleUploadLocal} className="gap-2 text-xs">
+                  <HardDrive size={12} className="text-stone-400 shrink-0" />
+                  <span className="whitespace-nowrap">Upload from Computer</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowFileHubPicker(true)} className="gap-2 text-xs">
+                  <FolderOpen size={12} className="text-stone-400 shrink-0" />
+                  <span className="whitespace-nowrap">Select from Documents</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+
+      {/* File Hub Picker Modal */}
+      {showFileHubPicker && (
+        <FileHubPickerModal
+          evidenceName={evidence.name}
+          onClose={() => setShowFileHubPicker(false)}
+          onSelect={handleSelectFromPicker}
+        />
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && linkedGroup && (
+        <CategoryReviewModal
+          group={linkedGroup}
+          allGroups={allGroups}
+          onClose={() => setShowReviewModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// Document Panel - Two-state panel for evidence management
+function DocumentPanel({
+  items,
+  documentGroups,
+  mode,
+  onModeChange,
+}: {
+  items: EnhancedChecklistItem[];
+  documentGroups: DocumentGroup[];
+  mode: DocumentPanelMode;
+  onModeChange: (mode: DocumentPanelMode) => void;
+}) {
+  // State for document preview modal
+  const [previewGroup, setPreviewGroup] = useState<DocumentGroup | null>(null);
+
+  // Collect all required evidence from items (deduplicated)
+  const allRequiredEvidence = useMemo(() => {
+    const evidenceMap = new Map<string, RequiredEvidence>();
+    items.forEach((item) => {
+      item.requiredEvidence?.forEach((ev) => {
+        if (!evidenceMap.has(ev.id)) {
+          evidenceMap.set(ev.id, ev);
+        }
+      });
+    });
+    return Array.from(evidenceMap.values());
+  }, [items]);
+
+  // Helper to find linked group for evidence
+  const getLinkedGroup = (evidence: RequiredEvidence): DocumentGroup | undefined => {
+    if (!evidence.linkedFileId) return undefined;
+    return documentGroups.find((g) => g.id === evidence.linkedFileId);
+  };
+
+  // Split into mandatory and optional
+  const mandatoryEvidence = allRequiredEvidence.filter((ev) => ev.isMandatory);
+  const optionalEvidence = allRequiredEvidence.filter((ev) => !ev.isMandatory);
+
+  // Count stats
+  const uploadedMandatory = mandatoryEvidence.filter((ev) => ev.isUploaded).length;
+  const totalMandatory = mandatoryEvidence.length;
+
+  // Available document groups for linking (excluding unclassified and empty groups)
+  const availableGroups = documentGroups.filter(
+    (g) => g.id !== "unclassified" && g.files.filter((f) => !f.isRemoved).length > 0
+  );
+
+  // Count how many times each document group is linked
+  const linkCountByGroupId = useMemo(() => {
+    const counts: Record<string, number> = {};
+    allRequiredEvidence.forEach((ev) => {
+      if (ev.linkedFileId) {
+        counts[ev.linkedFileId] = (counts[ev.linkedFileId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [allRequiredEvidence]);
+
+  // Toggle between modes
+  const toggleMode = () => {
+    onModeChange(mode === "default" ? "expanded" : "default");
+  };
+
+  // ============================================
+  // DEFAULT MODE - Single column sidebar
+  // ============================================
+  if (mode === "default") {
+    if (allRequiredEvidence.length === 0) {
+      return (
+        <div className="h-full flex flex-col bg-stone-50/50">
+          {/* Header with expand toggle */}
+          <div className="shrink-0 px-3 py-2 border-b border-stone-100 flex items-center justify-between">
+            <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Documents</span>
+            <button
+              onClick={toggleMode}
+              className="p-1 rounded hover:bg-stone-200 transition-colors text-stone-400 hover:text-stone-600"
+              title="Expand"
+            >
+              <Columns3 className="size-3.5" />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center p-4 text-stone-400">
+            <FileText className="size-6 mb-2" />
+            <p className="text-xs text-center">No documents required</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-full flex flex-col bg-stone-50/50">
+        {/* Header with expand toggle */}
+        <div className="shrink-0 px-3 py-2 border-b border-stone-100">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Documents</span>
+            <button
+              onClick={toggleMode}
+              className="p-1 rounded hover:bg-stone-200 transition-colors text-stone-400 hover:text-stone-600"
+              title="Expand"
+            >
+              <Columns3 className="size-3.5" />
+            </button>
+          </div>
+          <p className="text-[10px] text-stone-400 tabular-nums">
+            {uploadedMandatory}/{totalMandatory} required uploaded
+          </p>
+        </div>
+
+        {/* Evidence list - using unified EvidenceSlot */}
+        <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
+          {/* Mandatory documents */}
+          {mandatoryEvidence.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-wide mb-2 px-1">
+                Required
+              </p>
+              <div className="space-y-2">
+                {mandatoryEvidence.map((ev) => (
+                  <EvidenceSlot
+                    key={ev.id}
+                    evidence={ev}
+                    linkedGroup={getLinkedGroup(ev)}
+                    isLinking={false}
+                    onStartLink={() => {}}
+                    onCancelLink={() => {}}
+                    allGroups={documentGroups}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Optional documents */}
+          {optionalEvidence.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide mb-2 px-1">
+                Optional
+              </p>
+              <div className="space-y-2">
+                {optionalEvidence.map((ev) => (
+                  <EvidenceSlot
+                    key={ev.id}
+                    evidence={ev}
+                    linkedGroup={getLinkedGroup(ev)}
+                    isLinking={false}
+                    onStartLink={() => {}}
+                    onCancelLink={() => {}}
+                    allGroups={documentGroups}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================
+  // EXPANDED MODE - Two columns: Evidence + Documents
+  // ============================================
+  return (
+    <div className="h-full flex flex-col bg-stone-50/50">
+      {/* Header */}
+      <div className="shrink-0 px-3 py-2 border-b border-stone-100">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Documents</span>
+          <button
+            onClick={toggleMode}
+            className="p-1 rounded hover:bg-stone-200 transition-colors text-stone-400 hover:text-stone-600"
+            title="Collapse"
+          >
+            <PanelRight className="size-3.5" />
+          </button>
+        </div>
+        <p className="text-[10px] text-stone-400 tabular-nums">
+          {uploadedMandatory}/{totalMandatory} required uploaded
+        </p>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Left: Evidence Requirements */}
+        <div className="w-48 shrink-0 border-r border-stone-100 overflow-auto">
+          <div className="p-3 space-y-3">
+            <p className="text-[10px] font-medium text-stone-500 uppercase tracking-wide px-1">
+              Required Documents
+            </p>
+            {allRequiredEvidence.map((ev) => (
+              <EvidenceSlot
+                key={ev.id}
+                evidence={ev}
+                linkedGroup={getLinkedGroup(ev)}
+                isLinking={false}
+                onStartLink={() => {}}
+                onCancelLink={() => {}}
+                allGroups={documentGroups}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Available Documents */}
+        <div className="flex-1 min-w-0 overflow-auto">
+          <div className="p-3 space-y-3">
+            <p className="text-[10px] font-medium text-stone-500 uppercase tracking-wide px-1">
+              Documents
+            </p>
+
+            {availableGroups.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {availableGroups.map((group) => {
+                  const activeFiles = group.files.filter((f) => !f.isRemoved);
+                  const linkCount = linkCountByGroupId[group.id] || 0;
+
+                  const handleDragStart = (e: React.DragEvent) => {
+                    e.dataTransfer.setData("application/x-document-group-id", group.id);
+                    e.dataTransfer.effectAllowed = "link";
+                  };
+
+                  const handleClick = () => {
+                    setPreviewGroup(group);
+                  };
+
+                  return (
+                    <div
+                      key={group.id}
+                      draggable
+                      onDragStart={handleDragStart}
+                      onClick={handleClick}
+                      className={cn(
+                        "rounded-lg border overflow-hidden text-left transition-all cursor-pointer hover:shadow-sm",
+                        linkCount > 0
+                          ? "border-blue-200 bg-blue-50/30 hover:border-blue-300"
+                          : "border-stone-200 bg-white hover:border-stone-300"
+                      )}
+                    >
+                      {/* Mini preview */}
+                      <div className="aspect-[4/3] bg-stone-50 p-2 flex items-center justify-center relative">
+                        <div className="h-full aspect-[1/1.414] bg-white rounded border border-stone-200 p-1.5 shadow-sm">
+                          <DocumentPreviewContent size="sm" />
+                        </div>
+                        {/* Link count badge */}
+                        {linkCount > 0 && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[8px] font-semibold text-blue-700 bg-blue-100 rounded flex items-center gap-0.5 tabular-nums">
+                            <Link2 size={8} />
+                            {linkCount}
+                          </span>
+                        )}
+                        {/* Status badge */}
+                        {group.status === "reviewed" && (
+                          <span className="absolute top-1 right-1 px-1 py-0.5 text-[8px] font-semibold text-emerald-700 bg-emerald-100 rounded flex items-center gap-0.5">
+                            <Check size={8} strokeWidth={3} />
+                          </span>
+                        )}
+                      </div>
+                      {/* Title and info */}
+                      <div className="px-2 py-1.5 border-t border-stone-100">
+                        <p className="text-[10px] font-medium text-stone-700 truncate">
+                          {group.title}
+                        </p>
+                        <p className="text-[9px] text-stone-400 tabular-nums">
+                          {activeFiles.length} {activeFiles.length === 1 ? "page" : "pages"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-stone-400">
+                <FolderOpen className="size-8 mx-auto mb-2" />
+                <p className="text-xs">No documents available</p>
+                <p className="text-[10px] mt-1">Upload files to Documents first</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Drag hint */}
+      <div className="shrink-0 px-4 py-2 border-t border-stone-100 bg-stone-50/50">
+        <p className="text-[10px] text-stone-400 text-center">
+          Drag documents to link them to required slots
+        </p>
+      </div>
+
+      {/* Document Preview Modal */}
+      {previewGroup && (
+        <CategoryReviewModal
+          group={previewGroup}
+          allGroups={documentGroups}
+          onClose={() => setPreviewGroup(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Main Detail Panel - Left: Field cards, Right: Evidence sidebar
 export function ChecklistDetailPanel({
   sectionTitle,
   sectionId,
@@ -450,6 +1067,12 @@ export function ChecklistDetailPanel({
 }: ChecklistDetailPanelProps) {
   const documentGroups = useDocumentGroups();
   const updateField = useCaseDetailStore((state) => state.updateEnhancedChecklistField);
+
+  // Multi-select filter state
+  const [activeFilters, setActiveFilters] = useState<Set<FieldFilterKey>>(new Set());
+
+  // Document panel mode state
+  const [docPanelMode, setDocPanelMode] = useState<DocumentPanelMode>("default");
 
   // Local form state - initialize from items
   const [formValues, setFormValues] = useState<Record<string, string>>(() => {
@@ -503,12 +1126,12 @@ export function ChecklistDetailPanel({
     setFormValues(originalValues);
   };
 
-  // Collect all required evidence from items (deduplicated)
-  const allRequiredEvidence = useMemo(() => {
+  // Count missing mandatory evidence
+  const missingMandatory = useMemo(() => {
     const evidenceMap = new Map<string, RequiredEvidence>();
     items.forEach((item) => {
       item.requiredEvidence?.forEach((ev) => {
-        if (!evidenceMap.has(ev.id)) {
+        if (ev.isMandatory && !ev.isUploaded && !evidenceMap.has(ev.id)) {
           evidenceMap.set(ev.id, ev);
         }
       });
@@ -516,22 +1139,37 @@ export function ChecklistDetailPanel({
     return Array.from(evidenceMap.values());
   }, [items]);
 
-  // Helper to find linked group for evidence
-  const getLinkedGroup = (evidence: RequiredEvidence): DocumentGroup | undefined => {
-    if (!evidence.linkedFileId) return undefined;
-    return documentGroups.find((g) => g.id === evidence.linkedFileId);
-  };
-
-  // Split into mandatory and optional
-  const mandatoryEvidence = allRequiredEvidence.filter((ev) => ev.isMandatory);
-  const optionalEvidence = allRequiredEvidence.filter((ev) => !ev.isMandatory);
-  const missingMandatory = mandatoryEvidence.filter((ev) => !ev.isUploaded);
-
   // Completed fields count (based on current form values)
   const completedFields = items.filter((i) => !!formValues[i.id]).length;
 
-  // Unresolved issues count (for display in header)
-  const unresolvedIssues = issues.filter((i) => i.status !== "resolved");
+  // Filter items based on active filters (multi-select with OR logic)
+  const filteredItems = useMemo(() => {
+    if (activeFilters.size === 0) return items;
+
+    return items.filter((item) => {
+      // Check each active filter - item matches if ANY filter matches (OR logic)
+      for (const filterKey of activeFilters) {
+        switch (filterKey) {
+          case "missing":
+            if (item.isRequired && !item.value) return true;
+            break;
+          case "extracted":
+            if (item.source === "extracted") return true;
+            break;
+          case "manual":
+            if (item.source === "manual") return true;
+            break;
+          case "questionnaire":
+            if (item.source === "questionnaire") return true;
+            break;
+          case "low_confidence":
+            if (item.source === "extracted" && item.confidenceScore !== undefined && item.confidenceScore < 80) return true;
+            break;
+        }
+      }
+      return false;
+    });
+  }, [items, activeFilters]);
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -566,111 +1204,63 @@ export function ChecklistDetailPanel({
         </div>
       </div>
 
-      {/* Tabs - Form Data & Supporting Documents */}
-      <Tabs
-        defaultValue="form-data"
-        className="flex-1 flex flex-col min-h-0 overflow-hidden"
-      >
-        <TabsList className="shrink-0 w-full h-10 p-1 bg-stone-50 rounded-none justify-start gap-1 px-6 border-b border-stone-100">
-          <TabsTrigger
-            value="form-data"
-            className="px-3 py-1.5 rounded-md text-sm text-stone-500 data-[state=active]:bg-white data-[state=active]:text-stone-900 data-[state=active]:shadow-sm hover:text-stone-700 transition-all"
-          >
-            Details
-            <span className="ml-1.5 text-xs text-stone-400 tabular-nums">{items.length}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="supporting-documents"
-            className="px-3 py-1.5 rounded-md text-sm text-stone-500 data-[state=active]:bg-white data-[state=active]:text-stone-900 data-[state=active]:shadow-sm hover:text-stone-700 transition-all"
-          >
-            Supporting Documents
-            {missingMandatory.length > 0 && (
-              <span className="ml-1.5 text-xs text-amber-600 tabular-nums">{missingMandatory.length}</span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Details Tab - Two column form */}
-        <TabsContent
-          value="form-data"
-          className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden overflow-auto"
-        >
+      {/* Main content: Left fields + Right evidence sidebar */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Left: Field Cards - Scrollable list */}
+        <div className="flex-1 min-w-0 overflow-auto">
           <div className="px-6 py-5">
-            {items.length > 0 ? (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                {items.map((item) => (
-                  <FormField
+            {/* Filter Dropdown - Multi-select filter to locate fields */}
+            <FieldFilterDropdown
+              items={items}
+              activeFilters={activeFilters}
+              onFilterChange={setActiveFilters}
+            />
+
+            {/* Field Cards */}
+            <div className="space-y-3">
+              {filteredItems.length > 0 ? (
+                filteredItems.map((item) => (
+                  <FieldCard
                     key={item.id}
                     item={item}
                     editValue={formValues[item.id] || ""}
                     onValueChange={(value) => handleFieldChange(item.id, value)}
                     isEdited={editedFieldIds.has(item.id)}
+                    documentGroups={documentGroups}
                   />
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-stone-400 py-8 text-center">
-                No fields in this section
-              </p>
-            )}
+                ))
+              ) : activeFilters.size > 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-sm text-stone-500">No fields match the filter</p>
+                  <button
+                    onClick={() => setActiveFilters(new Set())}
+                    className="mt-2 text-xs text-[#0E4268] hover:underline"
+                  >
+                    Show all fields
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-stone-400 py-8 text-center">
+                  No fields in this section
+                </p>
+              )}
+            </div>
           </div>
-        </TabsContent>
+        </div>
 
-        {/* Supporting Documents Tab */}
-        <TabsContent
-          value="supporting-documents"
-          className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden overflow-auto"
-        >
-          <div className="px-6 py-5 space-y-5">
-            {allRequiredEvidence.length > 0 ? (
-              <>
-                {/* Mandatory documents - grid with A4 ratio cards */}
-                {mandatoryEvidence.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wide mb-2">
-                      Required Documents
-                    </p>
-                    <div className="grid grid-cols-6 xl:grid-cols-8 gap-2">
-                      {mandatoryEvidence.map((ev) => (
-                        <SupportingDocumentCard
-                          key={ev.id}
-                          evidence={ev}
-                          linkedGroup={getLinkedGroup(ev)}
-                          allGroups={documentGroups}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Optional documents - grid with A4 ratio cards */}
-                {optionalEvidence.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-400 uppercase tracking-wide mb-2">
-                      Optional Documents
-                    </p>
-                    <div className="grid grid-cols-6 xl:grid-cols-8 gap-2">
-                      {optionalEvidence.map((ev) => (
-                        <SupportingDocumentCard
-                          key={ev.id}
-                          evidence={ev}
-                          linkedGroup={getLinkedGroup(ev)}
-                          allGroups={documentGroups}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-stone-400">
-                <FileText className="size-6 mb-2" />
-                <p className="text-xs">No documents required</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+        {/* Right: Document Panel - Dynamic width based on mode */}
+        <div className={cn(
+          "shrink-0 border-l border-stone-100",
+          docPanelMode === "default" ? "w-52" : "w-[420px]"
+        )}>
+          <DocumentPanel
+            items={items}
+            documentGroups={documentGroups}
+            mode={docPanelMode}
+            onModeChange={setDocPanelMode}
+          />
+        </div>
+      </div>
 
       {/* Save/Cancel Footer - fixed at bottom, only show when changes detected */}
       {hasChanges && (

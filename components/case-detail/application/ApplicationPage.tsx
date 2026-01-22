@@ -543,17 +543,23 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
               const isEditedFromExtracted = editedFieldIds.has(field.id);
               const isExtracted = field.source === "extracted" && value === field.prefilledValue;
 
+              // All assessment fields are required
+              const isRequired = true;
+
               return (
                 <div
                   key={field.id}
-                  className="group py-3 px-3 rounded-lg"
+                  className={cn(
+                    "group py-3 px-3 rounded-lg transition-colors",
+                    !hasValue && isRequired && "bg-amber-50/30"
+                  )}
                 >
                   {/* Label row with status and source badge */}
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <div className={cn(
                         "shrink-0 size-1.5 rounded-full",
-                        hasValue ? "bg-emerald-500" : "bg-stone-300"
+                        hasValue ? "bg-emerald-500" : isRequired ? "bg-amber-400" : "bg-stone-300"
                       )} />
                       <label className="text-[11px] font-medium text-stone-600 leading-tight truncate">
                         {field.label}
@@ -568,14 +574,17 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
                     )}
                   </div>
 
-                  {/* Select dropdown */}
+                  {/* Select dropdown - styled to match text input in ChecklistDetailPanel */}
                   <Select value={value} onValueChange={(v) => handleFieldChange(field.id, v)}>
-                    <SelectTrigger size="sm" className="w-full text-xs h-9">
-                      <SelectValue placeholder="Select an option" />
+                    <SelectTrigger className={cn(
+                      "w-full",
+                      !hasValue && "bg-stone-50"
+                    )}>
+                      <SelectValue placeholder={isRequired ? "Required" : "Optional"} />
                     </SelectTrigger>
                     <SelectContent>
                       {field.options.map((option) => (
-                        <SelectItem key={option.value} value={option.value} className="text-xs">
+                        <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
                       ))}

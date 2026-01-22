@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ExternalLink,
   ClipboardCheck,
+  FileText,
 } from "lucide-react";
 import {
   Select,
@@ -214,44 +215,51 @@ interface AssessmentFieldProps {
 
 function AssessmentField({ field, value, onChange }: AssessmentFieldProps) {
   const hasValue = !!value;
-  const selectedOption = field.options.find((o) => o.value === value);
+  // All assessment fields are required
+  const isRequired = true;
+  const isExtractedValue = field.source === "extracted" && value === field.prefilledValue;
 
   return (
-    <div className="group py-2.5 px-3 rounded-lg">
-      {/* Status dot + Label */}
-      <div className="flex items-center gap-1.5 mb-2">
-        <div className={cn(
-          "shrink-0 size-1.5 rounded-full",
-          hasValue ? "bg-emerald-500" : "bg-stone-300"
-        )} />
-        <label className="text-[11px] text-stone-500 leading-tight">
-          {field.label}
-        </label>
+    <div className={cn(
+      "group py-3 px-3 rounded-lg transition-colors",
+      !hasValue && isRequired && "bg-amber-50/30"
+    )}>
+      {/* Label row with status and source badge */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className={cn(
+            "shrink-0 size-1.5 rounded-full",
+            hasValue ? "bg-emerald-500" : isRequired ? "bg-amber-400" : "bg-stone-300"
+          )} />
+          <label className="text-[11px] font-medium text-stone-600 leading-tight truncate">
+            {field.label}
+          </label>
+        </div>
+        {/* Source badge - inline with label, matches AssessmentSourceBadge */}
+        {hasValue && isExtractedValue && field.sourceDocument && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded">
+            <FileText className="size-2.5" />
+            {field.sourceDocument}
+          </span>
+        )}
       </div>
 
-      {/* Select dropdown */}
+      {/* Select dropdown - styled to match text input in ChecklistDetailPanel */}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger size="sm" className="w-full text-xs h-8">
-          <SelectValue placeholder="Select an option" />
+        <SelectTrigger className={cn(
+          "w-full",
+          !hasValue && "bg-stone-50"
+        )}>
+          <SelectValue placeholder={isRequired ? "Required" : "Optional"} />
         </SelectTrigger>
         <SelectContent>
           {field.options.map((option) => (
-            <SelectItem key={option.value} value={option.value} className="text-xs">
+            <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-
-      {/* Source document tag */}
-      {field.source === "extracted" && field.sourceDocument && value === field.prefilledValue && (
-        <div className="mt-1.5">
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-stone-500 bg-stone-100 border border-stone-200 rounded">
-            <span className="size-1 rounded-full bg-stone-400" />
-            {field.sourceDocument}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
@@ -568,19 +576,29 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
           </div>
         </div>
 
-        {/* Form Content - Scrollable area */}
-        <div className="flex-1 overflow-y-auto bg-stone-50">
-          <div className="max-w-3xl mx-auto p-5 pb-4">
-            {/* Section Header */}
-            <div className="mb-4">
-              <h2 className="text-base font-semibold text-stone-900">Assessment Questions</h2>
-              <p className="text-xs text-stone-500 mt-1">
-                These questions determine the structure of the application checklist
-              </p>
+        {/* Section Header - matches AssessmentDetailPanel */}
+        <div className="shrink-0 px-6 py-3 border-b border-stone-100">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-base font-semibold text-stone-900">Case Assessment</h2>
+              <span className="text-xs text-stone-400 tabular-nums">
+                {completedCount}/{totalCount} complete
+              </span>
             </div>
+            {/* Status */}
+            {totalCount - completedCount > 0 && (
+              <span className="text-xs text-stone-500 tabular-nums">
+                {totalCount - completedCount} field{totalCount - completedCount > 1 ? "s" : ""} needed
+              </span>
+            )}
+          </div>
+        </div>
 
-            {/* Fields Grid */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+        {/* Form Content - Scrollable area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-5">
+            {/* Fields Grid - matches ChecklistDetailPanel */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
               {visibleFields.map((field) => (
                 <AssessmentField
                   key={field.id}
@@ -594,8 +612,8 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
         </div>
 
         {/* Fixed Footer - Submit Button */}
-        <div className="shrink-0 px-5 py-3 bg-white border-t border-stone-200">
-          <div className="max-w-3xl mx-auto flex items-center justify-end">
+        <div className="shrink-0 px-6 py-3 bg-white border-t border-stone-200">
+          <div className="flex items-center justify-end">
             <button
               onClick={handleSubmit}
               disabled={!canSubmit || isSubmitting}

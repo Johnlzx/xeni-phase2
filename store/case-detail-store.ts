@@ -1695,6 +1695,34 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      // Unlink evidence from a document group
+      unlinkEvidence: (evidenceId: string) => {
+        set(
+          (state) => {
+            // Update enhanced checklist items - reset the evidence to unlinked state
+            const updatedEnhancedItems = state.enhancedChecklistItems.map((item) => ({
+              ...item,
+              requiredEvidence: item.requiredEvidence?.map((ev) =>
+                ev.id === evidenceId
+                  ? {
+                      ...ev,
+                      isUploaded: false,
+                      linkedFileId: undefined,
+                      linkedFileName: undefined,
+                    }
+                  : ev
+              ),
+            }));
+
+            return {
+              enhancedChecklistItems: updatedEnhancedItems,
+            };
+          },
+          false,
+          "unlinkEvidence"
+        );
+      },
+
       // Demo: Review all documents and analyze to generate client profile
       reviewAllDocumentsAndAnalyze: async () => {
         const state = get();

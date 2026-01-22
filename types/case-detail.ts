@@ -526,6 +526,9 @@ export interface CaseDetailActions {
   // Link evidence to an existing document group from File Hub
   linkEvidenceToGroup: (evidenceId: string, groupId: string) => void;
 
+  // Unlink evidence from a document group
+  unlinkEvidence: (evidenceId: string) => void;
+
   // Initialize case from CreateCaseModal
   // Case Notes and Passport are special documents - auto-confirmed
   initializeCaseFromCreation: (data: {
