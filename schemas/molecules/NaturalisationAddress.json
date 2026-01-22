@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_address/v1.0.0",
+  "title": "Naturalisation Address Information Schema",
+  "description": "Address information for British naturalisation application with 5-year history",
+  "x-llmHint": "Naturalisation address information with 5-year residence history. Match: utility bills, council tax statements, tenancy agreements, mortgage statements, bank statements showing address history.",
+  "definitions": {
+    "PreviousAddressWithDuration": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/InternationalAddress"
+        },
+        {
+          "type": "object",
+          "description": "Previous Address with Duration - International address with residence period",
+          "required": ["startDate"],
+          "properties": {
+            "startDate": {
+              "allOf": [
+                {
+                  "$ref": "../common/Common.json#/definitions/DateField"
+                },
+                {
+                  "description": "Date you lived there from (DD-MM-YYYY)",
+                  "default": "01-01-2010"
+                }
+              ]
+            },
+            "endDate": {
+              "allOf": [
+                {
+                  "$ref": "../common/Common.json#/definitions/DateField"
+                },
+                {
+                  "description": "Date you lived there to (DD-MM-YYYY)",
+                  "default": "31-12-2010"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "AddressInformation": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isCurrentResidence": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["livingAddress"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasLivedAtCurrentAddressFor5Years": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "previousAddresses": {}
+            }
+          }
+        }
+      ],
+      "description": "Address Information",
+      "required": [
+        "address",
+        "isCurrentResidence",
+        "moveInDate",
+        "hasLivedAtCurrentAddressFor5Years",
+        "citizenshipCeremonyLocation"
+      ],
+      "properties": {
+        "moveInDate": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/MonthYearField"
+            },
+            {
+              "description": "When did you start living at this address? (MM-YYYY)",
+              "default": "01-2010"
+            }
+          ]
+        },
+        "livingAddress": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/UKAddress"
+            },
+            {
+              "description": "Living address where the person physically resides"
+            }
+          ]
+        },
+        "previousAddresses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviousAddressWithDuration"
+          },
+          "description": "Previous Addresses"
+        },
+        "isCurrentResidence": {
+          "type": "boolean",
+          "description": "Is this where you live? Set to false only if livingAddress is provided in AddressInformation)",
+          "default": true
+        },
+        "address": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/UKAddress"
+            },
+            {
+              "description": "Postal address for receiving correspondence about your application and immigration status"
+            }
+          ]
+        },
+        "citizenshipCeremonyLocation": {
+          "type": "string",
+          "description": "Citizenship Ceremony Location",
+          "default": "Aberdeen City"
+        },
+        "hasLivedAtCurrentAddressFor5Years": {
+          "type": "boolean",
+          "description": "Have you lived at your current address for 5 years?",
+          "default": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,732 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/global-common/v1.4.0",
+  "title": "Common Schema Definitions",
+  "description": "Fundamental type definitions and reusable structures shared across all UK immigration application schemas.",
+  "x-llmHint": "Base type definitions. Match: passports, national ID cards, addresses, personal names. Provides foundational types for all schemas.",
+  "definitions": {
+    "DateField": {
+      "type": "string",
+      "description": "Date in DD-MM-YYYY format",
+      "pattern": "^\\d{1,2}-\\d{1,2}-\\d{4}$"
+    },
+    "MonthYearField": {
+      "type": "string",
+      "description": "Month and Year in MM-YYYY format",
+      "pattern": "^\\d{1,2}-\\d{4}$"
+    },
+    "IsoDateField": {
+      "type": "string",
+      "description": "Date in YYYY-MM-DD format (RFC 3339 full-date)",
+      "format": "date"
+    },
+    "Title": {
+      "enum": ["Mr", "Mrs", "Ms", "Miss", "Doctor", "Reverend"],
+      "type": "string",
+      "description": "Title. Infer from sex: Female -> Ms, Male -> Mr. Use other values only if explicitly stated",
+      "default": "Ms"
+    },
+    "SexBinary": {
+      "type": "string",
+      "description": "Sex (binary) as shown in passport or travel document",
+      "enum": ["Male", "Female"],
+      "default": "Male"
+    },
+    "Sex": {
+      "type": "string",
+      "description": "Sex as shown in passport or travel document",
+      "enum": ["Male", "Female", "Unspecified"],
+      "default": "Male"
+    },
+    "RelationshipStatus": {
+      "type": "string",
+      "description": "Relationship status (UK application standard set)",
+      "enum": [
+        "Single",
+        "Married or a civil partner",
+        "Unmarried partner",
+        "Divorced or civil partnership dissolved",
+        "Separated",
+        "Widowed or a surviving civil partner"
+      ],
+      "default": "Single"
+    },
+    "YesNo": {
+      "type": "boolean",
+      "description": "Yes/No field"
+    },
+    "RelationshipType": {
+      "type": "string",
+      "description": "Relationship type for partner/spouse",
+      "enum": [
+        "Husband",
+        "Wife",
+        "Civil partner",
+        "Fiancé(e)",
+        "Proposed civil partner",
+        "Unmarried partner"
+      ]
+    },
+    "RelationshipEndReason": {
+      "type": "string",
+      "description": "Reason why a relationship ended",
+      "enum": [
+        "Divorced",
+        "Widowed",
+        "Civil partnership dissolved",
+        "The relationship ended"
+      ]
+    },
+    "CountryCode": {
+      "type": "string",
+      "description": "ISO 3166-1 alpha-3 country code (e.g., GBR, USA, CHN)",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "CountryName": {
+      "type": "string",
+      "description": "Full country name in English (e.g., 'United Kingdom', 'China', 'United States').",
+      "default": "United Kingdom"
+    },
+    "NationalityDemonym": {
+      "type": "string",
+      "description": "Nationality adjective/demonym in English (e.g., 'British', 'Chinese', 'American').",
+      "default": "British"
+    },
+    "PlaceName": {
+      "type": "string",
+      "description": "Place name (city/town/province) as written in the document.",
+      "default": "XXXXX"
+    },
+    "OrganisationName": {
+      "type": "string",
+      "description": "Organisation/company/institution name.",
+      "default": "XXXXX"
+    },
+    "JobTitle": {
+      "type": "string",
+      "description": "Job title/position name.",
+      "default": "XXXXX"
+    },
+    "ReferenceNumber": {
+      "type": "string",
+      "description": "Reference/identifier number as shown in the document.",
+      "default": ""
+    },
+    "CertificateOfSponsorshipNumber": {
+      "allOf": [
+        { "$ref": "#/definitions/ReferenceNumber" },
+        {
+          "minLength": 5,
+          "maxLength": 50
+        }
+      ],
+      "description": "UK Skilled Worker Certificate of Sponsorship (CoS) reference number."
+    },
+    "SponsorLicenceNumber": {
+      "allOf": [
+        { "$ref": "#/definitions/ReferenceNumber" },
+        {
+          "minLength": 5,
+          "maxLength": 50
+        }
+      ],
+      "description": "UK sponsor licence number (as shown on CoS/employer sponsorship documents)."
+    },
+    "SocCode": {
+      "type": "string",
+      "description": "UK Standard Occupational Classification (SOC) code.",
+      "minLength": 4,
+      "maxLength": 10,
+      "default": ""
+    },
+    "CountryCodeAlpha2Or3": {
+      "type": "string",
+      "description": "Country code in ISO 3166-1 alpha-2 or alpha-3 format (e.g., GB/GBR, US/USA, CN/CHN).",
+      "pattern": "^[A-Z]{2,3}$",
+      "default": "GBR"
+    },
+    "BRPNumber": {
+      "type": "string",
+      "description": "Biometric Residence Permit (BRP) number (9 characters).",
+      "pattern": "^[A-Z0-9]{9}$",
+      "default": "ZUX111111"
+    },
+    "UKNationalInsuranceNumber": {
+      "type": "string",
+      "description": "UK National Insurance number (e.g., 'QQ 12 34 56 C').",
+      "pattern": "^[A-Z]{2}\\s?\\d{2}\\s?\\d{2}\\s?\\d{2}\\s?[A-D]$",
+      "minLength": 9,
+      "maxLength": 13,
+      "default": "AA111111A"
+    },
+    "PhoneNumber": {
+      "type": "string",
+      "description": "Phone number with optional country code. Note: Will be auto-normalized to digits only (spaces, +, -, parentheses removed) for UK government form compatibility.",
+      "pattern": "^\\+?[0-9\\s\\-()]+$"
+    },
+    "Email": {
+      "type": "string",
+      "description": "Email address",
+      "format": "email"
+    },
+    "UKPostcode": {
+      "type": "string",
+      "description": "UK Postcode format",
+      "pattern": "^[A-Z]{1,2}[0-9][0-9A-Z]?\\s?[0-9][A-Z]{2}$"
+    },
+    "PersonBase": {
+      "type": "object",
+      "description": "Person Base - Common fields for all person-related definitions",
+      "properties": {
+        "givenName": {
+          "type": "string",
+          "description": "Given Name",
+          "default": "XXXXX"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family Name",
+          "default": "XXXXX"
+        },
+        "dateOfBirth": {
+          "allOf": [
+            { "$ref": "#/definitions/DateField" },
+            { "default": "01-01-1990" }
+          ]
+        }
+      }
+    },
+    "OtherName": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "nameChangeReason": { "const": "Other" }
+            }
+          },
+          "then": {
+            "required": ["nameChangeReasonDetails"]
+          }
+        }
+      ],
+      "description": "Other Name",
+      "required": ["title", "givenName", "familyName", "nameChangeReason", "enteredUKUsingThisName"],
+      "properties": {
+        "title": { "$ref": "#/definitions/Title" },
+        "givenName": {
+          "type": "string",
+          "description": "Other Given Name(s)",
+          "default": "XXXXX"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Other Family Name",
+          "default": "XXXXX"
+        },
+        "nameChangeReason": {
+          "enum": ["Marriage or civil partnership", "Divorce", "Other"],
+          "type": "string",
+          "description": "Why have you been known by another name?",
+          "default": "Other"
+        },
+        "nameChangeReasonDetails": {
+          "type": "string",
+          "description": "Enter the reason why you have been known by another name - Give details",
+          "default": "professionally used"
+        },
+        "legalNameChangeDate": {
+          "type": "string",
+          "description": "If you legally changed your name, when did you do this? (DD-MM-YYYY)",
+          "default": "01-01-2010"
+        },
+        "enteredUKUsingThisName": {
+          "type": "boolean",
+          "description": "Have you ever entered the UK using this name?",
+          "default": false
+        }
+      }
+    },
+    "DocumentBase": {
+      "type": "object",
+      "description": "Document Base - Common fields for identity documents",
+      "properties": {
+        "issueDate": {
+          "allOf": [
+            { "$ref": "#/definitions/DateField" },
+            { "description": "Issue Date" }
+          ]
+        },
+        "expiryDate": {
+          "allOf": [
+            { "$ref": "#/definitions/DateField" },
+            { "description": "Expiry Date" }
+          ]
+        },
+        "issuingAuthority": {
+          "type": "string",
+          "description": "Issuing Authority"
+        }
+      }
+    },
+    "MRZ": {
+      "type": "object",
+      "description": "Raw MRZ lines from the passport. For a TD3 passport, there are exactly two lines with 44 characters each. Use these lines to extract all structured passport fields according to ICAO Doc 9303.",
+      "additionalProperties": false,
+      "required": ["line1", "line2"],
+      "properties": {
+        "line1": {
+          "type": "string",
+          "description": "MRZ Line 1",
+          "default": ""
+        },
+        "line2": {
+          "type": "string",
+          "description": "MRZ Line 2",
+          "default": ""
+        }
+      }
+    },
+    "Passport": {
+      "allOf": [
+        { "$ref": "#/definitions/DocumentBase" },
+        {
+          "type": "object",
+          "description": "Passport - Complete passport definition for UK immigration applications",
+          "additionalProperties": false,
+          "required": ["passportNumber", "passportType", "placeOfIssue", "issuingCountry", "issuingCountryCode", "mrz"],
+          "properties": {
+            "issueDate": { "default": "01-01-2021" },
+            "expiryDate": { "default": "01-01-2026" },
+            "passportNumber": {
+              "type": "string",
+              "description": "Passport Number",
+              "default": "P1111111"
+            },
+            "passportType": {
+              "$ref": "#/definitions/PassportType"
+            },
+            "placeOfIssue": {
+              "type": "string",
+              "description": "Place of Issue",
+              "default": "Anycity"
+            },
+            "issuingCountry": {
+              "type": "string",
+              "description": "Issuing Country",
+              "default": "Greece"
+            },
+            "issuingCountryCode": {
+              "type": "string",
+              "description": "Issuing Country Code (ICAO/ISO)",
+              "default": "GRC"
+            },
+            "issuingAuthority": { "default": "HMPO" },
+            "mrz": { "$ref": "#/definitions/MRZ" }
+          }
+        }
+      ]
+    },
+    "PassportType": {
+      "enum": ["P", "D", "S", "O"],
+      "type": "string",
+      "description": "Passport Type (P=Regular, D=Diplomatic, S=Service, O=Official)",
+      "default": "P"
+    },
+    "PassportNumber": {
+      "type": "string",
+      "description": "Passport number as shown in the passport/travel document.",
+      "minLength": 5,
+      "maxLength": 50
+    },
+    "NationalIdCard": {
+      "allOf": [
+        { "$ref": "#/definitions/DocumentBase" },
+        {
+          "type": "object",
+          "description": "National ID Card",
+          "additionalProperties": false,
+          "properties": {
+            "cardNumber": {
+              "type": "string",
+              "description": "National ID Card Number",
+              "default": ""
+            },
+            "issuingCountry": {
+              "type": "string",
+              "description": "Issuing Country",
+              "default": ""
+            }
+          },
+          "x-docTypes": ["NATIONAL_ID_CARD"]
+        }
+      ]
+    },
+    "UKAddress": {
+      "type": "object",
+      "description": "UK Address - Standard UK address format",
+      "additionalProperties": false,
+      "required": ["townOrCity", "postCode"],
+      "properties": {
+        "addressLine1": {
+          "type": "string",
+          "description": "Address Line 1",
+          "default": "2 Marsham Street"
+        },
+        "addressLine2": {
+          "type": "string",
+          "description": "Address Line 2",
+          "default": ""
+        },
+        "addressLine3": {
+          "type": "string",
+          "description": "Address Line 3",
+          "default": ""
+        },
+        "townOrCity": {
+          "type": "string",
+          "description": "Town or City",
+          "default": "London"
+        },
+        "postCode": {
+          "type": "string",
+          "description": "UK Postcode",
+          "default": "SW1P 4DF"
+        }
+      }
+    },
+    "InternationalAddress": {
+      "type": "object",
+      "description": "International Address - Generic address format for any country. IMPORTANT: Always extract postal/ZIP code separately into postCode field.",
+      "additionalProperties": false,
+      "required": ["townOrCity", "country"],
+      "properties": {
+        "addressLine1": {
+          "type": "string",
+          "description": "Address Line 1 (street address, house number, road name)",
+          "default": "2 Marsham Street"
+        },
+        "addressLine2": {
+          "type": "string",
+          "description": "Address Line 2 (apartment/suite/building name only)",
+          "default": ""
+        },
+        "townOrCity": {
+          "type": "string",
+          "description": "Town or City name only (do NOT include postal code)",
+          "default": "London"
+        },
+        "provinceOrState": {
+          "type": "string",
+          "description": "Province/State/County/District",
+          "default": ""
+        },
+        "postCode": {
+          "type": "string",
+          "description": "Postal/ZIP Code",
+          "default": "SW1P 4DF"
+        },
+        "country": {
+          "type": "string",
+          "description": "Country",
+          "default": "United Kingdom"
+        }
+      }
+    },
+    "CurrencyAmount": {
+      "type": "object",
+      "description": "Currency Amount - Currency symbol with amount",
+      "additionalProperties": false,
+      "required": ["currency", "amount"],
+      "properties": {
+        "currency": {
+          "type": "string",
+          "description": "Currency code (ISO 4217)",
+          "default": "GBP"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount",
+          "default": 10
+        }
+      }
+    },
+    "TelephoneNumber": {
+      "type": "object",
+      "description": "Telephone Number - Country code and number. Note: Both countryCode and number will be auto-normalized to digits only (spaces, +, -, parentheses removed) for UK government form compatibility.",
+      "additionalProperties": false,
+      "required": ["countryCode", "number"],
+      "properties": {
+        "countryCode": {
+          "type": "string",
+          "description": "Country code (e.g., 44 for UK). Will be auto-normalized to digits only.",
+          "default": "44"
+        },
+        "number": {
+          "type": "string",
+          "description": "Telephone number. Will be auto-normalized to digits only.",
+          "default": "11111111"
+        }
+      }
+    },
+    "YearMonthDuration": {
+      "type": "object",
+      "description": "Year Month Duration - Duration in years and months",
+      "additionalProperties": false,
+      "properties": {
+        "years": {
+          "type": "integer",
+          "description": "Years",
+          "default": 5
+        },
+        "months": {
+          "type": "integer",
+          "description": "Months",
+          "default": 0
+        }
+      }
+    },
+    "UKAddressBase": {
+      "allOf": [{ "$ref": "#/definitions/UKAddress" }],
+      "description": "Alias for UKAddress - UK Address Base"
+    },
+    "AddressBase": {
+      "allOf": [{ "$ref": "#/definitions/InternationalAddress" }],
+      "description": "Alias for InternationalAddress - Generic international address"
+    },
+    "FullName": {
+      "type": "object",
+      "description": "Full name with title, given name and family name",
+      "additionalProperties": false,
+      "required": ["title", "givenName", "familyName"],
+      "properties": {
+        "title": {
+          "$ref": "#/definitions/Title"
+        },
+        "givenName": {
+          "type": "string",
+          "description": "Given name(s)",
+          "default": "XXXXX"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family name",
+          "default": "XXXXX"
+        }
+      }
+    },
+    "Duration": {
+      "allOf": [{ "$ref": "#/definitions/YearMonthDuration" }],
+      "description": "Alias for YearMonthDuration - Duration in years and months"
+    },
+    "TelephoneUsageLocation": {
+      "type": "array",
+      "description": "Where do you use this telephone number? MULTI-SELECT: Extract ALL selected options from the document, not just one.",
+      "items": {
+        "enum": [
+          "For use whilst in the UK",
+          "For use whilst out of the UK"
+        ],
+        "type": "string"
+      },
+      "default": ["For use whilst out of the UK"]
+    },
+    "TelephoneUsageLocationSingle": {
+      "type": "string",
+      "description": "Where do you use this telephone number? SINGLE-SELECT.",
+      "enum": ["For use whilst in the UK", "For use whilst out of the UK"],
+      "default": "For use whilst in the UK"
+    },
+    "TelephoneType": {
+      "type": "array",
+      "description": "Type of telephone number. MULTI-SELECT: Extract ALL selected options (e.g., if Home, Business, and Mobile are all checked, include all three in the array).",
+      "items": {
+        "enum": [
+          "Home telephone number",
+          "Business telephone number",
+          "Mobile telephone number"
+        ],
+        "type": "string"
+      },
+      "default": ["Mobile telephone number"]
+    },
+    "TelephoneContactMethod": {
+      "enum": [
+        "I can be contacted by telephone call and text message (SMS)",
+        "I can only be contacted by telephone call",
+        "I can only be contacted by text message (SMS)",
+        "I cannot be contacted by telephone call or text message (SMS)"
+      ],
+      "type": "string",
+      "description": "How can you be contacted by telephone?",
+      "default": "I can be contacted by telephone call and text message (SMS)"
+    },
+    "EmailBelongsTo": {
+      "enum": [
+        "You",
+        "An immigration adviser based in the UK",
+        "An immigration adviser based outside the UK",
+        "Someone else"
+      ],
+      "type": "string",
+      "description": "Who does this email belong to?",
+      "default": "You"
+    },
+    "EmailBasic": {
+      "type": "object",
+      "description": "Email Basic - Basic email information with address and ownership",
+      "additionalProperties": false,
+      "required": ["emailAddress", "belongsTo"],
+      "properties": {
+        "emailAddress": {
+          "type": "string",
+          "format": "email",
+          "description": "Email Address",
+          "default": "mail@example.com"
+        },
+        "belongsTo": {
+          "$ref": "#/definitions/EmailBelongsTo"
+        }
+      }
+    },
+    "PhoneBasic": {
+      "type": "object",
+      "description": "Phone Basic - Basic telephone information with number, usage location and type. Note: telephoneNumber will be auto-normalized to digits only (spaces, +, -, parentheses removed) for UK government form compatibility.",
+      "additionalProperties": false,
+      "required": ["telephoneNumber", "usageLocation", "telephoneType"],
+      "properties": {
+        "telephoneNumber": {
+          "type": "string",
+          "description": "Telephone Number. Will be auto-normalized to digits only (e.g., '+44 7448 229103' becomes '447448229103').",
+          "pattern": "^[0-9+\\s()-]+$",
+          "default": "07111111111"
+        },
+        "usageLocation": {
+          "type": "array",
+          "description": "Where do you use this telephone number? MULTI-SELECT: Extract ALL selected options.",
+          "items": {
+            "enum": ["For use whilst in the UK", "For use whilst out of the UK"],
+            "type": "string"
+          },
+          "default": ["For use whilst in the UK"]
+        },
+        "telephoneType": {
+          "type": "array",
+          "description": "Type of telephone number. MULTI-SELECT: Extract ALL selected options (Home/Business/Mobile).",
+          "items": {
+            "enum": ["Home telephone number", "Business telephone number", "Mobile telephone number"],
+            "type": "string"
+          },
+          "default": ["Mobile telephone number"]
+        }
+      }
+    },
+    "ContactPreferences": {
+      "type": "object",
+      "description": "Contact Preferences - Which contact method to use for different purposes",
+      "additionalProperties": false,
+      "required": [
+        "emailForQuestions",
+        "emailForDecision",
+        "emailForAfterDecision"
+      ],
+      "properties": {
+        "emailForQuestions": {
+          "type": "string",
+          "format": "email",
+          "description": "Which email address should we use to contact you with any questions about your application?",
+          "default": "mail@example.com"
+        },
+        "emailForDecision": {
+          "type": "string",
+          "format": "email",
+          "description": "Which email address should we use to send a decision on your application?",
+          "default": "mail@example.com"
+        },
+        "emailForAfterDecision": {
+          "type": "string",
+          "format": "email",
+          "description": "Which email address should we use to communicate with you after your application has been decided?",
+          "default": "mail@example.com"
+        }
+      }
+    },
+    "VisitCountCategory": {
+      "enum": [
+        "Zero",
+        "Once",
+        "2 to 5 times",
+        "6 or more times"
+      ],
+      "type": "string",
+      "description": "Categorized count of visits (system-calculated from visits array length)",
+      "default": "Zero"
+    },
+    "TransportDetails": {
+      "type": "object",
+      "description": "Transport Details - Entry/Leave location and transport method",
+      "additionalProperties": false,
+      "required": ["location", "transportInfo"],
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "Entry/leave location (e.g., London Heathrow)",
+          "default": "London Heathrow"
+        },
+        "transportInfo": {
+          "type": "string",
+          "description": "Flight number, train service or ship name (include operator name if known)",
+          "default": "BA123"
+        }
+      }
+    },
+    "VisitDuration": {
+      "type": "object",
+      "description": "Duration of visit - Select a unit of time and enter a value",
+      "additionalProperties": false,
+      "required": ["unit", "value"],
+      "properties": {
+        "unit": {
+          "enum": ["Days", "Weeks", "Months"],
+          "type": "string",
+          "description": "Unit of time",
+          "default": "Days"
+        },
+        "value": {
+          "type": "integer",
+          "description": "Duration value",
+          "minimum": 1,
+          "default": 2
+        }
+      }
+    },
+    "TravelEntryDate": {
+      "allOf": [
+        { "$ref": "#/definitions/DateField" },
+        {
+          "description": "Entry date (DD-MM-YYYY)",
+          "default": "01-01-2024"
+        }
+      ]
+    },
+    "TravelLeaveDate": {
+      "allOf": [
+        { "$ref": "#/definitions/DateField" },
+        {
+          "description": "Leave date (DD-MM-YYYY)",
+          "default": "01-02-2024"
+        }
+      ]
+    },
+    "TravelDurationComputed": {
+      "allOf": [
+        { "$ref": "#/definitions/VisitDuration" },
+        {
+          "description": "Duration of stay",
+          "x-computed": "calculateDuration(entryDate, leaveDate)"
+        }
+      ]
+    }
+  }
+}

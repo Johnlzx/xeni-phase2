@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/address/v2.0.7",
+  "title": "Address Information Schema",
+  "description": "Reusable schema definitions for address information across UK immigration applications",
+  "x-llmHint": "Address information (current residential address, correspondence address, and previous address history). Match when content includes structured address fields (address line(s), town/city, province/state, postal code, country) and address questions such as: your address, correspondence address, previous address history, how long have you lived at this address, ownership status (rent/own). Do NOT use for UK stay/accommodation questions like: where will you be staying in the UK, will you be living anywhere else, hotel/booking details (use molecules/Accommodation).",
+  "definitions": {
+    "OwnershipStatus": {
+      "enum": ["I own it", "I rent it", "Other"],
+      "type": "string",
+      "description": "Ownership status of the property",
+      "default": "I own it"
+    },
+    "ResidenceAddressDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        {
+          "type": "object",
+          "description": "Residence Address Detail - Address with duration and ownership. If howLongLived is not provided, it should be calculated from startDate.",
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "ownershipStatus": {
+                    "const": "Other"
+                  }
+                }
+              },
+              "then": {
+                "required": ["ownershipDetails"]
+              }
+            }
+          ],
+          "required": [
+            "addressLine1",
+            "townOrCity",
+            "country",
+            "startDate",
+            "ownershipStatus"
+          ],
+          "properties": {
+            "addressLine1": {
+              "default": "123 Main Street"
+            },
+            "addressLine3": {
+              "type": "string",
+              "description": "Address Line 3",
+              "default": ""
+            },
+            "townOrCity": {
+              "default": "XXXXX"
+            },
+            "country": {
+              "default": "Afghanistan"
+            },
+            "startDate": {
+              "allOf": [
+                {
+                  "$ref": "../common/Common.json#/definitions/MonthYearField"
+                },
+                {
+                  "description": "When did you start living at this address? (MM-YYYY)",
+                  "default": "01-2020"
+                }
+              ]
+            },
+            "howLongLived": {
+              "allOf": [
+                {
+                  "$ref": "../common/Common.json#/definitions/YearMonthDuration"
+                },
+                {
+                  "description": "How long have you lived at this address?",
+                  "x-computed": "calculateDuration(startDate, now())",
+                  "readOnly": true
+                }
+              ]
+            },
+            "ownershipStatus": {
+              "$ref": "#/definitions/OwnershipStatus"
+            },
+            "ownershipDetails": {
+              "type": "string",
+              "description": "Details of ownership (if 'Other' selected)",
+              "default": "Living with parents"
+            }
+          }
+        }
+      ]
+    },
+    "CorrespondenceAddressDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        {
+          "type": "object",
+          "description": "Correspondence Address Detail - Address for receiving mail",
+          "additionalProperties": false,
+          "required": ["addressLine1", "townOrCity", "country"],
+          "properties": {
+            "addressLine1": {
+              "default": "123 Main Street"
+            },
+            "addressLine3": {
+              "type": "string",
+              "description": "Address Line 3",
+              "default": ""
+            },
+            "townOrCity": {
+              "default": "XXXXX"
+            },
+            "country": {
+              "default": "Afghanistan"
+            }
+          }
+        }
+      ]
+    },
+    "PreviousAddressDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        {
+          "type": "object",
+          "description": "Previous Address Detail - Historical address with dates",
+          "additionalProperties": false,
+          "required": [
+            "addressLine1",
+            "townOrCity",
+            "country",
+            "startDate",
+            "endDate",
+            "isUKAddress"
+          ],
+          "properties": {
+            "addressLine1": {
+              "default": "123 Main Street"
+            },
+            "addressLine3": {
+              "type": "string",
+              "description": "Address Line 3",
+              "default": ""
+            },
+            "startDate": {
+              "$ref": "../common/Common.json#/definitions/MonthYearField"
+            },
+            "endDate": {
+              "$ref": "../common/Common.json#/definitions/MonthYearField"
+            },
+            "isUKAddress": {
+              "type": "boolean",
+              "description": "UK address?",
+              "default": false
+            }
+          }
+        }
+      ]
+    },
+    "AddressInformation": {
+      "type": "object",
+      "description": "Address Information - Current and correspondence addresses",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasDifferentCorrespondenceAddress": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["correspondenceAddress"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasPreviousAddresses": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["previousAddresses"]
+          }
+        }
+      ],
+      "required": [
+        "residenceAddress",
+        "hasDifferentCorrespondenceAddress",
+        "hasPreviousAddresses"
+      ],
+      "properties": {
+        "residenceAddress": {
+          "$ref": "#/definitions/ResidenceAddressDetail"
+        },
+        "hasDifferentCorrespondenceAddress": {
+          "type": "boolean",
+          "description": "Is correspondence address different from residence address?",
+          "default": false
+        },
+        "correspondenceAddress": {
+          "$ref": "#/definitions/CorrespondenceAddressDetail"
+        },
+        "hasPreviousAddresses": {
+          "type": "boolean",
+          "description": "Have you lived at any other addresses in the past 2 years?",
+          "default": false
+        },
+        "previousAddresses": {
+          "type": "array",
+          "description": "Previous addresses (in the past 2 years)",
+          "items": {
+            "$ref": "#/definitions/PreviousAddressDetail"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

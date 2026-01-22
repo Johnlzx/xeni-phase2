@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/contact/v2.2.0",
+  "title": "Contact Information Schema",
+  "description": "Reusable schema definitions for contact information across UK immigration applications",
+  "x-llmHint": "Contact information. Match: correspondence with email/phone, business cards, application forms with contact details.",
+  "definitions": {
+    "ContactInformation": {
+      "type": "object",
+      "description": "Contact Information - Complete email and telephone contact details for UK immigration applications",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasAdditionalEmail": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["additionalEmail"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasAdditionalTelephone": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["additionalTelephone"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "telephoneContactMethod": {
+                "const": "I can only be contacted by telephone call"
+              }
+            }
+          },
+          "then": {
+            "required": ["telephoneContactMethodExplanation"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "telephoneContactMethod": {
+                "const": "I can only be contacted by text message (SMS)"
+              }
+            }
+          },
+          "then": {
+            "required": ["telephoneContactMethodExplanation"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "telephoneContactMethod": {
+                "const": "I cannot be contacted by telephone call or text message (SMS)"
+              }
+            }
+          },
+          "then": {
+            "required": ["telephoneContactMethodExplanation"]
+          }
+        }
+      ],
+      "required": [
+        "primaryEmail",
+        "hasAdditionalEmail",
+        "contactPreferences",
+        "telephoneContactMethod",
+        "primaryTelephone",
+        "hasAdditionalTelephone",
+        "preferredContactNumber"
+      ],
+      "properties": {
+        "primaryEmail": {
+          "$ref": "../common/Common.json#/definitions/EmailBasic"
+        },
+        "hasAdditionalEmail": {
+          "type": "boolean",
+          "description": "Do you have another email address?",
+          "default": false
+        },
+        "additionalEmail": {
+          "type": "array",
+          "description": "Additional email addresses",
+          "items": {
+            "$ref": "../common/Common.json#/definitions/EmailBasic"
+          },
+          "default": []
+        },
+        "contactPreferences": {
+          "$ref": "../common/Common.json#/definitions/ContactPreferences"
+        },
+        "telephoneContactMethod": {
+          "$ref": "../common/Common.json#/definitions/TelephoneContactMethod"
+        },
+        "telephoneContactMethodExplanation": {
+          "type": "string",
+          "description": "Explain why you cannot be contacted by a specific telephone method. Required when 'telephoneContactMethod' is not 'I can be contacted by telephone call and text message (SMS)'.",
+          "default": "XXXXX"
+        },
+        "primaryTelephone": {
+          "$ref": "../common/Common.json#/definitions/PhoneBasic"
+        },
+        "hasAdditionalTelephone": {
+          "type": "boolean",
+          "description": "Do you have any other telephone numbers?",
+          "default": false
+        },
+        "additionalTelephone": {
+          "type": "array",
+          "description": "Additional telephone numbers",
+          "items": {
+            "$ref": "../common/Common.json#/definitions/PhoneBasic"
+          },
+          "default": []
+        },
+        "preferredContactNumber": {
+          "type": "string",
+          "description": "Your preferred contact number",
+          "default": "07111111111"
+        }
+      }
+    }
+  }
+}

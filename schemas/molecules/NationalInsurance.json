@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/national_insurance/v1.1.0",
+  "title": "National Insurance Number Schema",
+  "description": "UK National Insurance number - reusable across visa types",
+  "x-llmHint": "UK National Insurance number. Match: NI number cards, HMRC letters, P60/P45 forms, payslips showing NI number.",
+  "definitions": {
+    "NationalInsurance": {
+      "type": "object",
+      "description": "UK National Insurance number if applicable",
+      "additionalProperties": false,
+      "required": ["hasNationalInsuranceNumber"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasNationalInsuranceNumber": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["nationalInsuranceNumber"]
+          }
+        }
+      ],
+      "properties": {
+        "hasNationalInsuranceNumber": {
+          "type": "boolean",
+          "description": "Do you have a National Insurance number?",
+          "default": false,
+          "x-computed": "exists(nationalInsuranceNumber)"
+        },
+        "nationalInsuranceNumber": {
+          "$ref": "../common/Common.json#/definitions/UKNationalInsuranceNumber"
+        }
+      }
+    }
+  }
+}

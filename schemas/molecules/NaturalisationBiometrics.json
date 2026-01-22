@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_biometrics/v1.0.0",
+  "title": "Naturalisation Biometrics Schema",
+  "description": "Biometrics configuration for British naturalisation application",
+  "x-llmHint": "Naturalisation biometrics. Match: biometrics appointment confirmations, location selection forms.",
+  "definitions": {
+    "Biometrics": {
+      "type": "object",
+      "description": "Naturalisation biometrics and location confirmation",
+      "additionalProperties": false,
+      "required": [
+        "isInUK",
+        "biometricsCountry",
+        "biometricsLocationConfirmed"
+      ],
+      "properties": {
+        "isInUK": {
+          "type": "boolean",
+          "description": "Are you in the UK?",
+          "default": true
+        },
+        "biometricsCountry": {
+          "type": "string",
+          "description": "Select a country to provide your biometrics"
+        },
+        "biometricsLocationConfirmed": {
+          "type": "boolean",
+          "description": "I have identified the location where I will provide my biometrics (or I am unable to provide my biometrics at any location)",
+          "default": true
+        }
+      }
+    }
+  }
+}

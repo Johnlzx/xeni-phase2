@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_travel/v1.0.0",
+  "title": "Naturalisation UK Arrival and Travel Schema",
+  "description": "UK arrival and travel history for British naturalisation application",
+  "x-llmHint": "CRITICAL: Naturalisation requires TWO types of travel records: (1) ARRIVALS to UK (ukTrips) - extract ALL rows where destination is UK/United Kingdom/any UK location, (2) DEPARTURES from UK (outsideUKTrips) - extract rows where destination is NOT UK. DO NOT skip UK-destination rows. Match: travel tickets, passport stamps, entry/exit records, airline boarding passes, travel itineraries, travel history tables.",
+  "x-llmRules": [
+    {
+      "ruleId": "TRIPS_TO_UK_CRITICAL",
+      "targetPath": "ukArrivalAndTravel.ukTrips",
+      "description": "CRITICAL: Extract ALL trips where destination/arrival country is UK, United Kingdom, or any UK location. These are ARRIVAL records to the UK and MUST be captured.",
+      "identifiers": [
+        "UK", "United Kingdom", "U.K.", "Great Britain", "GB",
+        "England", "Scotland", "Wales", "Northern Ireland",
+        "London", "Manchester", "Birmingham", "Edinburgh", "Cardiff", "Belfast",
+        "arrived in UK", "entered UK", "came to UK", "travelled to UK", "UK entry", "arrival to UK",
+        "returned to UK", "came back to UK"
+      ],
+      "antiPatterns": [
+        "DO NOT skip rows with UK destination",
+        "DO NOT exclude UK entries",
+        "DO NOT treat UK rows as invalid"
+      ],
+      "rule": "CRITICAL EXTRACTION RULE: When you see a travel record where the DESTINATION or ARRIVAL LOCATION contains any UK-related term (UK, United Kingdom, England, Scotland, Wales, Northern Ireland, or any UK city), you MUST extract it to ukTrips[] with arrivalDate. DO NOT skip these records. UK arrivals are the PRIMARY data needed for naturalisation applications.",
+      "outputFields": ["arrivalDate", "arrivalLocation", "reasonForTrip"],
+      "examples": [
+        "Row shows 'Destination: UK' → Extract to ukTrips with arrivalDate",
+        "Row shows 'Arrived: London' → Extract to ukTrips with arrivalDate",
+        "Row shows 'Entry to United Kingdom' → Extract to ukTrips with arrivalDate"
+      ]
+    },
+    {
+      "ruleId": "TRIPS_OUTSIDE_UK_SECONDARY",
+      "targetPath": "ukArrivalAndTravel.outsideUKTrips",
+      "description": "SECONDARY: Only extract trips where destination is NOT the UK and trip duration exceeds 2 days",
+      "identifiers": ["trips outside UK", "travel abroad", "left the UK", "departed UK", "international travel", "overseas trips", "foreign travel"],
+      "antiPatterns": [
+        "NEVER include UK-destination trips here",
+        "NEVER include trips of 2 days or less (<=48 hours)"
+      ],
+      "rule": "Extract trips where: (1) destination is OUTSIDE the UK (e.g., France, Spain, USA, etc.), AND (2) trip duration is MORE than 2 days. If destination is UK, this belongs in ukTrips instead.",
+      "outputFields": ["countryVisited", "reasonForTrip", "departureDate", "returnDate"],
+      "examples": [
+        "Row shows 'Destination: France, departed 01-03-2019, returned 15-03-2019' → Extract to outsideUKTrips",
+        "Row shows 'Destination: UK' → DO NOT extract here, extract to ukTrips instead"
+      ]
+    },
+    {
+      "ruleId": "UK_FIRST_ARRIVAL_INFORMATION",
+      "targetPath": "ukArrivalAndTravel",
+      "description": "First arrival to UK is separate from travel history - collect when and where applicant first entered the UK",
+      "identifiers": ["when did you first arrive in the UK", "first arrival date", "where did you first arrive", "first entry to UK", "initial UK arrival"],
+      "rule": "Extract the date and location of the FIRST time the applicant arrived in the UK (not subsequent trips)",
+      "outputFields": ["firstArrivalDate", "firstArrivalLocation"]
+    }
+  ],
+  "definitions": {
+    "TripToUK": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Trip to UK (arrival/entry record)",
+      "required": [
+        "arrivalDate"
+      ],
+      "properties": {
+        "arrivalDate": {
+          "type": "string",
+          "description": "Date of arrival to UK (DD-MM-YYYY)",
+          "default": "01-01-2020"
+        },
+        "arrivalLocation": {
+          "type": "string",
+          "description": "Location of arrival (e.g., London Heathrow, Manchester Airport)",
+          "default": "London Heathrow"
+        },
+        "reasonForTrip": {
+          "type": "string",
+          "description": "Reason for coming to UK (e.g., work, study, family visit)",
+          "default": "Work"
+        }
+      }
+    },
+    "TripOutsideUK": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Trip Outside UK (only trips longer than 2 days)",
+      "required": [
+        "countryVisited",
+        "reasonForTrip",
+        "departureDate",
+        "returnDate"
+      ],
+      "properties": {
+        "countryVisited": {
+          "type": "string",
+          "description": "Country Visited",
+          "default": "Italy"
+        },
+        "reasonForTrip": {
+          "type": "string",
+          "description": "Reason for Trip (e.g., holiday, business, visiting relatives)",
+          "default": "XXXXX"
+        },
+        "departureDate": {
+          "type": "string",
+          "description": "Departure Date from UK (DD-MM-YYYY)",
+          "default": "21-01-2024"
+        },
+        "returnDate": {
+          "type": "string",
+          "description": "Return Date to UK (DD-MM-YYYY)",
+          "default": "26-01-2024"
+        },
+        "durationInDays": {
+          "type": "object",
+          "description": "Duration of trip (computed from departure and return dates)",
+          "x-computed": "calculateDuration(departureDate, returnDate)",
+
+          "properties": {
+            "unit": {
+              "type": "string",
+              "description": "Duration unit (e.g., Days, Months)"
+            },
+            "value": {
+              "type": "integer",
+              "description": "Duration value",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "UKArrivalAndTravel": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasTripsOutsideUK": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outsideUKTrips": {}
+            }
+          }
+        }
+      ],
+      "description": "UK Arrival and Travel",
+      "required": [
+        "firstArrivalDate",
+        "firstArrivalLocation",
+        "hasTripsOutsideUK"
+      ],
+      "properties": {
+        "firstArrivalDate": {
+          "type": "string",
+          "description": "When did you first arrive in the UK? (DD-MM-YYYY)",
+          "default": "01-01-2000",
+          "x-computed": {
+            "formula": "minDate(ukTrips, \"arrivalDate\")",
+            "priority": "ocr-first"
+          }
+        },
+        "firstArrivalLocation": {
+          "type": "string",
+          "description": "Where did you first arrive in the UK?",
+          "default": "XXXXX"
+        },
+        "ukTrips": {
+          "type": "array",
+          "description": "Trips to UK (arrival/entry records)",
+          "x-llmHint": "Include ALL arrival/entry records to the UK. Each record represents when the applicant arrived in or entered the UK. Sort by arrivalDate in ascending order (earliest first).",
+          "items": {
+            "$ref": "#/definitions/TripToUK"
+          },
+          "default": []
+        },
+        "hasTripsOutsideUK": {
+          "type": "boolean",
+          "description": "Have you had any trips outside of the UK?",
+          "default": false,
+          "x-computed": "exists(outsideUKTrips)"
+        },
+        "outsideUKTrips": {
+          "type": "array",
+          "description": "Trips Outside UK (only trips longer than 2 days)",
+          "x-llmHint": "Only include trips OUTSIDE the UK that lasted MORE than 2 days. Exclude short trips of 1-2 days.",
+          "x-filter": [
+            {
+              "arrayField": "countryVisited",
+              "rule": "NOT_EQUALS",
+              "params": {
+                "value": ["UK", "United Kingdom", "U.K.", "Great Britain", "GB", "England", "Scotland", "Wales", "Northern Ireland"]
+              },
+              "action": "REMOVE_ITEM"
+            },
+            {
+              "arrayField": "durationInDays.value",
+              "rule": "NUMERIC_GREATER_THAN",
+              "params": { "value": 2 },
+              "action": "REMOVE_ITEM"
+            }
+          ],
+          "items": {
+            "$ref": "#/definitions/TripOutsideUK"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

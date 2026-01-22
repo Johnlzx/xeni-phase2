@@ -14,19 +14,19 @@ export function OverviewPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-hide">
-      <div className="max-w-7xl w-full mx-auto p-6 pb-20 flex flex-col gap-6">
-        {/* Top Section - Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[320px]">
-          {/* Left Column - Case Profile */}
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col px-4 lg:px-6 py-4 gap-4 min-h-0">
+        {/* Top Row - Case Notes & Documents (side by side, fixed height) */}
+        <div className="shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4 h-[280px]">
+          {/* Case Notes Card */}
           <CaseProfileCard onOpenVisaDialog={handleOpenVisaDialog} />
 
-          {/* Right Column - Document Hub */}
+          {/* Documents Card */}
           <FileUploadZone />
         </div>
 
-        {/* Application Section - Full Width */}
-        <div className="min-h-[360px]">
+        {/* Application Card - fills remaining space, scrolls internally */}
+        <div className="flex-1 min-h-0">
           <ApplicationCard
             onOpenVisaDialog={handleOpenVisaDialog}
             className="h-full"

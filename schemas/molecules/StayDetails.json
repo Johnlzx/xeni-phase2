@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/stay_details/v1.0.0",
+  "title": "Stay Details Schema",
+  "description": "Shared reusable definitions for UK stay arrangements (accommodation bookings and staying with relatives/friends).",
+  "x-llmHint": "UK stay details. Match: hotel bookings, Airbnb confirmations, invitation letters, host contact details, travel itineraries with UK address and dates.",
+  "definitions": {
+    "RelativeDetails": {
+      "type": "object",
+      "description": "Relative Details - Information about a relative in the UK",
+      "additionalProperties": false,
+      "required": [
+        "relativeName",
+        "telephoneNumber",
+        "emailAddress",
+        "address",
+        "arrivalDate",
+        "leaveDate"
+      ],
+      "properties": {
+        "relativeName": {
+          "type": "string",
+          "description": "Name of relative",
+          "default": "XXXXX"
+        },
+        "telephoneNumber": {
+          "$ref": "../common/Common.json#/definitions/PhoneNumber"
+        },
+        "emailAddress": {
+          "$ref": "../common/Common.json#/definitions/Email"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddress"
+        },
+        "arrivalDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Arrival date for this stay in the UK",
+              "x-default-expression": "now+30d"
+            }
+          ]
+        },
+        "leaveDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Leave date for this stay in the UK",
+              "x-default-expression": "now+45d"
+            }
+          ]
+        }
+      }
+    },
+    "AccommodationDetails": {
+      "type": "object",
+      "description": "Accommodation Details - Information about accommodation in the UK",
+      "additionalProperties": false,
+      "required": [
+        "location",
+        "address",
+        "arrivalDate",
+        "leaveDate"
+      ],
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "Where are you planning to stay in the UK?",
+          "default": "Hotel"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddress"
+        },
+        "arrivalDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Arrival date for this accommodation",
+              "x-default-expression": "now+30d"
+            }
+          ]
+        },
+        "leaveDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Leave date for this accommodation",
+              "x-default-expression": "now+45d"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

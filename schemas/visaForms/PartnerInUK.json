@@ -1,0 +1,1116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/forms/partner_visa_in_uk/v1.0.0",
+  "title": "UK Partner Visa (In UK) Application Schema",
+  "description": "Complete application form for UK family visa - partner route for applicants currently in the United Kingdom (switch or extension)",
+  "x-llmHint": "UK Partner Visa (Appendix FM) for applicants in UK. For switching to or extending partner route. Match: FLR(M) application forms, partner visa in-UK applications, extension/switch applications.",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "visaType",
+    "start",
+    "application",
+    "finance"
+  ],
+  "properties": {
+    "visaType": {
+      "$ref": "../molecules/VisaType.json#/definitions/VisaType"
+    },
+    "start": {
+      "$ref": "#/definitions/Start"
+    },
+    "application": {
+      "type": "array",
+      "description": "Application section - Personal details, immigration status, and family information",
+      "items": {
+        "$ref": "#/definitions/Application"
+      },
+      "minItems": 1,
+      "default": []
+    },
+    "finance": {
+      "$ref": "#/definitions/Finance"
+    }
+  },
+  "definitions": {
+    "Start": {
+      "type": "object",
+      "title": "Start Section",
+      "description": "Initial information about location and legal representation",
+      "additionalProperties": false,
+      "required": [
+        "applicantLocation",
+        "openApplication",
+        "categoryOfLeave",
+        "contactEmail",
+        "standardWhoEmailBelongsTo",
+        "legalRep"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "categoryOfLeave": {
+                "const": "Partner"
+              }
+            }
+          },
+          "then": {
+            "required": ["extendLTR"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "categoryOfLeave": {
+                "const": "I am not applying as a family member - I am only applying on the basis of private life in the UK"
+              }
+            }
+          },
+          "then": {
+            "required": ["privateLifePermissionToStay"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "legalRep": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "legalRepName",
+              "standardLegalRepEmailWithoutEmailOwnership",
+              "legalRepContactDetails",
+              "legalRepRegulation"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "applicantLocation": {
+          "type": "boolean",
+          "description": "Are you currently in the UK?",
+          "default": true
+        },
+        "openApplication": {
+          "type": "object",
+          "description": "Other Home Office applications",
+          "properties": {
+            "hasOpenApplication": {
+              "type": "boolean",
+              "description": "Do you have any other open applications with the Home Office?",
+              "default": false
+            },
+            "applicationDetails": {
+              "type": "string",
+              "description": "Please provide details of your other application",
+              "maxLength": 500,
+              "default": ""
+            }
+          }
+        },
+        "categoryOfLeave": {
+          "type": "string",
+          "description": "Basis of your application",
+          "enum": [
+            "Partner",
+            "Parent",
+            "Other family member",
+            "I am not applying as a family member - I am only applying on the basis of private life in the UK"
+          ],
+          "default": "Partner"
+        },
+        "extendLTR": {
+          "type": "object",
+          "description": "Your current visa or leave to remain (for Partner applications)",
+          "properties": {
+            "isExtendingSameRoute": {
+              "type": "boolean",
+              "description": "Are you applying to extend your leave to remain on the partner route?",
+              "default": true
+            },
+            "previouslyHeldPartnerVisa": {
+              "type": "boolean",
+              "description": "Have you previously held leave to remain on the partner route with your current partner?",
+              "default": false
+            }
+          }
+        },
+        "privateLifePermissionToStay": {
+          "type": "object",
+          "description": "Permission to stay on the Private Life route",
+          "properties": {
+            "hasPrivateLifePermission": {
+              "type": "boolean",
+              "description": "Do you currently have permission to stay in the UK on the private life route?",
+              "default": false
+            },
+            "previouslyHadPrivateLifePermission": {
+              "type": "boolean",
+              "description": "Have you previously had permission to stay in the UK on the private life route?",
+              "default": false
+            }
+          }
+        },
+        "contactEmail": {
+          "$ref": "../common/Common.json#/definitions/EmailBasic"
+        },
+        "standardWhoEmailBelongsTo": {
+          "type": "string",
+          "description": "Who does this email address belong to?",
+          "enum": [
+            "Applicant",
+            "Applicant's representative",
+            "Applicant's sponsor",
+            "Someone else"
+          ],
+          "default": "Applicant"
+        },
+        "legalRep": {
+          "type": "boolean",
+          "description": "Do you have an immigration adviser?",
+          "default": false
+        },
+        "legalRepName": {
+          "type": "object",
+          "description": "Immigration adviser's name",
+          "properties": {
+            "givenName": {
+              "type": "string",
+              "description": "Given name(s)",
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "type": "string",
+              "description": "Family name",
+              "default": "XXXXX"
+            }
+          }
+        },
+        "standardLegalRepEmailWithoutEmailOwnership": {
+          "$ref": "../common/Common.json#/definitions/EmailBasic"
+        },
+        "legalRepContactDetails": {
+          "type": "object",
+          "description": "Immigration adviser's contact details",
+          "properties": {
+            "organisationName": {
+              "type": "string",
+              "description": "Organisation name",
+              "default": "XXXXX Ltd"
+            },
+            "address": {
+              "$ref": "../common/Common.json#/definitions/InternationalAddress"
+            },
+            "telephoneNumber": {
+              "$ref": "../common/Common.json#/definitions/TelephoneNumber"
+            }
+          }
+        },
+        "legalRepRegulation": {
+          "type": "object",
+          "description": "Immigration adviser's regulation",
+          "properties": {
+            "regulatoryBody": {
+              "type": "string",
+              "description": "Which organisation regulates your immigration adviser?",
+              "enum": [
+                "Solicitors Regulation Authority",
+                "General Council of the Bar",
+                "Chartered Institute of Legal Executives",
+                "Faculty Office of the Archbishop of Canterbury",
+                "Office of the Immigration Services Commissioner",
+                "My immigration adviser is exempt from regulation"
+              ],
+              "default": "Solicitors Regulation Authority"
+            },
+            "membershipNumber": {
+              "type": "string",
+              "description": "Immigration adviser's membership number (if applicable)",
+              "default": ""
+            }
+          }
+        },
+        "dutyToStateAllReasons": {
+          "type": "boolean",
+          "description": "I understand my duty to give all reasons for staying in the UK",
+          "default": true
+        }
+      }
+    },
+    "Application": {
+      "type": "object",
+      "title": "Application",
+      "description": "Applicant details and immigration information",
+      "additionalProperties": false,
+      "required": [
+        "standardNameList",
+        "standardContactEmailWithEmailOwnership",
+        "standardTelephoneDetails",
+        "standardCorrespondenceAddress",
+        "standardPersonalDetails",
+        "standardPassport",
+        "standardIdentityCard",
+        "standardOtherNationality",
+        "currentUKImmigrationStatusFreeText",
+        "currentUKImmigrationStatusDates",
+        "standardCurrentPermission",
+        "familyHowLongLivedInUK",
+        "hasApplicantHadAnyAbsenceFromTheUK",
+        "areThereOtherCountriesApplicantLivedIn",
+        "nationalInsuranceNumber",
+        "englishDegree",
+        "englishLanguageTestCertificate",
+        "standardHowYouEnteredTheUK",
+        "standardImmigrationProblems",
+        "standardCriminalConvictions",
+        "personOfGoodCharacter",
+        "terroristActivities",
+        "terroristOrganisations",
+        "terroristViews",
+        "warCrimes",
+        "homeOfficeReferenceNumbers",
+        "partnerNameList",
+        "partnerNationalityAndDateOfBirth",
+        "partnerNationalInsuranceNumber",
+        "relationshipToPartner",
+        "partnerInUK",
+        "partnerLocation",
+        "firstTimeApplyingForPartnerRouteVisa",
+        "doYouHaveAPreviousPartner",
+        "doYouHaveNonApplicantChildrenFamily"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "standardCurrentPermission": {
+                "enum": ["Family", "Other"]
+              }
+            }
+          },
+          "then": {
+            "required": ["currentLeaveToRemain"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasApplicantHadAnyAbsenceFromTheUK": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["applicantAbsencesSinceLivingInUK"],
+            "properties": {
+              "applicantAbsencesSinceLivingInUK": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "areThereOtherCountriesApplicantLivedIn": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["otherCountriesTheApplicantLivedIn"],
+            "properties": {
+              "otherCountriesTheApplicantLivedIn": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "firstTimeApplyingForPartnerRouteVisa": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["stageOfExtension"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "doYouHaveAPreviousPartner": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["previousPartners"],
+            "properties": {
+              "previousPartners": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "doYouHaveNonApplicantChildrenFamily": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["familyRoutesNonApplicantChildren"],
+            "properties": {
+              "familyRoutesNonApplicantChildren": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "standardNameList": {
+          "type": "array",
+          "description": "Your name and other names",
+          "items": {
+            "$ref": "../common/Common.json#/definitions/NameDetail"
+          },
+          "minItems": 1,
+          "default": []
+        },
+        "standardContactEmailWithEmailOwnership": {
+          "type": "object",
+          "description": "Applicant's contact email",
+          "properties": {
+            "email": {
+              "$ref": "../common/Common.json#/definitions/EmailBasic"
+            },
+            "isApplicantEmail": {
+              "type": "boolean",
+              "description": "Is this your email address?",
+              "default": true
+            }
+          }
+        },
+        "standardTelephoneDetails": {
+          "$ref": "../common/Common.json#/definitions/PhoneBasic"
+        },
+        "standardCorrespondenceAddress": {
+          "type": "object",
+          "description": "Applicant's postal address",
+          "properties": {
+            "isSameAsCurrentAddress": {
+              "type": "boolean",
+              "description": "Is your postal address the same as your current address?",
+              "default": true
+            },
+            "address": {
+              "$ref": "../common/Common.json#/definitions/UKAddress"
+            }
+          }
+        },
+        "standardPersonalDetails": {
+          "$ref": "../molecules/Base.json#/definitions/PersonalDetailsCore"
+        },
+        "standardPassport": {
+          "$ref": "../molecules/Base.json#/definitions/PassportDetails"
+        },
+        "standardIdentityCard": {
+          "type": "object",
+          "description": "Identity card details",
+          "properties": {
+            "hasIdentityCard": {
+              "type": "boolean",
+              "description": "Do you have an identity card?",
+              "default": false
+            },
+            "identityCard": {
+              "$ref": "../molecules/Base.json#/definitions/IdentityCardDetails"
+            }
+          }
+        },
+        "standardOtherNationality": {
+          "type": "object",
+          "description": "Other nationalities",
+          "properties": {
+            "hasOtherNationality": {
+              "type": "boolean",
+              "description": "Do you have any other nationalities?",
+              "default": false
+            },
+            "nationalities": {
+              "type": "array",
+              "description": "List of other nationalities",
+              "items": {
+                "$ref": "../common/Common.json#/definitions/CountryName"
+              },
+              "default": []
+            }
+          }
+        },
+        "currentUKImmigrationStatusFreeText": {
+          "type": "object",
+          "description": "Your current UK immigration status",
+          "properties": {
+            "hasCurrentStatus": {
+              "type": "boolean",
+              "description": "Do you have a current UK visa, entry clearance or grant of leave?",
+              "default": true
+            },
+            "statusDescription": {
+              "type": "string",
+              "description": "What is your current immigration status?",
+              "maxLength": 500,
+              "default": "Partner visa"
+            }
+          }
+        },
+        "currentUKImmigrationStatusDates": {
+          "type": "object",
+          "description": "Your current visa or leave to remain dates",
+          "properties": {
+            "issueDate": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/DateField" },
+                { "description": "When was your current visa or leave to remain issued?" }
+              ]
+            },
+            "expiryDate": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/DateField" },
+                { "description": "When does your current visa or leave to remain expire?" }
+              ]
+            }
+          }
+        },
+        "standardCurrentPermission": {
+          "type": "string",
+          "description": "Your current permission to be in the UK",
+          "enum": [
+            "Study",
+            "Work",
+            "Family",
+            "Visit",
+            "Transit",
+            "Other"
+          ],
+          "default": "Family"
+        },
+        "familyHowLongLivedInUK": {
+          "type": "object",
+          "description": "Time lived in the UK",
+          "properties": {
+            "years": {
+              "type": "integer",
+              "description": "Years",
+              "minimum": 0,
+              "default": 0
+            },
+            "months": {
+              "type": "integer",
+              "description": "Months",
+              "minimum": 0,
+              "maximum": 11,
+              "default": 0
+            }
+          }
+        },
+        "currentLeaveToRemain": {
+          "type": "string",
+          "description": "Your current leave to remain category (if permission type is Family or Other)",
+          "maxLength": 200,
+          "default": "Partner"
+        },
+        "hasApplicantHadAnyAbsenceFromTheUK": {
+          "type": "boolean",
+          "description": "Time spent outside the UK - Have you had any absences from the UK since you started living here?",
+          "default": false
+        },
+        "applicantAbsencesSinceLivingInUK": {
+          "type": "array",
+          "description": "Details of time spent outside the UK",
+          "items": {
+            "$ref": "../molecules/Travel.json#/definitions/UKAbsenceDetail"
+          },
+          "default": []
+        },
+        "areThereOtherCountriesApplicantLivedIn": {
+          "type": "boolean",
+          "description": "Other countries you have lived in - Have you lived in any other countries for 12 months or more since the age of 18?",
+          "default": false
+        },
+        "otherCountriesTheApplicantLivedIn": {
+          "type": "array",
+          "description": "Details of other countries you have lived in",
+          "items": {
+            "$ref": "../molecules/Travel.json#/definitions/CountryResidenceDetail"
+          },
+          "default": []
+        },
+        "applicantLastVisit": {
+          "type": "object",
+          "description": "Your last visit to your country of nationality",
+          "properties": {
+            "lastVisitDate": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/DateField" },
+                { "description": "When did you last visit your country of nationality?" }
+              ]
+            },
+            "purposeOfVisit": {
+              "type": "string",
+              "description": "What was the purpose of your visit?",
+              "maxLength": 500,
+              "default": "Holiday"
+            }
+          }
+        },
+        "applicantFamilyOrFriends": {
+          "type": "object",
+          "description": "Your family or friends in country of nationality",
+          "properties": {
+            "hasFamilyOrFriends": {
+              "type": "boolean",
+              "description": "Do you have any family or friends in your country of nationality?",
+              "default": true
+            },
+            "details": {
+              "type": "string",
+              "description": "Please provide details",
+              "maxLength": 500,
+              "default": "Parents and siblings"
+            }
+          }
+        },
+        "applicantWhichCountryWouldYouGoTo": {
+          "type": "object",
+          "description": "Leaving the UK",
+          "properties": {
+            "wouldLeaveUK": {
+              "type": "boolean",
+              "description": "If you had to leave the UK, would you go to your country of nationality?",
+              "default": true
+            },
+            "alternativeCountry": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/CountryName" },
+                { "description": "If no, which country would you go to?" }
+              ]
+            }
+          }
+        },
+        "nationalInsuranceNumber": {
+          "$ref": "../molecules/NationalInsurance.json#/definitions/NationalInsuranceNumber"
+        },
+        "englishDegree": {
+          "type": "object",
+          "description": "English language - degree taught in English",
+          "properties": {
+            "hasDegreeInEnglish": {
+              "type": "boolean",
+              "description": "Do you have a degree that was taught in English?",
+              "default": false
+            },
+            "degreeTaughtInEnglishEvidenceDetails": {
+              "$ref": "../molecules/Language.json#/definitions/DegreeEvidenceDetails"
+            }
+          }
+        },
+        "englishLanguageTestCertificate": {
+          "type": "object",
+          "description": "English language test",
+          "properties": {
+            "hasEnglishTest": {
+              "type": "boolean",
+              "description": "Do you have an English language test certificate?",
+              "default": false
+            },
+            "testDetails": {
+              "$ref": "../molecules/Language.json#/definitions/EnglishLanguageTestDetails"
+            }
+          }
+        },
+        "standardHowYouEnteredTheUK": {
+          "type": "object",
+          "description": "How you entered the UK",
+          "properties": {
+            "entryMethod": {
+              "type": "string",
+              "description": "How did you enter the UK?",
+              "enum": [
+                "I entered the UK legally with a valid visa or entry clearance",
+                "I entered the UK illegally",
+                "I was granted temporary admission or bail at the UK border",
+                "Other"
+              ],
+              "default": "I entered the UK legally with a valid visa or entry clearance"
+            },
+            "entryDetails": {
+              "type": "string",
+              "description": "Please provide details (if Other)",
+              "maxLength": 500,
+              "default": ""
+            }
+          }
+        },
+        "standardImmigrationProblems": {
+          "type": "object",
+          "description": "Immigration history",
+          "properties": {
+            "hasImmigrationProblems": {
+              "type": "boolean",
+              "description": "Have you ever had any immigration problems?",
+              "default": false
+            },
+            "standardImmigrationProblemsDetailsList": {
+              "type": "array",
+              "description": "Details of immigration problems",
+              "items": {
+                "$ref": "../molecules/ImmigrationHistory.json#/definitions/ImmigrationProblemDetail"
+              },
+              "default": []
+            }
+          }
+        },
+        "standardCriminalConvictions": {
+          "$ref": "../molecules/Convictions.json#/definitions/ConvictionsHistory"
+        },
+        "personOfGoodCharacter": {
+          "$ref": "../molecules/Character.json#/definitions/StandardPersonOfGoodCharacter"
+        },
+        "terroristActivities": {
+          "$ref": "../molecules/Character.json#/definitions/StandardTerroristActivities"
+        },
+        "terroristOrganisations": {
+          "$ref": "../molecules/Character.json#/definitions/StandardTerroristOrganisations"
+        },
+        "terroristViews": {
+          "$ref": "../molecules/Character.json#/definitions/StandardTerroristViews"
+        },
+        "warCrimes": {
+          "$ref": "../molecules/Character.json#/definitions/StandardWarCrimes"
+        },
+        "homeOfficeReferenceNumbers": {
+          "type": "object",
+          "description": "Your Home Office reference number",
+          "properties": {
+            "hasReferenceNumber": {
+              "type": "boolean",
+              "description": "Do you have a Home Office reference number?",
+              "default": false
+            },
+            "referenceNumber": {
+              "type": "string",
+              "description": "Home Office reference number",
+              "default": ""
+            }
+          }
+        },
+        "partnerNameList": {
+          "type": "array",
+          "description": "Your current partner's name",
+          "items": {
+            "$ref": "../common/Common.json#/definitions/NameDetail"
+          },
+          "minItems": 1,
+          "default": []
+        },
+        "partnerNationalityAndDateOfBirth": {
+          "type": "object",
+          "description": "Date of birth and nationality of your partner",
+          "properties": {
+            "dateOfBirth": {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            "nationality": {
+              "$ref": "../common/Common.json#/definitions/CountryName"
+            }
+          }
+        },
+        "partnerNationalInsuranceNumber": {
+          "$ref": "../molecules/NationalInsurance.json#/definitions/NationalInsuranceNumber"
+        },
+        "relationshipToPartner": {
+          "type": "object",
+          "description": "Relationship to partner",
+          "properties": {
+            "relationshipType": {
+              "type": "string",
+              "description": "What is your relationship to your partner?",
+              "enum": [
+                "Spouse",
+                "Civil partner",
+                "Fiancé(e) or proposed civil partner",
+                "Unmarried partner"
+              ],
+              "default": "Spouse"
+            },
+            "marriageDate": {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            "marriagePlace": {
+              "$ref": "../common/Common.json#/definitions/CountryName"
+            }
+          }
+        },
+        "partnerInUK": {
+          "type": "object",
+          "description": "Your partner's status",
+          "properties": {
+            "isPartnerInUK": {
+              "type": "boolean",
+              "description": "Is your partner currently residing in the UK?",
+              "default": true
+            },
+            "partnerStatus": {
+              "type": "string",
+              "description": "What is your partner's status?",
+              "enum": [
+                "British citizen",
+                "Settled in the UK",
+                "Refugee or humanitarian protection",
+                "Other"
+              ],
+              "default": "British citizen"
+            },
+            "partnerHomeOfficeReferenceNumbers": {
+              "type": "object",
+              "description": "Partner's Home Office reference number (if not in UK)",
+              "properties": {
+                "hasReferenceNumber": {
+                  "type": "boolean",
+                  "description": "Does your partner have a Home Office reference number?",
+                  "default": false
+                },
+                "referenceNumber": {
+                  "type": "string",
+                  "description": "Home Office reference number",
+                  "default": ""
+                }
+              }
+            }
+          }
+        },
+        "partnerLocation": {
+          "type": "object",
+          "description": "Partner location",
+          "properties": {
+            "isSameAddress": {
+              "type": "boolean",
+              "description": "Does your partner live at the same address as you?",
+              "default": true
+            },
+            "partnerAddress": {
+              "$ref": "../common/Common.json#/definitions/InternationalAddress"
+            }
+          }
+        },
+        "firstTimeApplyingForPartnerRouteVisa": {
+          "type": "boolean",
+          "description": "Extending or switching to a partner route - Is this the first time you have applied for a partner route, or an extension, with your current partner?",
+          "default": false
+        },
+        "stageOfExtension": {
+          "type": "string",
+          "description": "Reason for extension",
+          "enum": [
+            "This is my first extension (2.5 year route)",
+            "This is my second extension (5 year route)",
+            "This is my second extension - I am applying for indefinite leave to remain (5 year route)",
+            "This is my third extension (10 year route)",
+            "This is my third extension - I am applying for indefinite leave to remain (10 year route)"
+          ],
+          "default": "This is my first extension (2.5 year route)"
+        },
+        "doYouHaveAPreviousPartner": {
+          "type": "boolean",
+          "description": "The applicant's previous partner - Do you have any previous partners (including spouses, civil partners, fiancé(e)s or unmarried partners)?",
+          "default": false
+        },
+        "previousPartners": {
+          "type": "array",
+          "description": "Previous partner details",
+          "items": {
+            "$ref": "../molecules/Family.json#/definitions/PreviousPartnerDetail"
+          },
+          "default": []
+        },
+        "doYouHaveNonApplicantChildrenFamily": {
+          "type": "boolean",
+          "description": "Your children - Do you have any children who are not applying with you?",
+          "default": false
+        },
+        "familyRoutesNonApplicantChildren": {
+          "type": "array",
+          "description": "Children not applying with you",
+          "items": {
+            "$ref": "../molecules/Family.json#/definitions/NonApplicantChildDetail"
+          },
+          "default": []
+        }
+      }
+    },
+    "Finance": {
+      "type": "object",
+      "title": "Finance Section",
+      "description": "Financial information for Partner Visa (In UK) application",
+      "additionalProperties": false,
+      "required": [
+        "permittedBenefits"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "permittedBenefits": {
+                "properties": {
+                  "selectedBenefits": {
+                    "not": {
+                      "contains": {
+                        "const": "No, my partner does not receive any of these benefits"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "leadApplicantIncomeSources",
+              "sponsorIncomeSources",
+              "doYouReceiveRegularIncomeFromFriendOrFamily",
+              "applicantAndPartnerPublicFunds"
+            ]
+          },
+          "else": {
+            "required": [
+              "financialRequirement",
+              "incomeTypeSelection"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "permittedBenefits": {
+          "$ref": "../molecules/PartnerFinance.json#/definitions/PermittedBenefits",
+          "description": "Specified benefits - Does your partner currently receive any permitted benefits?"
+        },
+        "leadApplicantIncomeSources": {
+          "type": "object",
+          "description": "Your employment income (for those with permitted benefits)",
+          "properties": {
+            "hasIncome": {
+              "type": "boolean",
+              "description": "Do you have any income sources (employment, self-employment, pension, property rental, etc.)?",
+              "default": false
+            },
+            "incomeDetails": {
+              "type": "string",
+              "description": "Please provide details of your income sources",
+              "maxLength": 1000,
+              "default": ""
+            }
+          }
+        },
+        "sponsorIncomeSources": {
+          "type": "object",
+          "description": "Your partner's employment income (for those with permitted benefits)",
+          "properties": {
+            "hasIncome": {
+              "type": "boolean",
+              "description": "Does your partner have any income sources (employment, self-employment, pension, property rental, etc.)?",
+              "default": false
+            },
+            "incomeDetails": {
+              "type": "string",
+              "description": "Please provide details of your partner's income sources",
+              "maxLength": 1000,
+              "default": ""
+            }
+          }
+        },
+        "doYouReceiveRegularIncomeFromFriendOrFamily": {
+          "type": "object",
+          "description": "Income regularly received from friend or family",
+          "properties": {
+            "receivesIncome": {
+              "type": "boolean",
+              "description": "Do you receive regular income from a friend or family member?",
+              "default": false
+            },
+            "regularlyReceivedIncomeFromFriendOrFamilyList": {
+              "type": "array",
+              "description": "Details of regular income from friend or family",
+              "items": {
+                "$ref": "../molecules/PartnerFinance.json#/definitions/IncomeFromFamilyOrFriends"
+              },
+              "default": []
+            }
+          }
+        },
+        "applicantAndPartnerPublicFunds": {
+          "type": "object",
+          "description": "Public funds",
+          "properties": {
+            "receivesPublicFunds": {
+              "type": "boolean",
+              "description": "Do you or your partner receive any public funds (other than the specified benefits already mentioned)?",
+              "default": false
+            },
+            "applicantAndPartnerPublicFundsChecklist": {
+              "$ref": "../molecules/PartnerFinance.json#/definitions/PublicFundsFinance"
+            }
+          }
+        },
+        "financialRequirement": {
+          "$ref": "../molecules/PartnerFinance.json#/definitions/FinancialRequirement"
+        },
+        "dependantCalculation": {
+          "$ref": "../molecules/PartnerFinance.json#/definitions/DependantCalculation"
+        },
+        "incomeTypeSelection": {
+          "$ref": "../molecules/PartnerFinance.json#/definitions/IncomeTypeSelection"
+        },
+        "employmentIncomeList": {
+          "type": "array",
+          "description": "Employment income details",
+          "items": {
+            "$ref": "../molecules/PartnerFinance.json#/definitions/EmploymentIncomeDetail"
+          },
+          "default": []
+        },
+        "previousEmploymentList": {
+          "type": "array",
+          "description": "Previous employment details",
+          "items": {
+            "$ref": "../molecules/PartnerFinance.json#/definitions/PreviousEmploymentDetail"
+          },
+          "default": []
+        },
+        "selfEmploymentIncomeList": {
+          "type": "array",
+          "description": "Self-employment income details",
+          "items": {
+            "$ref": "../molecules/PartnerFinance.json#/definitions/SelfEmploymentIncomeDetail"
+          },
+          "default": []
+        },
+        "savingsList": {
+          "type": "array",
+          "description": "Cash savings details",
+          "items": {
+            "$ref": "../molecules/PartnerFinance.json#/definitions/CashSavingsDetail"
+          },
+          "default": []
+        },
+        "nonEmploymentIncomeList": {
+          "type": "array",
+          "description": "Non-employment income details",
+          "items": {
+            "$ref": "../molecules/PartnerFinance.json#/definitions/NonEmploymentIncomeDetail"
+          },
+          "default": []
+        },
+        "pensionList": {
+          "type": "array",
+          "description": "Pension income details",
+          "items": {
+            "$ref": "../molecules/PartnerFinance.json#/definitions/PensionDetail"
+          },
+          "default": []
+        },
+        "homeDetails": {
+          "type": "object",
+          "description": "Home details",
+          "properties": {
+            "homeOwnership": {
+              "type": "string",
+              "description": "Do you own or rent your home?",
+              "enum": [
+                "I own my home",
+                "I rent my home",
+                "I neither own nor rent my home"
+              ],
+              "default": "I rent my home"
+            },
+            "homeAddress": {
+              "$ref": "../common/Common.json#/definitions/UKAddress"
+            },
+            "monthlyRentOrMortgage": {
+              "type": "number",
+              "description": "Monthly rent or mortgage payment (in GBP)",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        },
+        "aboutYourHome": {
+          "type": "object",
+          "description": "About your home",
+          "properties": {
+            "numberOfBedrooms": {
+              "type": "integer",
+              "description": "How many bedrooms does your home have?",
+              "minimum": 0,
+              "default": 1
+            },
+            "numberOfPeopleInHousehold": {
+              "type": "integer",
+              "description": "How many people live in your home (including you and your partner)?",
+              "minimum": 1,
+              "default": 2
+            }
+          }
+        },
+        "propertyOutsideUK": {
+          "type": "object",
+          "description": "Property outside the UK",
+          "properties": {
+            "ownsPropertyOutsideUK": {
+              "type": "boolean",
+              "description": "Do you or your partner own any property outside the UK?",
+              "default": false
+            },
+            "propertyDetails": {
+              "type": "string",
+              "description": "Please provide details of the property",
+              "maxLength": 500,
+              "default": ""
+            }
+          }
+        },
+        "businessInterestsOutsideUK": {
+          "type": "object",
+          "description": "Business interests outside the UK",
+          "properties": {
+            "hasBusinessInterests": {
+              "type": "boolean",
+              "description": "Do you or your partner have any business interests outside the UK?",
+              "default": false
+            },
+            "businessDetails": {
+              "type": "string",
+              "description": "Please provide details of the business interests",
+              "maxLength": 500,
+              "default": ""
+            }
+          }
+        },
+        "otherInformation": {
+          "$ref": "../molecules/PartnerFinance.json#/definitions/OtherInformationAppendixFM"
+        }
+      }
+    }
+  }
+}

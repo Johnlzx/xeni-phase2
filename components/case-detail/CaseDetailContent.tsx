@@ -9,7 +9,7 @@ export function CaseDetailContent() {
   const activeNav = useCaseDetailStore((state) => state.activeNav);
 
   return (
-    <div className="min-h-full bg-stone-50">
+    <div className="h-full bg-stone-50">
       {activeNav === "overview" && <OverviewPage />}
       {activeNav === "documents" && <FileHubPage />}
       {activeNav === "application" && <ApplicationPage />}

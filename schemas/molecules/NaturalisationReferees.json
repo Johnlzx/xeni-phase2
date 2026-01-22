@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_referees/v1.0.0",
+  "title": "Naturalisation Referees Schema",
+  "description": "Referee information for British naturalisation application",
+  "x-llmHint": "Naturalisation referees. Match: referee declaration forms, character reference letters from British citizens.",
+  "definitions": {
+    "RefereeDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Referee Detail",
+          "required": [
+            "title",
+            "sex",
+            "address",
+            "hasLivedAtAddressFor3Years",
+            "phoneNumber",
+            "email",
+            "profession",
+            "hasBritishPassport",
+            "howTheyKnowApplicant"
+          ],
+          "properties": {
+            "sex": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/SexBinary" },
+                { "description": "Sex", "default": "Male" }
+              ]
+            },
+            "email": {
+              "type": "string",
+              "description": "Email Address",
+              "default": "newmail@example.com"
+            },
+            "address": {
+              "$ref": "../common/Common.json#/definitions/UKAddress"
+            },
+            "title": {
+              "$ref": "../common/Common.json#/definitions/Title"
+            },
+            "profession": {
+              "type": "string",
+              "description": "Profession",
+              "default": "Accountant"
+            },
+            "phoneNumber": {
+              "type": "string",
+              "description": "Phone Number",
+              "default": "07111 111111"
+            },
+            "hasBritishPassport": {
+              "type": "boolean",
+              "description": "Does your referee have a British passport?",
+              "default": false
+            },
+            "howTheyKnowApplicant": {
+              "type": "string",
+              "description": "How does the referee know the applicant?",
+              "default": "XXXXX"
+            },
+            "hasLivedAtAddressFor3Years": {
+              "type": "boolean",
+              "description": "Have they lived at this address for more than 3 years?",
+              "default": true
+            }
+          }
+        }
+      ]
+    },
+    "Referees": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Referees",
+      "required": ["firstReferee", "secondReferee"],
+      "properties": {
+        "firstReferee": {
+          "$ref": "#/definitions/RefereeDetail"
+        },
+        "secondReferee": {
+          "$ref": "#/definitions/RefereeDetail"
+        }
+      }
+    }
+  }
+}

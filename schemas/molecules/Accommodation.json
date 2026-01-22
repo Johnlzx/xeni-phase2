@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/accommodation/v2.0.0",
+  "title": "Partner Visa Accommodation Schema",
+  "description": "UK accommodation details for partner visa applications - covers where you will stay and live with your sponsor",
+  "x-llmHint": "UK accommodation / UK stay addresses (arrival stay, temporary stays, and intended residence with sponsor). Match when content includes: do you know where you will be staying in the UK, what address will you be staying at while in the UK, will you be living anywhere else in the UK, accommodation provided by employer, hotel/booking confirmations, tenancy/mortgage/council tax/utility-bill style accommodation evidence, or host contact details (family/friend/landlord and their phone). Do NOT use for current residential address, correspondence address, or previous address history outside this UK-stay context (use molecules/Address).",
+  "x-llmRules": [
+    {
+      "ruleId": "ACCOM_MULTI_ADDR",
+      "targetPath": "accommodation.ukStayAddresses",
+      "rule": "Extract ALL addresses. Question 'What address will you be staying at?' = stayType:initial. Question 'Will you be living anywhere else?' = stayType:temporary. NEVER skip addresses."
+    },
+    {
+      "ruleId": "ACCOM_CONTACT",
+      "targetPath": "accommodation.ukStayAddresses[].contactPerson",
+      "rule": "If 'Is this the home of a family member/friend?' has contact details, set isHomeOfKnownPerson=true and populate contactPerson."
+    }
+  ],
+  "definitions": {
+    "UKStayContact": {
+      "type": "object",
+      "description": "Contact person at a UK stay address (for staying at someone's home)",
+      "additionalProperties": false,
+      "required": [
+        "givenName",
+        "familyName",
+        "relationship",
+        "telephoneNumber"
+      ],
+      "properties": {
+        "givenName": {
+          "type": "string",
+          "description": "Given names of the person whose home you will be staying at",
+          "default": ""
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family name of the person whose home you will be staying at",
+          "default": ""
+        },
+        "relationship": {
+          "type": "string",
+          "description": "Their relationship to you (e.g., partner, friend, family member)",
+          "default": ""
+        },
+        "telephoneNumber": {
+          "$ref": "../common/Common.json#/definitions/TelephoneNumber"
+        }
+      }
+    },
+    "OtherResident": {
+      "type": "object",
+      "description": "Details of another resident living at the intended residence property (not sponsor or their dependants)",
+      "additionalProperties": false,
+      "required": [
+        "givenName",
+        "familyName",
+        "dateOfBirth",
+        "countryOfNationality",
+        "relationshipToSponsor"
+      ],
+      "properties": {
+        "givenName": {
+          "type": "string",
+          "description": "Given name(s) of the other resident",
+          "maxLength": 100,
+          "default": "XXXXX"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family name of the other resident",
+          "maxLength": 100,
+          "default": "XXXXX"
+        },
+        "dateOfBirth": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "Date of birth (DD-MM-YYYY)", "default": "01-01-1970" }
+          ]
+        },
+        "countryOfNationality": {
+          "type": "string",
+          "description": "Country of nationality",
+          "maxLength": 100,
+          "default": "Afghanistan"
+        },
+        "passportNumber": {
+          "type": "string",
+          "description": "Passport number",
+          "maxLength": 50,
+          "default": "P1111111"
+        },
+        "relationshipToSponsor": {
+          "type": "string",
+          "description": "Relationship to sponsor (e.g., Father, Mother, Friend, Lodger)",
+          "maxLength": 100,
+          "default": "Friend"
+        }
+      }
+    },
+    "UKStayAddress": {
+      "type": "object",
+      "description": "A UK stay address with type classification. OCR extracts addresses here with appropriate stayType.",
+      "additionalProperties": false,
+      "required": [
+        "stayType",
+        "address",
+        "isHomeOfKnownPerson"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isHomeOfKnownPerson": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "contactPerson"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "stayType": {
+          "type": "string",
+          "description": "Type of stay: 'initial' = first address upon arrival, 'temporary' = short-term stay (hotel, B&B, friends), 'intendedResidence' = where couple will live with sponsor",
+          "enum": [
+            "initial",
+            "temporary",
+            "intendedResidence"
+          ],
+          "default": "initial"
+        },
+        "stayingWithName": {
+          "type": "string",
+          "description": "If staying with friends, relatives, or another person, give their full name. For hotels/B&Bs, enter the accommodation name.",
+          "maxLength": 200,
+          "default": "XXXXX"
+        },
+        "address": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/UKAddress" },
+            { "description": "UK address where you will be staying" }
+          ]
+        },
+        "entryDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "When will you arrive there? (DD-MM-YYYY) - required for temporary stays" }
+          ]
+        },
+        "leaveDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "When will you leave there? (DD-MM-YYYY) - required for temporary stays" }
+          ]
+        },
+        "isHomeOfKnownPerson": {
+          "type": "boolean",
+          "description": "Is this the home of a family member, friend or another person you know?",
+          "default": false
+        },
+        "contactPerson": {
+          "allOf": [
+            { "$ref": "#/definitions/UKStayContact" },
+            { "description": "Details of the person whose home you will be staying at (required if isHomeOfKnownPerson is true)" }
+          ]
+        }
+      }
+    },
+    "IntendedResidenceDetails": {
+      "type": "object",
+      "description": "Property details for the address where you and your sponsor intend to live together (stayType='intendedResidence')",
+      "additionalProperties": false,
+      "required": [
+        "sponsorOwnsProperty",
+        "hasOtherResidents"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "sponsorOwnsProperty": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "propertyRentalStatus"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "propertyRentalStatus": {
+                "const": "Other"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "propertyRentalDetails"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasOtherResidents": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "otherResidents"
+            ],
+            "properties": {
+              "otherResidents": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "sponsorOwnsProperty": {
+          "type": "boolean",
+          "description": "Does your sponsor own this property?",
+          "default": false
+        },
+        "propertyRentalStatus": {
+          "type": "string",
+          "description": "Select which option applies (shown when sponsor does not own the property)",
+          "enum": [
+            "They rent it privately",
+            "They rent it from a local authority or housing association",
+            "They do not own or rent it, but live there with someone else",
+            "Other"
+          ],
+          "default": "They rent it privately"
+        },
+        "propertyRentalDetails": {
+          "type": "string",
+          "description": "Give more details about the property (required when rental status is 'Other')",
+          "maxLength": 500,
+          "default": ""
+        },
+        "numberOfBedrooms": {
+          "type": "integer",
+          "description": "How many bedrooms are there in the property?",
+          "minimum": 0,
+          "maximum": 99,
+          "default": 1
+        },
+        "numberOfOtherRooms": {
+          "type": "integer",
+          "description": "How many other rooms are there in the property? (Do not include kitchens, bathrooms and toilets)",
+          "minimum": 0,
+          "maximum": 99,
+          "default": 1
+        },
+        "hasOtherResidents": {
+          "type": "boolean",
+          "description": "Does anyone else, other than your sponsor and their dependants, live at this property?",
+          "default": false
+        },
+        "otherResidents": {
+          "type": "array",
+          "description": "Details of other residents at the property (not including sponsor and their dependants)",
+          "items": {
+            "$ref": "#/definitions/OtherResident"
+          },
+          "default": []
+        }
+      }
+    },
+    "Accommodation": {
+      "type": "object",
+      "description": "Complete accommodation information for partner visa. All UK stay addresses are stored in ukStayAddresses array with stayType classification. Property details for intendedResidence are in intendedResidenceDetails.",
+      "additionalProperties": false,
+      "required": [
+        "knowsWhereStaying"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "knowsWhereStaying": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "ukStayAddresses"
+            ],
+            "properties": {
+              "ukStayAddresses": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "knowsWhereStaying": {
+          "type": "boolean",
+          "description": "Do you know where you will be staying in the UK?",
+          "default": false
+        },
+        "ukStayAddresses": {
+          "type": "array",
+          "description": "All UK stay addresses. Each address has stayType: 'initial' (first arrival), 'temporary' (short-term), or 'intendedResidence' (live with sponsor). One address should have stayType='intendedResidence'.",
+          "items": {
+            "$ref": "#/definitions/UKStayAddress"
+          },
+          "default": []
+        },
+        "intendedResidenceDetails": {
+          "allOf": [
+            { "$ref": "#/definitions/IntendedResidenceDetails" },
+            { "description": "Property details for the address with stayType='intendedResidence'. This includes ownership, rooms, and other residents information." }
+          ]
+        }
+      }
+    }
+  }
+}

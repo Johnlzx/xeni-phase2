@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/base/v1.2.0",
+  "title": "Base Profile Schema",
+  "description": "Top-level business entity definitions for UK immigration applications. Contains PersonalDetails and IdentityDocuments.",
+  "x-llmHint": "Core applicant identity. Match: passports (MRZ, bio page), national ID cards, birth certificates.",
+  "definitions": {
+    "PersonalDetails": {
+      "allOf": [
+        { "$ref": "../common/Common.json#/definitions/PersonBase" },
+        {
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "hasOtherNames": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "otherNames": {}
+            }
+          },
+          "type": "object",
+          "description": "Personal Details - Common personal information for UK immigration applications",
+          "required": [
+            "title",
+            "fullNameAsOnPassport",
+            "hasOtherNames",
+            "sex",
+            "relationshipStatus",
+            "countryOfNationality",
+            "nationality",
+            "countryOfBirth",
+            "placeOfBirth",
+            "completingFormForSomeoneElse",
+            "hasCurrentPassportOrTravelDocument"
+          ],
+          "properties": {
+            "completingFormForSomeoneElse": {
+              "type": "boolean",
+              "description": "Completing the form for someone else",
+              "default": false
+            },
+            "hasCurrentPassportOrTravelDocument": {
+              "type": "boolean",
+              "description": "Has current passport or travel document",
+              "default": true
+            },
+            "title": {
+              "$ref": "../common/Common.json#/definitions/Title"
+            },
+            "fullNameAsOnPassport": {
+              "type": "string",
+              "description": "Full Name as on Passport",
+              "default": "Elif Kaya"
+            },
+            "hasOtherNames": {
+              "type": "boolean",
+              "description": "Has Other Names (Set to true only if otherNames are provided)",
+              "default": false
+            },
+            "otherNames": {
+              "type": "array",
+              "description": "Other Names (Only provide names that differ from the official name in PersonalDetails)",
+              "items": { "$ref": "../common/Common.json#/definitions/OtherName" },
+              "default": []
+            },
+            "sex": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/SexBinary" },
+                { "description": "Sex", "default": "Female" }
+              ]
+            },
+            "relationshipStatus": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/RelationshipStatus" },
+                { "description": "Relationship Status", "default": "Single" }
+              ]
+            },
+            "countryOfNationality": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/CountryName" },
+                { "description": "Country name of the passport holder's nationality, as written on the passport (e.g., 'China', 'United States', 'France', 'Germany', 'India', 'Japan'). For UK passports, use the full nationality type exactly as printed, such as 'British Citizen', 'British National (Overseas)'. Do NOT use the adjective form (not 'Chinese', 'American').", "default": "Afghanistan" }
+              ]
+            },
+            "nationality": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/NationalityDemonym" },
+                { "description": "Nationality in English adjective/demonym form, derived from the MRZ nationality code (e.g., 'CHN' -> 'Chinese', 'USA' -> 'American', 'FRA' -> 'French', 'GBR' -> 'British'). Do not return the 3-letter code or the country name.", "default": "Afghan" }
+              ]
+            },
+            "countryOfBirth": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/CountryName" },
+                { "description": "Country of Birth (Full country name). If document explicitly lists country, copy the full country name. Convert ISO codes/abbreviations: UK/GBR -> 'United Kingdom', USA/US -> 'United States', CHN/CN -> 'China'. If only city/town is present in the document, attempt cautious inference based on geographic knowledge.", "default": "Afghanistan" }
+              ]
+            },
+            "placeOfBirth": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/PlaceName" },
+                { "description": "Place of Birth (City/town/province as shown in document). Extract exact text from passport's 'Place of birth' field. Examples: 'London', 'New York', 'Shanghai', 'Mumbai'. If passport shows 'London, United Kingdom', extract only 'London' for placeOfBirth. Do NOT include country name in this field.", "default": "XXXXX" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "BiometricResidencePermit": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasBRP": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["brpNumber"]
+          }
+        }
+      ],
+      "description": "Biometric Residence Permit",
+      "required": ["hasBRP"],
+      "properties": {
+        "hasBRP": {
+          "type": "boolean",
+          "description": "Do you have a biometric residence permit (BRP)?",
+          "default": false
+        },
+        "brpNumber": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/BRPNumber" },
+            { "description": "BRP Number (9 characters)" }
+          ]
+        }
+      }
+    },
+    "NationalIdentityCard": {
+      "allOf": [
+        { "$ref": "../common/Common.json#/definitions/DocumentBase" },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "if": {
+            "properties": {
+              "hasNationalIdCard": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["idCardNumber"]
+          },
+          "description": "National Identity Card",
+          "required": ["hasNationalIdCard"],
+          "properties": {
+            "issueDate": { "default": "" },
+            "expiryDate": { "default": "" },
+            "idCardNumber": {
+              "type": "string",
+              "description": "National Identity Card Number",
+              "default": "111111111"
+            },
+            "issuingAuthority": { "default": "XXXXX" },
+            "hasNationalIdCard": {
+              "type": "boolean",
+              "description": "Do you have a valid national identity card?",
+              "default": false
+            }
+          }
+        }
+      ]
+    },
+    "OtherNationalityDetail": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "canProvideValidPassport": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["passportNumber", "passportIssuingAuthority", "passportExpiryDate"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasValidNationalIdCard": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["idCardNumber", "idCardIssuingAuthority"]
+          }
+        }
+      ],
+      "description": "Other Nationality Detail",
+      "required": [
+        "countryOfOtherNationality",
+        "dateHeldFrom",
+        "stillHoldsThisNationality",
+        "canProvideValidPassport",
+        "hasValidNationalIdCard"
+      ],
+      "properties": {
+        "dateHeldTo": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "Date Held To (DD-MM-YYYY)", "default": "31-12-2000" }
+          ]
+        },
+        "dateHeldFrom": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "Date Held From (DD-MM-YYYY)", "default": "01-01-2000" }
+          ]
+        },
+        "idCardNumber": {
+          "type": "string",
+          "description": "National Identity Card Number",
+          "default": "111111111"
+        },
+        "passportNumber": {
+          "type": "string",
+          "description": "Passport Number",
+          "default": "P1111111"
+        },
+        "idCardIssueDate": {
+          "type": "string",
+          "description": "ID Card Issue Date (DD-MM-YYYY)",
+          "default": "01-01-2021"
+        },
+        "idCardExpiryDate": {
+          "type": "string",
+          "description": "ID Card Expiry Date (DD-MM-YYYY)",
+          "default": "01-01-2026"
+        },
+        "passportExpiryDate": {
+          "type": "string",
+          "description": "Passport Expiry Date (DD-MM-YYYY)",
+          "default": "01-01-2026"
+        },
+        "hasValidNationalIdCard": {
+          "type": "boolean",
+          "description": "Do you have a valid national identity card for this nationality?",
+          "default": false
+        },
+        "idCardIssuingAuthority": {
+          "type": "string",
+          "description": "ID Card Issuing Authority",
+          "default": "XXXXX"
+        },
+        "canProvideValidPassport": {
+          "type": "boolean",
+          "description": "Can you provide a valid passport for this nationality?",
+          "default": true
+        },
+        "passportIssuingAuthority": {
+          "type": "string",
+          "description": "Passport Issuing Authority",
+          "default": "XXXXX"
+        },
+        "countryOfOtherNationality": {
+          "type": "string",
+          "description": "Country of Other Nationality",
+          "default": "Afghanistan"
+        },
+        "stillHoldsThisNationality": {
+          "type": "boolean",
+          "description": "I still hold this nationality",
+          "default": false
+        }
+      }
+    },
+    "IdentityDocuments": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasOtherNationalities": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "otherNationalityDetails": {}
+            }
+          }
+        }
+      ],
+      "description": "Identity Documents - Container for passport and other identity documents",
+      "required": [
+        "passport",
+        "biometricResidencePermit",
+        "nationalIdentityCard",
+        "hasOtherNationalities"
+      ],
+      "properties": {
+        "passport": {
+          "$ref": "../common/Common.json#/definitions/Passport"
+        },
+        "otherNationalityDetails": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/OtherNationalityDetail" },
+          "description": "Other Nationality Details"
+        },
+        "nationalIdentityCard": {
+          "$ref": "#/definitions/NationalIdentityCard"
+        },
+        "hasOtherNationalities": {
+          "type": "boolean",
+          "description": "Has Other Nationalities or Citizenship",
+          "default": false,
+          "x-computed": "exists(otherNationalityDetails)"
+        },
+        "biometricResidencePermit": {
+          "$ref": "#/definitions/BiometricResidencePermit"
+        }
+      }
+    },
+    "UKVisaApplications": {
+      "type": "object",
+      "description": "UK Visa Applications - Previous UK visa history",
+      "additionalProperties": false,
+      "required": ["hasBeenIssuedUKVisa"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasBeenIssuedUKVisa": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["visaIssueDate"]
+          }
+        }
+      ],
+      "properties": {
+        "hasBeenIssuedUKVisa": {
+          "type": "boolean",
+          "description": "Have you been issued with a UK visa in the past 10 years?",
+          "default": false
+        },
+        "visaIssueDate": {
+          "$ref": "../common/Common.json#/definitions/MonthYearField"
+        }
+      }
+    },
+    "UKLeaveToRemain": {
+      "type": "object",
+      "description": "UK Leave to Remain - Previous leave to remain applications",
+      "additionalProperties": false,
+      "required": ["hasAppliedForLeaveToRemain"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasAppliedForLeaveToRemain": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["applicationDate", "applicationResult"]
+          }
+        }
+      ],
+      "properties": {
+        "hasAppliedForLeaveToRemain": {
+          "type": "boolean",
+          "description": "Have you applied for leave to remain in the UK in the past 10 years?",
+          "default": false
+        },
+        "applicationDate": {
+          "$ref": "../common/Common.json#/definitions/MonthYearField"
+        },
+        "applicationResult": {
+          "enum": ["Approved", "Refused"],
+          "type": "string",
+          "description": "What was the result of your application?",
+          "default": "Approved"
+        }
+      }
+    }
+  }
+}

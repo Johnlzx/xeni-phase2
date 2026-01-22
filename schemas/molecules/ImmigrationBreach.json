@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/immigration_law_breach/v1.0.0",
+  "title": "Immigration Law Breach Schema",
+  "description": "History of UK immigration law violations",
+  "x-llmHint": "UK immigration law breach. Match: overstayer letters, enforcement notices, removal directions, immigration tribunal decisions.",
+  "definitions": {
+    "ImmigrationBreach": {
+      "type": "object",
+      "properties": {
+        "hasBreachedImmigrationLaw": {
+          "type": "boolean",
+          "description": "Have you ever: entered the UK illegally, remained in the UK beyond the validity of your visa or permission to stay, breached the conditions of your leave, given false information when applying for a visa or leave, or breached UK immigration law in any other way?",
+          "default": false,
+          "x-computed": "exists(immigrationLawBreaches)"
+        },
+        "immigrationLawBreaches": {
+          "type": "array",
+          "description": "Immigration law breaches",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "breachType",
+              "breachDate",
+              "breachDetails"
+            ],
+            "properties": {
+              "breachType": {
+                "type": "string",
+                "description": "Details of breach of UK immigration law",
+                "enum": [
+                  "I entered the UK illegally",
+                  "I remained in the UK beyond the validity of my visa/permission to stay",
+                  "I breached the conditions of my leave",
+                  "I gave false information when applying for a visa, leave to enter or remain",
+                  "Other"
+                ],
+                "default": "I entered the UK illegally"
+              },
+              "breachDate": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/DateField" },
+                  { "description": "When did this breach of UK immigration law happen?" }
+                ]
+              },
+              "breachDetails": {
+                "type": "string",
+                "description": "Give details of what happened",
+                "maxLength": 500,
+                "default": ""
+              }
+            }
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "hasBreachedImmigrationLaw"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasBreachedImmigrationLaw": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "immigrationLawBreaches"
+            ],
+            "properties": {
+              "immigrationLawBreaches": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "description": "History of UK immigration law violations"
+    }
+  }
+}

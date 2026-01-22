@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/visa_type_selection/v1.0.0",
+  "title": "Visa Type Selection Schema",
+  "description": "Visa type confirmation for Family Migration applications",
+  "x-llmHint": "Visa type selection. Match: application forms indicating Appendix FM Partner or Appendix FM Child route.",
+  "definitions": {
+    "VisaType": {
+      "type": "object",
+      "properties": {
+        "visaType": {
+          "type": "string",
+          "description": "Confirm what type of visa you want to apply for",
+          "enum": [
+            "Appendix FM Partner",
+            "Appendix FM Child"
+          ],
+          "default": "Appendix FM Partner"
+        }
+      },
+      "required": [
+        "visaType"
+      ],
+      "additionalProperties": false,
+      "description": "Visa type confirmation for Family Migration applications"
+    }
+  }
+}

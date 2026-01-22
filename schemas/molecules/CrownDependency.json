@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/crown_dependency_residence/v1.0.0",
+  "title": "Crown Dependency Residence Schema",
+  "description": "Current residence in Crown Dependencies",
+  "x-llmHint": "Crown Dependency residence. Match: Jersey/Guernsey/Isle of Man ID cards, residence permits, utility bills from Crown Dependencies.",
+  "definitions": {
+    "CrownDependency": {
+      "type": "object",
+      "properties": {
+        "livingInCrownDependency": {
+          "type": "boolean",
+          "description": "Are you living in Jersey, Guernsey or the Isle of Man?",
+          "default": false
+        },
+        "crownDependencyDetails": {
+          "type": "string",
+          "description": "Which Crown Dependency do you live in?",
+          "enum": [
+            "Jersey",
+            "Guernsey",
+            "Isle of Man"
+          ],
+          "default": "Jersey"
+        }
+      },
+      "required": [
+        "livingInCrownDependency"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "livingInCrownDependency": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "crownDependencyDetails"
+            ]
+          }
+        }
+      ],
+      "description": "Current residence in Crown Dependencies"
+    }
+  }
+}

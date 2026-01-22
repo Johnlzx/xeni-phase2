@@ -241,7 +241,7 @@ export interface EnhancedQualityIssue {
 // Enhanced Checklist Item Types
 // ============================================
 
-// Linked Document Reference
+// Linked Document Reference (source documents for data extraction)
 export interface LinkedDocument {
   fileId: string;
   fileName: string;
@@ -249,6 +249,19 @@ export interface LinkedDocument {
   pageNumbers: number[];
   extractedText?: string;
   thumbnailUrl?: string;
+}
+
+// Required Evidence (documents needed for visa submission)
+export interface RequiredEvidence {
+  id: string;
+  name: string; // e.g., "Valid Passport", "Bank Statements"
+  description?: string; // Detailed requirement
+  isUploaded: boolean; // Whether the document has been uploaded
+  linkedFileId?: string; // If uploaded, the file ID
+  linkedFileName?: string; // If uploaded, the file name
+  isMandatory: boolean; // Whether it's mandatory for the application
+  acceptedFormats?: string[]; // e.g., ["PDF", "JPEG"]
+  validityPeriod?: string; // e.g., "Must be dated within 31 days"
 }
 
 // Enhanced Checklist Item (with document references)
@@ -260,7 +273,8 @@ export interface EnhancedChecklistItem {
   description?: string;
   value: string | null;
   source: "extracted" | "questionnaire" | "manual" | null;
-  linkedDocuments: LinkedDocument[];
+  linkedDocuments: LinkedDocument[]; // Source documents (for extraction)
+  requiredEvidence: RequiredEvidence[]; // Required evidence for submission
   status: "complete" | "partial" | "missing";
   isRequired: boolean;
   isEditable: boolean;
@@ -469,6 +483,7 @@ export interface CaseDetailActions {
   // Application Phase
   setApplicationPhase: (phase: ApplicationPhase) => void;
   startAnalysis: () => Promise<void>;
+  reAnalyze: () => Promise<void>;
   initFormSchema: (visaType: VisaType) => void;
   launchFormPilot: () => void;
 
@@ -504,6 +519,12 @@ export interface CaseDetailActions {
 
   // Generate Enhanced Checklist (called after questionnaire)
   generateEnhancedChecklist: () => void;
+
+  // Evidence Upload (mock upload for evidence requirement)
+  uploadForEvidence: (evidenceId: string, evidenceName: string) => void;
+
+  // Link evidence to an existing document group from File Hub
+  linkEvidenceToGroup: (evidenceId: string, groupId: string) => void;
 
   // Initialize case from CreateCaseModal
   // Case Notes and Passport are special documents - auto-confirmed

@@ -1,0 +1,1452 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/forms/partner_visa_outside_uk/finance/v1.0.0",
+  "title": "Partner Visa Finance Schema",
+  "description": "Financial information for UK Partner Visa (Outside UK) application - Appendix FM financial requirements",
+  "x-llmHint": "Financial requirement for partner visa. Match: bank statements, payslips, employment contracts, P60, tax returns, pension statements, savings evidence, disability benefits, carer's allowance, attendance allowance, war pension, armed forces payments, DWP letters, permitted benefits, receive any benefits.",
+  "x-llmRules": [
+    {
+      "ruleId": "PUBLIC_FUNDS_DISAMBIGUATION",
+      "description": "Public funds data appears in 3 different places. Use this decision tree: (1) Check WHO: 'you/your'=applicant, 'sponsor/partner'=sponsor. (2) Check BENEFIT NAME: if matches PermittedBenefitType enum (Personal Independence Payment, Constant Attendance Allowance, etc.) → permittedBenefits; else if income-related (Child Benefit, Tax Credit) → publicFundsIncome; else → applicantPublicFunds.",
+      "decisionTree": {
+        "question": "WHO is receiving the funds?",
+        "branches": [
+          {
+            "condition": "Applicant (you/your)",
+            "targetPath": "applicantPublicFunds",
+            "fields": "receivedPublicFunds, publicFundRecords[fundName, amountPerPayment, paymentFrequency]"
+          },
+          {
+            "condition": "Sponsor/Partner AND benefit is Personal Independence Payment|Constant Attendance Allowance|Carer's Allowance|Disability Living Allowance|Attendance Allowance|War Pension|Police Pension",
+            "targetPath": "sponsor.sponsorFinance.permittedBenefits",
+            "fields": "selectedBenefits[], {benefitType}PermittedBenefit[firstPaidDate, amountReceivedLast12Months, dwpReferenceNumber]"
+          },
+          {
+            "condition": "Sponsor/Partner AND benefit is Child Benefit|Child Tax Credit|Income Support|Jobseeker's Allowance|other income benefits",
+            "targetPath": "sponsor.sponsorFinance.publicFundsIncome",
+            "fields": "receivesPublicFunds, familyHelp{childBenefit, childTaxCredit}, incomeHelp{...}"
+          }
+        ]
+      }
+    }
+  ],
+  "definitions": {
+    "PublicFundRecord": {
+      "type": "object",
+      "description": "Single public fund record",
+      "additionalProperties": false,
+      "required": [
+        "fundName",
+        "paymentFrequency",
+        "amountPerPayment",
+        "startDate",
+        "isStillReceiving"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isStillReceiving": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["endDate"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fundName": {
+                "const": "Other"
+              }
+            }
+          },
+          "then": {
+            "required": ["customFundName"]
+          }
+        }
+      ],
+      "properties": {
+        "fundName": {
+          "type": "string",
+          "enum": [
+            "Universal Credit",
+            "State Pension Credit",
+            "Personal Independence Payment",
+            "Attendance Allowance",
+            "Carer's Allowance",
+            "Disability Living Allowance",
+            "Housing Benefit",
+            "Health in Pregnancy Grant",
+            "Maternity Expenses Payment",
+            "Sure Start Maternity Grant Payment",
+            "Funeral Expenses Payment",
+            "Cold Weather Payment",
+            "Winter Fuel Payment",
+            "Budgeting Loan Payment",
+            "Severe Disablement Allowance",
+            "Income Based Employment and Support Allowance",
+            "Income Based Job Seekers Allowance",
+            "Income Support",
+            "Child Tax Credit and Working Tax Credit",
+            "Child Benefit",
+            "Social Housing & Homelessness Assistance",
+            "Council Tax Reduction Schemes",
+            "Social Security Scotland Benefits",
+            "Social Security Scotland Child Disability Payment",
+            "Social Security Scotland Adult Disability Payment",
+            "Social Security Scotland Carer's Allowance Supplement",
+            "Social Security Scotland Scottish Child Payment",
+            "Social Security Scotland Funeral Support Payment",
+            "Social Security Scotland Job Start Payment",
+            "Social Security Scotland Child Winter Heating Assistance",
+            "Social Security Scotland Winter Heating Payment",
+            "Carer Support Payment (Scotland)",
+            "Pension Age Disability Payment (Scotland)",
+            "Pension Age Winter Heating Payment (Scotland)",
+            "Scottish Adult Disability Living Allowance (Scotland)",
+            "Other"
+          ],
+          "description": "Name of public fund. Select 'Other' if your fund is not listed.",
+          "default": "Universal Credit"
+        },
+        "customFundName": {
+          "type": "string",
+          "description": "Custom fund name when 'Other' is selected. Required when fundName is 'Other'.",
+          "default": "Other"
+        },
+        "paymentFrequency": {
+          "type": "string",
+          "enum": ["Weekly", "Monthly"],
+          "description": "Frequency of payment",
+          "default": "Monthly"
+        },
+        "amountPerPayment": {
+          "type": "number",
+          "description": "How much do you receive each time? (GBP)",
+          "minimum": 0,
+          "default": 123
+        },
+        "startDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did you start receiving this public fund?",
+              "default": "01-01-2020"
+            }
+          ]
+        },
+        "endDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did you stop receiving this public fund?",
+              "default": "01-01-2024"
+            }
+          ]
+        },
+        "isStillReceiving": {
+          "type": "boolean",
+          "description": "I still receive this public fund",
+          "default": false
+        }
+      }
+    },
+    "PublicFunds": {
+      "type": "object",
+      "description": "APPLICANT's history of receiving public funds in the UK (past or present). NOT for sponsor's benefits.",
+      "additionalProperties": false,
+      "required": ["receivedPublicFunds"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "receivedPublicFunds": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["publicFundRecords"]
+          }
+        }
+      ],
+      "properties": {
+        "receivedPublicFunds": {
+          "type": "boolean",
+          "description": "Have you received any public funds (money) in the UK?",
+          "default": false,
+          "x-computed": "exists(publicFundRecords)"
+        },
+        "publicFundRecords": {
+          "type": "array",
+          "description": "Public fund records",
+          "items": {
+            "$ref": "#/definitions/PublicFundRecord"
+          },
+          "default": []
+        }
+      }
+    },
+    "ApplicantSelection": {
+      "type": "string",
+      "description": "Whose income/savings is this?",
+      "x-computed": "substituteTemplate(applicantSelection, sponsorFullName=sponsor.name.givenName+' '+sponsor.name.familyName, applicantFullName=personalDetails.givenName+' '+personalDetails.familyName)",
+      "enum": [
+        "{{sponsorFullName}}",
+        "{{applicantFullName}}",
+        "{{sponsorFullName}} and {{applicantFullName}} jointly"
+      ],
+      "default": "{{sponsorFullName}}"
+    },
+    "FinancialRequirement": {
+      "type": "object",
+      "description": "Financial requirement - Can you meet the financial requirement?",
+      "additionalProperties": false,
+      "required": ["canMeetFinancialRequirement"],
+      "properties": {
+        "canMeetFinancialRequirement": {
+          "type": "boolean",
+          "description": "Can you meet the financial requirement?",
+          "default": true
+        }
+      }
+    },
+    "DependantCalculation": {
+      "type": "object",
+      "description": "Additional sponsored children calculation",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isSponsoringAdditionalChildren": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["numberOfAdditionalChildren"]
+          }
+        }
+      ],
+      "required": ["isSponsoringAdditionalChildren"],
+      "properties": {
+        "isSponsoringAdditionalChildren": {
+          "type": "boolean",
+          "description": "Is your sponsor currently sponsoring any additional children? (Do not include children who are: dependants applying on this application, over 18, British Citizens, settled in the UK, EEA nationals with right to reside)",
+          "default": false
+        },
+        "numberOfAdditionalChildren": {
+          "type": "integer",
+          "description": "How many additional children are they sponsoring?",
+          "minimum": 1,
+          "default": 1 
+        }
+      }
+    },
+    "IncomeTypeSelection": {
+      "type": "object",
+      "description": "Select income types to meet financial requirement",
+      "additionalProperties": false,
+      "required": ["selectedIncomeTypes"],
+      "properties": {
+        "selectedIncomeTypes": {
+          "type": "array",
+          "description": "Which types of income will you rely on to meet the financial requirement? MULTI-SELECT: Extract ALL selected options.",
+          "x-computed": "substituteTemplate(selectedIncomeTypes, sponsorFullName=sponsor.name.givenName+' '+sponsor.name.familyName)",
+          "items": {
+            "type": "string",
+            "enum": [
+              "{{sponsorFullName}}'s employment",
+              "{{sponsorFullName}}'s self-employment",
+              "Non-employment income",
+              "Pension",
+              "Cash Savings"
+            ]
+          },
+          "default": ["Cash Savings"]
+        }
+      }
+    },
+    "EmploymentType": {
+      "type": "string",
+      "description": "Type of employment",
+      "enum": ["Permanent", "Temporary"],
+      "default": "Permanent"
+    },
+    "CompanyContact": {
+      "type": "object",
+      "description": "Company or business contact details",
+      "additionalProperties": false,
+      "required": ["companyName", "telephoneNumber"],
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "description": "What is the name of the company or business?",
+          "default": "XXXXX Company"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/InternationalAddress"
+        },
+        "telephoneNumber": {
+          "$ref": "../common/Common.json#/definitions/TelephoneNumber"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Company or business email address",
+          "default": "contact@example.com"
+        }
+      }
+    },
+    "CurrentEmploymentIncome": {
+      "type": "object",
+      "description": "Current employment income details for financial requirement",
+      "additionalProperties": false,
+      "required": ["jobTitle", "employmentType", "startDate", "employedSixMonthsSameEmployer", "annualIncome"],
+      "properties": {
+        "jobTitle": {
+          "type": "string",
+          "description": "What is their current job title?",
+          "default": "XXXXX"
+        },
+        "employmentType": {
+          "allOf": [
+            { "$ref": "#/definitions/EmploymentType" },
+            {  "default": "Permanent" }
+          ]
+        },
+        "startDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField"},
+            { "description": "When did the current employment begin?" }
+          ],
+          "default": "2020-01-01"
+        },
+        "employedSixMonthsSameEmployer": {
+          "type": "boolean",
+          "description": "Have they been employed by the same employer for the last 6 months prior to the date of application?",
+          "default": true
+        },
+        "annualIncome": {
+          "type": "number",
+          "description": "What is their annual income before tax for this employment in GBP?",
+          "minimum": 0,
+          "default": 123
+        }
+      }
+    },
+    "EmploymentEvidenceCatB": {
+      "type": "object",
+      "description": "Evidence required for Category B employment",
+      "additionalProperties": false,
+      "required": [
+        "isDirectorOfLimitedCompany"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isDirectorOfLimitedCompany": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["directorEvidence"]
+          }
+        }
+      ],
+      "properties": {
+        "requiredEvidence": {
+          "type": "object",
+          "description": "I will provide all of the following documents as evidence:",
+          "properties": {
+            "payslips": {
+              "type": "boolean",
+              "description": "Payslips covering any period of salaried employment (current and previous) in the period of 12 months prior to the date of application",
+              "default": true
+            },
+            "letterFromEmployer": {
+              "type": "boolean",
+              "description": "A letter from employer(s) who issued the payslips confirming: 1. the employment; 2. the gross annual salary; 3. how long the employment has been/was held; 4. the period over which the person has been paid the level of salary stated in their application; and 5. the type of employment (permanent, fixed-term contract or agency). If they are a crown civil servant you must also provide an official letter from their head of mission confirming the above and also confirming the start date and expected end date of their tour of duty outside the UK.",
+              "default": true
+            },
+            "bankStatements": {
+              "type": "boolean",
+              "description": "Personal bank statements corresponding to the same period(s) as the payslips showing that the salary has been paid into an account in the name of the person or in the name of the person and their partner jointly",
+              "default": true
+            }
+          }
+        },
+        "optionalEvidence": {
+          "type": "object",
+          "description": "Optionally, I will also provide the following documents as additional evidence:",
+          "properties": {
+            "p60ForRelevantPeriod": {
+              "type": "boolean",
+              "description": "A P60 for the relevant period(s) of employment relied upon",
+              "default": false
+            },
+            "signedContract": {
+              "type": "boolean",
+              "description": "A signed contract of employment",
+              "default": false
+            }
+          }
+        },
+        "isDirectorOfLimitedCompany": {
+          "type": "boolean",
+          "description": "Are they a director or non-executive director of a limited company based in the UK?",
+          "default": false
+        },
+        "directorEvidence": {
+          "type": "object",
+          "description": "Additional evidence for company directors - I will provide the following documents as evidence:",
+          "properties": {
+            "appendixFMSE": {
+              "type": "boolean",
+              "description": "Evidence as directed by Appendix FM-SE for a director or a non-executive director of a limited company based in the UK",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "EmploymentIncomeDetail": {
+      "type": "object",
+      "description": "Complete employment income details for financial requirement",
+      "additionalProperties": false,
+      "required": ["applicantSelection", "currentEmploymentIncome"],
+      "properties": {
+        "applicantSelection": {
+          "$ref": "#/definitions/ApplicantSelection"
+        },
+        "currentEmploymentIncome": {
+          "$ref": "#/definitions/CurrentEmploymentIncome"
+        },
+        "employerContact": {
+          "$ref": "#/definitions/CompanyContact"
+        },
+        "evidenceCatB": {
+          "$ref": "#/definitions/EmploymentEvidenceCatB"
+        }
+      }
+    },
+    "PreviousEmploymentDetail": {
+      "type": "object",
+      "description": "Previous employment details",
+      "additionalProperties": false,
+      "required": ["jobTitle", "startDate", "endDate", "employmentType", "annualIncome"],
+      "properties": {
+        "jobTitle": {
+          "type": "string",
+          "description": "What was their previous job title?",
+          "default": "XXXXX"
+        },
+        "startDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField"},
+            { "description": "When did the previous employment begin?" }
+          ],
+          "default": "2019-01-01"
+        },
+        "endDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField"},
+            { "description": "When did the previous employment end?" }
+          ],
+          "default": "2020-01-01"
+        },
+        "employmentType": {
+          "allOf": [
+            { "$ref": "#/definitions/EmploymentType" },
+            { "description": "What type of employment is this?", "default": "Permanent" }
+          ]
+        },
+        "annualIncome": {
+          "type": "number",
+          "description": "What was their annual income before tax for this employment in GBP?",
+          "minimum": 0,
+          "default": 0
+        },
+        "employerContact": {
+          "$ref": "#/definitions/CompanyContact"
+        },
+        "evidenceCatB": {
+          "$ref": "#/definitions/EmploymentEvidenceCatB"
+        }
+      }
+    },
+    "SelfEmploymentBusinessType": {
+      "type": "string",
+      "description": "Type of self-employment",
+      "enum": [
+        "A sole trader",
+        "In partnership",
+        "In a franchise agreement",
+        "A director or employee of a specified limited company based in the UK"
+      ],
+      "default": "A sole trader"
+    },
+    "SelfEmploymentIncomeDetail": {
+      "type": "object",
+      "description": "Self-employment income details",
+      "additionalProperties": false,
+      "required": ["applicantSelection", "businessType", "businessDescription"],
+      "properties": {
+        "applicantSelection": {
+          "$ref": "#/definitions/ApplicantSelection"
+        },
+        "titleOrRole": {
+          "type": "string",
+          "description": "Title or role in the self-employment",
+          "default": "XXXXX"
+        },
+        "businessType": {
+          "allOf": [
+            { "$ref": "#/definitions/SelfEmploymentBusinessType" },
+            { "default": "A sole trader" }
+          ]
+        },
+        "businessDuration": {
+          "type": "string",
+          "description": "How long have they been self-employed with this business or company? (For example, 3 years and 6 months)",
+          "default": "XXXXX"
+        },
+        "businessDescription": {
+          "type": "string",
+          "description": "What does their self-employed business or company do?",
+          "maxLength": 500,
+          "default": "XXXXX"
+        },
+        "startDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/MonthYearField" },
+            { "description": "When did they start working in this occupation or business? (MM YYYY)" }
+          ],
+          "default": "01-2020"
+        },
+        "isUKAddress": {
+          "type": "boolean",
+          "description": "Is this a UK address?",
+          "default": true
+        },
+        "companyDirector": {
+          "type": "string",
+          "description": "Company director name (if different from the self-employed person)",
+          "default": ""
+        },
+        "companyDetails": {
+          "$ref": "#/definitions/CompanyContact"
+        },
+        "income": {
+          "type": "object",
+          "description": "Self-employment income - You can use income from self-employment in either the last full financial year or an average of the last 2 years.",
+          "properties": {
+            "financialYearEndDate": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/DateField"},
+                { "description": "Please provide the end date of the last financial year, or if a director of a specified limited company, then provide the end date of the company's last financial year" }
+              ],
+              "default": "2024-04-05"
+            },
+            "lastFinancialYearIncome": {
+              "type": "number",
+              "description": "What was the income (in GBP) from self-employment in the last financial year? (This is the income, i.e. profit, not turnover. Please provide the figure before tax and National Insurance deductions. Get the figures from either form SA302 or SA300.)",
+              "minimum": 0,
+              "default": 123
+            },
+            "previousYearIncome": {
+              "type": "number",
+              "description": "If you want to provide an average over 2 years, add the previous financial year's income from self-employment. If not, leave this field blank. (You will have to provide evidence for both financial periods.)",
+              "minimum": 0
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Self-employment evidence",
+          "properties": {
+            "requiredEvidence": {
+              "type": "object",
+              "description": "All of the following:",
+              "properties": {
+                "taxPayableAndPaid": {
+                  "type": "boolean",
+                  "description": "Evidence of the amount of tax payable, paid and unpaid for the last full financial year",
+                  "default": true
+                },
+                "annualSelfAssessmentTaxReturn": {
+                  "type": "boolean",
+                  "description": "Annual self-assessment tax return to HMRC (copy or print out) for the last full financial year, or for the last two such years (where those documents show the necessary level of gross income as an average of those two years)",
+                  "default": true
+                },
+                "statementOfAccount": {
+                  "type": "boolean",
+                  "description": "Statement of Account (SA200 or SA302) for the last full financial year, or for the last two such years (where those documents show the necessary level of gross income as an average of those two years)",
+                  "default": true
+                },
+                "uniqueTaxReference": {
+                  "type": "boolean",
+                  "description": "Each partner's Unique Tax Reference Number (UTR) and/or the UTR of the partnership or business",
+                  "default": true
+                },
+                "personalBankStatements": {
+                  "type": "boolean",
+                  "description": "Personal bank statements for the same 12-month period as the tax return(s) showing that the income from self-employment has been paid into an account in the name of the person or in the name of the person and their partner jointly",
+                  "default": true
+                },
+                "evidenceOfOngoingSelfEmployment": {
+                  "type": "boolean",
+                  "description": "Evidence of ongoing self-employment through the provision of at least one of the following: a bank statement dated no more than three months earlier than the date of application showing transactions relating to ongoing trading, or evidence dated no more than three months earlier than the date of application of the renewal of a license to trade or of ongoing payment of business rates, business-related insurance premiums, employer National Insurance contributions or franchise payments to the parent company",
+                  "default": true
+                },
+                "franchiseAgreement": {
+                  "type": "boolean",
+                  "description": "A franchise agreement signed by both parties",
+                  "default": true
+                }
+              }
+            },
+            "optionalEvidence": {
+              "type": "object",
+              "description": "And the following, if available:",
+              "properties": {
+                "proofOfHMRCRegistration": {
+                  "type": "boolean",
+                  "description": "Proof of registration with HMRC as self-employed if available",
+                  "default": false
+                },
+                "separateBusinessBankStatements": {
+                  "type": "boolean",
+                  "description": "Where the person holds or held a separate business bank account(s), bank statements for the same 12-month period as the tax return(s)",
+                  "default": false
+                }
+              }
+            },
+            "accountsEvidence": {
+              "type": "string",
+              "description": "One of the following:",
+              "enum": [
+                "Annual audited accounts for the last financial year",
+                "If not required to produce annual audited accounts, unaudited accounts for the last full financial year and an accountant's certificate of confirmation, from an accountant who is a member of a UK Recognised Supervisory Body (as defined in the Companies Act 2006) or is a member of the Institute of Financial Accountants (IFA)",
+                "A certificate of VAT registration and the VAT return for the last full financial year (a copy or print out) confirming the VAT registration number, if turnover is in excess of £79,000 or was in excess of the threshold which applied during the last full financial year",
+                "Evidence to show appropriate planning permission or local planning authority consent is held to operate the type or class of business at the trading address (where this is a local authority requirement)"
+              ],
+              "default": "Annual audited accounts for the last financial year"
+            }
+          }
+        }
+      }
+    },
+    "CashSavingsDetail": {
+      "type": "object",
+      "description": "Cash savings details",
+      "additionalProperties": false,
+      "required": ["applicantSelection", "sourceOfSavings", "accountDetails"],
+      "properties": {
+        "applicantSelection": {
+          "$ref": "#/definitions/ApplicantSelection"
+        },
+        "sourceOfSavings": {
+          "type": "string",
+          "description": "What is the source of the cash savings? (e.g., savings over time, gift from a family member, paid out competition winnings)",
+          "maxLength": 500,
+          "default": "XXXXXX"
+        },
+        "accountDetails": {
+          "type": "object",
+          "description": "Savings account details",
+          "additionalProperties": false,
+          "required": ["accountOpenedDate", "amountHeld", "accountHolderName", "bankName"],
+          "properties": {
+            "accountOpenedDate": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/MonthYearField"},
+                { "description": "When was this account opened? (MM-YYYY)" }
+              ],
+              "default": "01-2020"
+            },
+            "amountHeld": {
+              "type": "number",
+              "description": "What amount of savings are held in this account in GBP? (Only include funds that have been in your account for the last 6 months)",
+              "minimum": 0,
+              "default": 123
+            },
+            "accountHolderName": {
+              "type": "string",
+              "description": "What name(s) is the account held under?",
+              "default": "XXXXXX"
+            },
+            "accountNumber": {
+              "type": "string",
+              "description": "What is the account number?",
+              "default": "000000"
+            },
+            "bankName": {
+              "type": "string",
+              "description": "Name of the bank or building society",
+              "default": "XXXXXBANK"
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Evidence for cash savings",
+          "properties": {
+            "personalBankStatements": {
+              "type": "boolean",
+              "description": "Personal bank statements showing that at least the level of cash savings relied upon in the application has been held in an account(s) for at least the period of 6 months before the application date",
+              "default": true
+            },
+            "declarationByAccountHolder": {
+              "type": "boolean",
+              "description": "A declaration by the account holder(s) of the source(s) of the cash savings",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "PensionType": {
+      "type": "string",
+      "description": "Type of pension",
+      "enum": [
+        "UK State Pension",
+        "Foreign State Pension",
+        "Private Pension",
+        "Other Pension"
+      ],
+      "default": "UK State Pension"
+    },
+    "NonEmploymentIncomeSource": {
+      "type": "string",
+      "description": "Source of non-employment income",
+      "enum": [
+        "Income from property rental",
+        "Dividends or other income from investments, stocks and shares, bonds or trust funds",
+        "Interest from savings",
+        "Maintenance payments from a former partner of the applicant/sponsor or by any children of the applicant/sponsor and their former partner",
+        "Payments under the War Pensions Scheme, the Armed Forces Compensation Scheme and the Armed Forces Attributable Benefits Scheme",
+        "UK Maternity Allowance, Bereavement Allowance, Bereavement Payment and Widowed Parent's Allowance",
+        "A maintenance grant or stipend (not a loan) associated with undergraduate or postgraduate study or research",
+        "Ongoing insurance payments",
+        "Ongoing payments from a structured legal settlement",
+        "Ongoing royalty payments"
+      ],
+      "default": "Income from property rental"
+    },
+    "NonEmploymentIncomeDetail": {
+      "type": "object",
+      "description": "Non-employment income details",
+      "additionalProperties": false,
+      "required": ["applicantSelection", "incomeSource"],
+      "properties": {
+        "applicantSelection": {
+          "$ref": "#/definitions/ApplicantSelection"
+        },
+        "incomeSource": {
+          "allOf": [
+            { "$ref": "#/definitions/NonEmploymentIncomeSource" },
+            { "default": "Income from property rental" }
+          ]
+        },
+        "bankDetails": {
+          "type": "object",
+          "description": "Bank account details where income is paid",
+          "properties": {
+            "bankName": {
+              "type": "string",
+              "description": "Bank or building society name the income is paid into",
+              "default": "XXXXX Bank"
+            },
+            "accountNumber": {
+              "type": "string",
+              "description": "Bank or building society account number the income is paid into",
+              "default": "00000000"
+            },
+            "financialInstitution": {
+              "type": "string",
+              "description": "Financial institution name in which the investment is held (if applicable)",
+              "default": "XXXXX"
+            }
+          }
+        },
+        "incomeDetails": {
+          "type": "object",
+          "description": "Income amount details",
+          "properties": {
+            "annualAmount": {
+              "type": "number",
+              "description": "What amount did they receive (in GBP) from this income source in the same financial year(s) to that of the self-employment income already added to this application? Enter the amount received in GBP before tax deductions.",
+              "minimum": 0,
+              "default": 123
+            }
+          }
+        },
+        "hasAllRequiredEvidence": {
+          "type": "boolean",
+          "description": "I will provide all the required documents to prove non-employment income from this source",
+          "default": true
+        }
+      }
+    },
+    "GenericPensionDetail": {
+      "type": "object",
+      "description": "Generic pension details (for Foreign State, Private, or Other pension)",
+      "properties": {
+        "annualAmount": {
+          "type": "number",
+          "description": "How much income will they receive from the pension in a 12-month period? Enter the amount received in GBP before tax deductions.",
+          "minimum": 0,
+          "default": 123
+        },
+        "country": {
+          "type": "string",
+          "description": "Which country is this pension registered in? (optional)",
+          "default": "Afghanistan"
+        },
+        "pensionReferenceNumber": {
+          "type": "string",
+          "description": "What is the pension reference number? (optional)",
+          "default": "00000"
+        },
+        "hasAllRequiredEvidence": {
+          "type": "boolean",
+          "description": "I will provide all evidence of this pension",
+          "default": true
+        }
+      }
+    },
+    "PensionDetail": {
+      "type": "object",
+      "description": "Pension income details",
+      "additionalProperties": false,
+      "required": ["applicantSelection", "pensionType"],
+      "properties": {
+        "applicantSelection": {
+          "$ref": "#/definitions/ApplicantSelection"
+        },
+        "pensionType": {
+          "allOf": [
+            { "$ref": "#/definitions/PensionType" },
+            { "description": "Select a pension type", "default": "UK State Pension" }
+          ]
+        },
+        "ukStatePension": {
+          "type": "object",
+          "description": "UK State Pension details",
+          "properties": {
+            "annualAmount": {
+              "type": "number",
+              "description": "How much income will they receive from the pension in a 12-month period? Enter the amount received in GBP before tax deductions.",
+              "minimum": 0,
+              "default": 123
+            },
+            "dwpReferenceNumber": {
+              "type": "string",
+              "description": "What is their Department for Work and Pensions (DWP) reference number? (optional)",
+              "default": ""
+            },
+            "hasAllRequiredEvidence": {
+              "type": "boolean",
+              "description": "I will provide all evidence of UK State Pension",
+              "default": true
+            }
+          }
+        },
+        "foreignStatePension": {
+          "$ref": "#/definitions/GenericPensionDetail"
+        },
+        "privatePension": {
+          "$ref": "#/definitions/GenericPensionDetail"
+        },
+        "otherPension": {
+          "$ref": "#/definitions/GenericPensionDetail"
+        }
+      }
+    },
+    "FutureEmployment": {
+      "type": "object",
+      "description": "Future employment in the UK",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasConfirmedOffer": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["offerDetails"]
+          }
+        }
+      ],
+      "required": ["hasConfirmedOffer"],
+      "properties": {
+        "hasConfirmedOffer": {
+          "type": "boolean",
+          "description": "Does the applicant have a confirmed offer of employment in the UK starting within 3 months of their return?",
+          "default": false
+        },
+        "offerDetails": {
+          "type": "object",
+          "description": "Details of employment offer",
+          "properties": {
+            "jobTitle": {
+              "type": "string",
+              "description": "Job title",
+              "default": "XXXXX"
+            },
+            "annualSalary": {
+              "type": "number",
+              "description": "Annual earnings in GBP",
+              "minimum": 0,
+              "default": 0
+            },
+            "employerName": {
+              "type": "string",
+              "description": "Company or organisation name",
+              "default": "XXXXX Company"
+            },
+            "startDate": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/DateField"},
+                { "description": "Employment start date" }
+              ],
+              "default": "2025-01-01"
+            },
+            "employerAddress": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/UKAddress"},
+                { "description": "Employer address (must be a UK address)" }
+              ]
+            },
+            "employerTelephone": {
+              "type": "string",
+              "description": "Telephone number we can contact your employer on",
+              "default": "00000000000"
+            },
+            "employerEmail": {
+              "type": "string",
+              "format": "email",
+              "description": "Email address we can contact your employer on",
+              "default": "hr@example.com"
+            }
+          }
+        }
+      }
+    },
+    "PublicFundsBenefitAmount": {
+      "type": "object",
+      "description": "Amount received for a specific public fund benefit",
+      "additionalProperties": false,
+      "properties": {
+        "applicantAmount": {
+          "type": "number",
+          "description": "How much does the applicant receive each month in GBP?",
+          "minimum": 0,
+          "default": 0
+        },
+        "partnerAmount": {
+          "type": "number",
+          "description": "How much does the partner receive each month in GBP?",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "PublicFundsIncome": {
+      "type": "object",
+      "description": "SPONSOR's current income from public funds (Child Benefit, Tax Credits, Income Support, etc.) for financial requirement calculation. NOT for disability/care benefits or applicant's funds.",
+      "additionalProperties": false,
+      "properties": {
+        "receivesPublicFunds": {
+          "type": "boolean",
+          "description": "Does the applicant or partner receive any public funds?",
+          "default": false
+        },
+        "familyHelp": {
+          "type": "object",
+          "description": "Family help benefits",
+          "properties": {
+            "childBenefit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Child Benefit" }
+              ]
+            },
+            "childTaxCredit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Child Tax Credit" }
+              ]
+            }
+          }
+        },
+        "incomeHelp": {
+          "type": "object",
+          "description": "Income help benefits",
+          "properties": {
+            "incomeBasedJobseekersAllowance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Income-based Jobseeker's Allowance" }
+              ]
+            },
+            "incomeRelatedEmploymentAndSupportAllowance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Income-related Employment and Support Allowance" }
+              ]
+            },
+            "incomeSupport": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Income Support" }
+              ]
+            },
+            "socialFundPayment": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Social Fund Payment" }
+              ]
+            },
+            "statePensionCredit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "State Pension Credit" }
+              ]
+            },
+            "workingTaxCredit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Working Tax Credit" }
+              ]
+            },
+            "universalCredit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Universal Credit" }
+              ]
+            }
+          }
+        },
+        "careAndDisabilityHelp": {
+          "type": "object",
+          "description": "Care and disability help benefits",
+          "properties": {
+            "attendanceAllowance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Attendance Allowance" }
+              ]
+            },
+            "carersAllowance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Carer's Allowance" }
+              ]
+            },
+            "disabilityLivingAllowance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Disability Living Allowance" }
+              ]
+            },
+            "personalIndependencePayment": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Personal Independence Payment" }
+              ]
+            },
+            "severeDisablementAllowance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Severe Disablement Allowance" }
+              ]
+            }
+          }
+        },
+        "housingHelp": {
+          "type": "object",
+          "description": "Housing help benefits",
+          "properties": {
+            "councilTaxBenefit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Council Tax Benefit" }
+              ]
+            },
+            "councilTaxReduction": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Council Tax Reduction" }
+              ]
+            },
+            "housingBenefit": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Housing Benefit" }
+              ]
+            },
+            "housingOrHomelessnessAssistance": {
+              "allOf": [
+                { "$ref": "#/definitions/PublicFundsBenefitAmount" },
+                { "description": "Housing or Homelessness Assistance" }
+              ]
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Evidence for public funds",
+          "properties": {
+            "bankStatements": {
+              "type": "boolean",
+              "description": "Bank statements from anytime during the 12 month period prior to the date of application showing payment for each of the public fund(s) received",
+              "default": true 
+            }
+          }
+        }
+      }
+    },
+    "MonthlyLivingCost": {
+      "type": "object",
+      "description": "Monthly living costs",
+      "additionalProperties": false,
+      "required": ["amount"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "How much does the applicant spend on living costs each month in GBP? (accommodation, food, travel expenses, mobile phone, etc.)",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "IncomeSourceType": {
+      "type": "string",
+      "description": "Source type of regular income",
+      "enum": ["Friend", "Relative", "Other"],
+      "default": "Friend"
+    },
+    "IncomeFrequency": {
+      "type": "string",
+      "description": "Frequency of income payments",
+      "enum": ["Monthly", "Weekly", "Fortnightly", "Other"],
+      "default": "Monthly"
+    },
+    "IncomeFromFamilyOrFriends": {
+      "type": "object",
+      "description": "Income regularly received from friends or family",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "receivesRegularIncome": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["incomeDetails"]
+          }
+        }
+      ],
+      "required": ["receivesRegularIncome"],
+      "properties": {
+        "receivesRegularIncome": {
+          "type": "boolean",
+          "description": "Does the applicant receive any regular income from friends or family?",
+          "default": false
+        },
+        "incomeDetails": {
+          "type": "array",
+          "description": "Details of regular income from friends or family",
+          "items": {
+            "type": "object",
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "frequency": { "const": "Other" }
+                  }
+                },
+                "then": {
+                  "required": ["frequencyDescription"]
+                }
+              }
+            ],
+            "properties": {
+              "sourceType": {
+                "$ref": "#/definitions/IncomeSourceType"
+              },
+              "frequency": {
+                "$ref": "#/definitions/IncomeFrequency"
+              },
+              "frequencyDescription": {
+                "type": "string",
+                "description": "Please describe the frequency of the income",
+                "default": "XXXXX"
+              },
+              "amount": {
+                "type": "number",
+                "description": "How much do they receive? (in GBP)",
+                "minimum": 0,
+                "default": 123
+              },
+              "evidence": {
+                "type": "object",
+                "description": "Evidence for income from friends or family",
+                "properties": {
+                  "bankStatements": {
+                    "type": "boolean",
+                    "description": "Personal bank statements showing the money received from a friend or relative has been paid into their account or an account in their and partner's names",
+                    "default": true
+                  }
+                }
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "OtherInformationAppendixFM": {
+      "type": "object",
+      "description": "Additional information for Appendix FM financial requirement",
+      "additionalProperties": false,
+      "properties": {
+        "additionalInformation": {
+          "type": "string",
+          "description": "Any other information you wish to provide about your financial circumstances",
+          "maxLength": 2000,
+          "default": "N/A"
+        }
+      }
+    },
+    "PermittedBenefitType": {
+      "type": "string",
+      "description": "Types of permitted benefits that can be received",
+      "enum": [
+        "Carer's Allowance",
+        "Disability Living Allowance",
+        "Severe Disablement Allowance",
+        "Industrial Injuries Disablement Allowance",
+        "Attendance Allowance",
+        "Personal Independence Payment",
+        "Armed Forces Independence Payment",
+        "Guaranteed income payment under the Armed Forces Compensation Scheme",
+        "Constant Attendance Allowance",
+        "Mobility Supplement",
+        "War Disablement Pension under the War Pensions Scheme",
+        "Police Injury Pension",
+        "Child Disability Payment (Scotland)",
+        "Adult Disability Payment (Scotland)",
+        "Carer's Support Payment (Scotland)",
+        "Pension Age Disability Payment (Scotland)",
+        "Scottish Adult Disability Living Allowance (Scotland)",
+        "No, my partner does not receive any of these benefits"
+      ]
+    },
+    "PermittedBenefitDetail": {
+      "type": "object",
+      "description": "Details for a specific permitted benefit",
+      "additionalProperties": false,
+      "properties": {
+        "firstPaidDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField"},
+            { "description": "What date was this benefit first paid?" }
+          ],
+          "default": "01-01-2025"
+        },
+        "dwpReferenceNumber": {
+          "type": "string",
+          "description": "Department for Work and Pensions (DWP) reference number (optional)",
+          "default": ""
+        },
+        "amountReceivedLast12Months": {
+          "type": "number",
+          "description": "How much has been received in the past 12 months? Enter the amount received in GBP before tax deductions.",
+          "minimum": 0,
+          "default": 123
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Documents to provide as evidence",
+          "properties": {
+            "officialDocument": {
+              "type": "boolean",
+              "description": "Official document from the Department for Work and Pensions or Veterans Agency confirming the current entitlement and amount received",
+              "default": true 
+            },
+            "bankStatements": {
+              "type": "boolean",
+              "description": "Bank statements from anytime during the 12 month period prior to the date of application showing payment for this benefit",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "PermittedBenefits": {
+      "type": "object",
+      "description": "SPONSOR's permitted disability/care benefits (Personal Independence Payment, Constant Attendance Allowance, etc.) that count toward financial requirement. NOT for applicant or general public funds.",
+      "additionalProperties": false,
+      "required": ["selectedBenefits"],
+      "properties": {
+        "selectedBenefits": {
+          "type": "array",
+          "description": "Tick the relevant box(es) to show which benefits your partner receives. MULTI-SELECT: Extract ALL selected options.",
+          "items": {
+            "$ref": "#/definitions/PermittedBenefitType"
+          },
+          "default": ["No, my partner does not receive any of these benefits"]
+        },
+        "carersAllowancePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "disabilityLivingAllowancePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "severeDisablementAllowancePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "industrialInjuriesDisablementAllowancePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "attendanceAllowancePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "personalIndependencePaymentPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "armedForcesIndependencePaymentPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "guaranteedIncomePaymentUnderTheArmedForcesCompensationSchemePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "constantAttendanceAllowancePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "mobilitySupplementPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "warDisablementPensionUnderTheWarPensionsSchemePermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "policeDisabilityPensionPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "childDisabilityPaymentScotlandPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "adultDisabilityPaymentScotlandPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "carersSupportPaymentScotlandPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "pensionAgeDisabilityPaymentScotlandPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        },
+        "scottishAdultDisabilityLivingAllowanceScotlandPermittedBenefit": {
+          "$ref": "#/definitions/PermittedBenefitDetail"
+        }
+      }
+    },
+    "Finance": {
+      "type": "object",
+      "description": "Complete financial information for Partner Visa (Outside UK) application",
+      "additionalProperties": false,
+      "required": [
+        "financialRequirement",
+        "incomeTypeSelection"
+      ],
+      "properties": {
+        "financialRequirement": {
+          "$ref": "#/definitions/FinancialRequirement"
+        },
+        "dependantCalculation": {
+          "$ref": "#/definitions/DependantCalculation"
+        },
+        "incomeTypeSelection": {
+          "$ref": "#/definitions/IncomeTypeSelection"
+        },
+        "employmentIncomeList": {
+          "type": "array",
+          "description": "Employment income details",
+          "items": {
+            "$ref": "#/definitions/EmploymentIncomeDetail"
+          },
+          "default": []
+        },
+        "addPreviousJob": {
+          "type": "boolean",
+          "description": "Do you want to add a previous job from within the last 12 months?",
+          "default": false
+        },
+        "previousEmploymentList": {
+          "type": "array",
+          "description": "Previous employment details",
+          "items": {
+            "$ref": "#/definitions/PreviousEmploymentDetail"
+          },
+          "default": []
+        },
+        "selfEmploymentIncomeList": {
+          "type": "array",
+          "description": "Self-employment income details",
+          "items": {
+            "$ref": "#/definitions/SelfEmploymentIncomeDetail"
+          },
+          "default": []
+        },
+        "savingsList": {
+          "type": "array",
+          "description": "Cash savings details",
+          "items": {
+            "$ref": "#/definitions/CashSavingsDetail"
+          },
+          "default": []
+        },
+        "nonEmploymentIncomeList": {
+          "type": "array",
+          "description": "Non-employment income details",
+          "items": {
+            "$ref": "#/definitions/NonEmploymentIncomeDetail"
+          },
+          "default": []
+        },
+        "pensionList": {
+          "type": "array",
+          "description": "Pension income details",
+          "items": {
+            "$ref": "#/definitions/PensionDetail"
+          },
+          "default": []
+        },
+        "incomeFromFamilyOrFriends": {
+          "$ref": "#/definitions/IncomeFromFamilyOrFriends"
+        },
+        "futureEmployment": {
+          "$ref": "#/definitions/FutureEmployment"
+        },
+        "publicFundsIncome": {
+          "$ref": "#/definitions/PublicFundsIncome"
+        },
+        "permittedBenefits": {
+          "$ref": "#/definitions/PermittedBenefits"
+        },
+        "monthlyLivingCost": {
+          "$ref": "#/definitions/MonthlyLivingCost"
+        },
+        "otherInformation": {
+          "$ref": "#/definitions/OtherInformationAppendixFM"
+        }
+      }
+    }
+  }
+}

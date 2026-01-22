@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/character/v3.0.0",
+  "title": "Character and Other History Schema",
+  "description": "Reusable schema for character assessment, covering war crimes, terrorist activities, extremist activities, and person of good character across UK immigration applications",
+  "x-llmHint": "Character and other history information. Match: police certificates, criminal record checks, court documents, bankruptcy records, questionnaire responses about war crimes, terrorist activities, security concerns.",
+  "definitions": {
+    "StandardWarCrimes": {
+      "type": "object",
+      "description": "War crimes declarations - involvement or suspicion of war crimes, crimes against humanity, or genocide",
+      "additionalProperties": false,
+      "required": [
+        "warCrimesInvolved",
+        "termsWarCrimes"
+      ],
+      "properties": {
+        "warCrimesInvolved": {
+          "type": "boolean",
+          "description": "In either peace or war time have you ever been involved in, or suspected of involvement in, war crimes, crimes against humanity, or genocide?",
+          "default": false
+        },
+        "warCrimesInvolvedDetails": {
+          "type": "string",
+          "description": "Details about war crimes involvement if answered Yes"
+        },
+        "termsWarCrimes": {
+          "type": "boolean",
+          "description": "I have read all of the information about war crimes, crimes against humanity and genocide, including the guidance",
+          "default": true
+        }
+      }
+    },
+    "StandardTerroristActivities": {
+      "type": "object",
+      "description": "Terrorist activities, organisations and views declarations",
+      "additionalProperties": false,
+      "required": [
+        "terroristActivitiesInvolved",
+        "terroristOrganisationMember",
+        "terroristViewsExpressed",
+        "termsTerroristActivities"
+      ],
+      "properties": {
+        "terroristActivitiesInvolved": {
+          "type": "boolean",
+          "description": "Have you ever been involved in, supported or encouraged terrorist activities in any country?",
+          "default": false
+        },
+        "terroristActivitiesInvolvedDetails": {
+          "type": "string",
+          "description": "Details about terrorist activities involvement if answered Yes"
+        },
+        "terroristOrganisationMember": {
+          "type": "boolean",
+          "description": "Have you ever been a member of, or given support to, an organisation which has been concerned in terrorism?",
+          "default": false
+        },
+        "terroristOrganisationMemberDetails": {
+          "type": "string",
+          "description": "Details about terrorist organisation membership if answered Yes"
+        },
+        "terroristViewsExpressed": {
+          "type": "boolean",
+          "description": "Have you, by any means or medium, expressed views that justify or glorify terrorist violence, or that may encourage others to commit terrorist or other serious criminal acts?",
+          "default": false
+        },
+        "terroristViewsExpressedDetails": {
+          "type": "string",
+          "description": "Details about terrorist views expressed if answered Yes"
+        },
+        "termsTerroristActivities": {
+          "type": "boolean",
+          "description": "I have read all of the information about terrorist activities, organisations and views, including the guidance",
+          "default": true
+        }
+      }
+    },
+    "StandardExtremistActivities": {
+      "type": "object",
+      "description": "Extremist organisations and views declarations",
+      "additionalProperties": false,
+      "required": [
+        "extremistOrganisationMember",
+        "extremistViewsExpressed",
+        "termsExtremistActivities"
+      ],
+      "properties": {
+        "extremistOrganisationMember": {
+          "type": "boolean",
+          "description": "Have you ever been a member of, or given support to, an organisation which is or has been concerned with extremism?",
+          "default": false
+        },
+        "extremistOrganisationMemberDetails": {
+          "type": "string",
+          "description": "Details about extremist organisation membership if answered Yes"
+        },
+        "extremistViewsExpressed": {
+          "type": "boolean",
+          "description": "Have you, by any means or medium, expressed any extremist views?",
+          "default": false
+        },
+        "extremistViewsDetails": {
+          "type": "string",
+          "description": "Details about extremist views expressed if answered Yes"
+        },
+        "termsExtremistActivities": {
+          "type": "boolean",
+          "description": "I have read all of the information about extremist organisations and views, including the guidance",
+          "default": true
+        }
+      }
+    },
+    "StandardPersonOfGoodCharacter": {
+      "type": "object",
+      "description": "Person of good character declarations - dangerous activities, character concerns, and other information",
+      "additionalProperties": false,
+      "required": [
+        "dangerousNonUKGovernmentWork",
+        "goodCharacterConcerns",
+        "otherCharacterInformation",
+        "termsPersonOfGoodCharacter"
+      ],
+      "properties": {
+        "dangerousNonUKGovernmentWork": {
+          "type": "boolean",
+          "description": "Have you, as part of your employment or otherwise, undertaken paid or unpaid activity on behalf of a non-UK government which you know to be dangerous to the interest or national security of the UK or its allies?",
+          "default": false
+        },
+        "dangerousNonUKGovernmentWorkDetails": {
+          "type": "string",
+          "description": "Details about dangerous non-UK government work if answered Yes"
+        },
+        "goodCharacterConcerns": {
+          "type": "boolean",
+          "description": "Have you ever engaged in any other activities which might indicate that you may not be considered to be a person of good character?",
+          "default": false
+        },
+        "goodCharacterConcernsDetails": {
+          "type": "string",
+          "description": "Details about good character concerns if answered Yes"
+        },
+        "otherCharacterInformation": {
+          "type": "boolean",
+          "description": "Is there any other information about your character or behaviour which you would like to make us aware of?",
+          "default": false
+        },
+        "otherCharacterInformationDetails": {
+          "type": "string",
+          "description": "Details about other character information if provided"
+        }
+      }
+    },
+    "CriminalityAndCharacter": {
+      "type": "object",
+      "description": "Combined character assessment - war crimes, terrorism, extremism, and good character declarations",
+      "additionalProperties": false,
+      "properties": {
+        "standardWarCrimes": {
+          "$ref": "#/definitions/StandardWarCrimes"
+        },
+        "standardTerroristActivities": {
+          "$ref": "#/definitions/StandardTerroristActivities"
+        },
+        "standardExtremistActivities": {
+          "$ref": "#/definitions/StandardExtremistActivities"
+        },
+        "standardPersonOfGoodCharacter": {
+          "$ref": "#/definitions/StandardPersonOfGoodCharacter"
+        }
+      }
+    }
+  }
+}

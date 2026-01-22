@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_relationship/v1.0.0",
+  "title": "Naturalisation Relationship Schema",
+  "description": "Relationship status and partner information for British naturalisation application",
+  "x-llmHint": "Naturalisation relationship information. Match: marriage certificates, civil partnership certificates, divorce decrees, death certificates of former spouse.",
+  "definitions": {
+    "PreviousPartner": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Previous Partner Details",
+          "required": [
+            "title",
+            "countryOfNationality",
+            "marriageOrCivilPartnershipDate",
+            "marriageOrCivilPartnershipPlace",
+            "relationshipEndDate",
+            "relationshipEndReason"
+          ],
+          "properties": {
+            "title": {
+              "$ref": "../common/Common.json#/definitions/Title"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Nationality on passport (e.g., British, American, Chinese, French, German, Indian, Japanese)",
+              "default": "United Kingdom"
+            },
+            "relationshipEndDate": {
+              "type": "string",
+              "description": "Date your previous marriage or civil partnership ended (DD-MM-YYYY)",
+              "default": "12-12-2000"
+            },
+            "relationshipEndReason": {
+              "type": "string",
+              "description": "Reason your previous marriage or civil partnership ended",
+              "default": "XXXXX"
+            },
+            "marriageOrCivilPartnershipDate": {
+              "type": "string",
+              "description": "Date of your previous marriage or civil partnership (DD-MM-YYYY)",
+              "default": "01-01-2000"
+            },
+            "marriageOrCivilPartnershipPlace": {
+              "type": "string",
+              "description": "Place of your previous marriage or civil partnership",
+              "default": "XXXXX"
+            }
+          }
+        }
+      ]
+    },
+    "Relationship": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasPreviousMarriageOrCivilPartnership": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["previousPartner"]
+          }
+        }
+      ],
+      "description": "Relationship",
+      "required": [
+        "sex",
+        "relationshipStatus",
+        "hasPreviousMarriageOrCivilPartnership"
+      ],
+      "properties": {
+        "sex": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/SexBinary" },
+            { "description": "Sex (as shown in passport or travel document)", "default": "Male" }
+          ]
+        },
+        "previousPartner": {
+          "$ref": "#/definitions/PreviousPartner"
+        },
+        "relationshipStatus": {
+          "type": "string",
+          "description": "Relationship Status",
+          "default": "Single"
+        },
+        "hasPreviousMarriageOrCivilPartnership": {
+          "type": "boolean",
+          "description": "Have you previously been married or in a civil partnership?",
+          "default": false
+        }
+      }
+    },
+    "PartnerDetails": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "description": "Partner Details",
+          "required": [
+            "title",
+            "isKnownByAnotherName",
+            "countryOfNationality",
+            "isNaturalisedBritishCitizen",
+            "townOfBirth",
+            "countryOfBirth",
+            "address",
+            "marriageOrCivilPartnershipDate",
+            "marriageOrCivilPartnershipPlace",
+            "hasPreviousMarriageOrCivilPartnership",
+            "hasChildrenWithOtherBirthParent"
+          ],
+          "properties": {
+            "title": {
+              "$ref": "../common/Common.json#/definitions/Title"
+            },
+            "address": {
+              "$ref": "../common/Common.json#/definitions/InternationalAddress"
+            },
+            "townOfBirth": {
+              "type": "string",
+              "description": "Town of Birth",
+              "default": "XXXXX"
+            },
+            "countryOfBirth": {
+              "type": "string",
+              "description": "Country of Birth",
+              "default": "Afghanistan"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of Nationality (e.g., British, American, Chinese, French, German, Indian, Japanese)",
+              "default": "Afghanistan"
+            },
+            "isKnownByAnotherName": {
+              "type": "boolean",
+              "description": "Is your partner known by another name?",
+              "default": false
+            },
+            "isNaturalisedBritishCitizen": {
+              "type": "boolean",
+              "description": "Is your partner a naturalised British citizen?",
+              "default": false
+            },
+            "marriageOrCivilPartnershipDate": {
+              "type": "string",
+              "description": "When did you marry or enter a civil partnership? (DD-MM-YYYY)",
+              "default": "12-12-2019"
+            },
+            "hasChildrenWithOtherBirthParent": {
+              "type": "boolean",
+              "description": "Do you have any children whose birth parent is not your partner?",
+              "default": false
+            },
+            "marriageOrCivilPartnershipPlace": {
+              "type": "string",
+              "description": "Where did you marry or enter a civil partnership?",
+              "default": "Manchester Town Hall, Manchester, United Kingdom"
+            },
+            "hasPreviousMarriageOrCivilPartnership": {
+              "type": "boolean",
+              "description": "Have you previously been married or in a civil partnership?",
+              "default": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

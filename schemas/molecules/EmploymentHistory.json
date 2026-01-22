@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/employment-history/v1.0.0",
+  "title": "Employment History Schema",
+  "description": "Reusable schema definitions for sensitive employment history across UK immigration applications",
+  "x-llmHint": "Sensitive employment history for government, military, intelligence, security, media, and judiciary roles. Match: employment history sections, CV/resume, work history declarations.",
+  "definitions": {
+    "EmploymentHistoryCategoryEnum": {
+      "type": "string",
+      "description": "Employment history category type. IMPORTANT: 'I have not worked in any of the jobs listed above' is mutually exclusive with all other options - if selected, it must be the only item in the array.",
+      "enum": [
+        "Armed forces (career)",
+        "Armed Forces (compulsory national or military service)",
+        "Government (including Public or Civil Administration and non-military compulsory national service)",
+        "Intelligence services",
+        "Security organisations (including police and private security services)",
+        "Media organisations",
+        "Judiciary (including work as a judge or magistrate)",
+        "I have not worked in any of the jobs listed above"
+      ]
+    },
+    "EmploymentHistoryItem": {
+      "type": "object",
+      "description": "Employment history item - A single employment history entry. LOGIC: If category is 'I have not worked in any of the jobs listed above', furtherDetails is not required and should be omitted. For all other categories (actual employment), furtherDetails is REQUIRED and must include job title/role, organization, and employment dates.",
+      "additionalProperties": false,
+      "required": ["category"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "category": {
+                "not": {
+                  "const": "I have not worked in any of the jobs listed above"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["category", "furtherDetails"]
+          }
+        }
+      ],
+      "properties": {
+        "category": {
+          "$ref": "#/definitions/EmploymentHistoryCategoryEnum"
+        },
+        "furtherDetails": {
+          "type": "string",
+          "description": "Further details about this employment. REQUIRED when category is NOT 'I have not worked...'. Should include: job title/role, organization name, and employment dates (e.g., 'Worked as administrative officer at Ministry of Health from 2015-2020').",
+          "default": "Worked as administrative officer from 2015-2020"
+        }
+      }
+    },
+    "EmploymentHistory": {
+      "type": "array",
+      "description": "Employment history - List of employment history items. LOGIC RULES: (1) At least one item is required. (2) If user selects 'I have not worked in any of the jobs listed above', it MUST be the only item in the array (no furtherDetails needed). (3) If user has worked in any listed organizations, include one item per category with required furtherDetails for each. (4) Multiple actual employment categories can be selected together, but CANNOT be mixed with 'I have not worked...'.",
+      "items": {
+        "$ref": "#/definitions/EmploymentHistoryItem"
+      },
+      "minItems": 1,
+      "default": [
+        {
+          "category": "I have not worked in any of the jobs listed above"
+        }
+      ],
+      "if": {
+        "contains": {
+          "properties": {
+            "category": {
+              "const": "I have not worked in any of the jobs listed above"
+            }
+          }
+        }
+      },
+      "then": {
+        "maxItems": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/fee_waiver/v1.0.0",
+  "title": "Fee Waiver Schema",
+  "description": "Whether applicant has applied for a fee waiver to avoid paying application fees and Immigration Health Surcharge (IHS)",
+  "x-llmHint": "Fee waiver application. Match: fee waiver approval letters, IHS exemption documents, questionnaire responses about fee waiver status.",
+  "definitions": {
+    "FeeWaiver": {
+      "type": "object",
+      "properties": {
+        "appliedForFeeWaiver": {
+          "type": "boolean",
+          "description": "Have you applied for a fee waiver for this application? A fee waiver allows you to apply without paying application fees.",
+          "default": false
+        },
+        "hasFeeWaiverCode": {
+          "type": "boolean",
+          "description": "Do you have a fee waiver code? If you have been granted a fee waiver, you will have a fee waiver code. Check your fee waiver decision notice.",
+          "default": false
+        },
+        "feeWaiverCode": {
+          "type": "string",
+          "description": "Enter fee waiver code",
+          "maxLength": 100,
+          "default": ""
+        },
+        "grantedIHSFeeWaiver": {
+          "type": "boolean",
+          "description": "Have you been granted a fee waiver for IHS (Immigration Health Surcharge)? Check your fee waiver decision notice.",
+          "default": false
+        }
+      },
+      "required": [
+        "appliedForFeeWaiver"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "appliedForFeeWaiver": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hasFeeWaiverCode",
+              "grantedIHSFeeWaiver"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "appliedForFeeWaiver": {
+                "const": true
+              },
+              "hasFeeWaiverCode": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "feeWaiverCode"
+            ]
+          }
+        }
+      ],
+      "description": "Whether applicant has applied for a fee waiver to avoid paying application fees and Immigration Health Surcharge (IHS)"
+    }
+  }
+}

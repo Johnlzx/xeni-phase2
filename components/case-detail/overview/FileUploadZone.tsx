@@ -52,7 +52,7 @@ export function FileUploadZone() {
   };
 
   return (
-    <div className="h-full min-h-[240px] flex flex-col rounded-xl border border-stone-200 overflow-hidden bg-white">
+    <div className="h-full flex flex-col rounded-xl border border-stone-200 overflow-hidden bg-white">
       {/* Header - clickable to open File Hub - unified height h-14 */}
       <button
         onClick={() => totalFiles > 0 && setActiveNav("documents")}

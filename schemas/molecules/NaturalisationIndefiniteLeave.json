@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_indefinite_leave/v1.0.0",
+  "title": "Naturalisation Indefinite Leave Schema",
+  "description": "Indefinite leave to remain (ILR) or settled status information for British naturalisation application",
+  "x-llmHint": "Indefinite leave to remain (ILR) or settled status proof. Match: BRP cards showing ILR, settled status letters, EU Settlement Scheme confirmation letters.",
+  "x-docTypes": ["INDEFINITE_LEAVE_DOCUMENT"],
+  "definitions": {
+    "IndefiniteLeave": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasBeenGrantedIndefiniteLeave": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "dateLeaveGranted",
+              "wasGrantedUnderEUSettlementScheme"
+            ]
+          }
+        }
+      ],
+      "description": "Granted Indefinite Leave",
+      "required": ["hasBeenGrantedIndefiniteLeave"],
+      "properties": {
+        "dateLeaveGranted": {
+          "type": "string",
+          "description": "Date your leave was granted (if known) (DD-MM-YYYY)",
+          "default": "01-01-2000"
+        },
+        "hasBeenGrantedIndefiniteLeave": {
+          "type": "boolean",
+          "description": "Have you been granted indefinite leave to enter or remain in the UK?",
+          "default": false
+        },
+        "wasGrantedUnderEUSettlementScheme": {
+          "type": "boolean",
+          "description": "Was your indefinite leave granted under the EU settlement scheme?",
+          "default": false
+        }
+      },
+      "x-docTypes": ["INDEFINITE_LEAVE_DOCUMENT"]
+    }
+  }
+}

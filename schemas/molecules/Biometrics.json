@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/biometrics_location/v1.0.0",
+  "title": "Biometrics Location Schema",
+  "description": "Selection and confirmation of biometric enrollment location",
+  "x-llmHint": "Biometrics appointment. Match: visa application centre bookings, biometrics appointment confirmations.",
+  "definitions": {
+    "Biometrics": {
+      "type": "object",
+      "description": "Selection and confirmation of biometric enrollment location",
+      "additionalProperties": false,
+      "required": [
+        "biometricsCountry",
+        "biometricsLocationConfirmed"
+      ],
+      "properties": {
+        "biometricsCountry": {
+          "type": "string",
+          "description": "Select a country to provide your biometrics"
+        },
+        "biometricsLocationConfirmed": {
+          "type": "boolean",
+          "description": "I have identified the location where I will provide my biometrics (or I am unable to provide my biometrics at any location)",
+          "default": true
+        }
+      }
+    }
+  }
+}

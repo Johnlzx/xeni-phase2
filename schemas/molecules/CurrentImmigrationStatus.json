@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/current_immigration_status/v1.0.0",
+  "title": "Current Immigration Status Schema",
+  "description": "Applicant's current immigration status in their country of residence",
+  "x-llmHint": "Current immigration status in country of residence. Match: visa stamps, residence permits, permanent residency cards, immigration status documents.",
+  "definitions": {
+    "CurrentImmigrationStatus": {
+      "type": "object",
+      "description": "Your current immigration status in your country of residence",
+      "additionalProperties": false,
+      "required": ["permissionType"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "permissionType": { "const": "I have a temporary visa" }
+            }
+          },
+          "then": {
+            "required": ["visaValidUntil"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "permissionType": { "const": "I am a permanent resident" }
+            }
+          },
+          "then": {
+            "required": ["permanentResidentSince"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "permissionType": { "const": "I do not have a visa and I am not a permanent resident" }
+            }
+          },
+          "then": {
+            "required": ["statusDetails"]
+          }
+        }
+      ],
+      "properties": {
+        "permissionType": {
+          "type": "string",
+          "description": "What permission do you have to be in your current country of residence?",
+          "enum": [
+            "I have a temporary visa",
+            "I am a permanent resident",
+            "I do not have a visa and I am not a permanent resident"
+          ],
+          "default": "I do not have a visa and I am not a permanent resident"
+        },
+        "visaValidUntil": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Valid until (DD-MM-YYYY)",
+              "x-default-expression": "now+90d"
+            }
+          ]
+        },
+        "permanentResidentSince": {
+          "type": "string",
+          "description": "Which year did you become a permanent resident? (YYYY)",
+          "pattern": "^\\d{4}$",
+          "default": "2020"
+        },
+        "statusDetails": {
+          "type": "string",
+          "description": "Give as much information about your status as possible, including if: you are waiting for a decision on a visa, you are not required to have a visa, or you are not in the country legally",
+          "maxLength": 500,
+          "default": "XXXXX"
+        }
+      }
+    }
+  }
+}

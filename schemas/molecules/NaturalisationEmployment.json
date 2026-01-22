@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_employment/v1.0.0",
+  "title": "Naturalisation Employment Schema",
+  "description": "Employment information for British naturalisation application",
+  "x-llmHint": "Naturalisation employment information. Match: employment contracts, payslips, P60/P45 forms, self-employment tax returns, employer letters.",
+  "definitions": {
+    "EmploymentDetail": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Employment Detail",
+      "required": [
+        "occupation",
+        "employmentTypes",
+        "employerOrBusinessName",
+        "employerAddress",
+        "startDate"
+      ],
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "description": "Start Date (DD-MM-YYYY or MM-YYYY if exact date unknown)",
+          "default": "01-08-2002"
+        },
+        "occupation": {
+          "type": "string",
+          "description": "What is your occupation?",
+          "default": "XXXXX"
+        },
+        "employerAddress": {
+          "$ref": "../common/Common.json#/definitions/UKAddress"
+        },
+        "employmentTypes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "An employee",
+              "A business partner",
+              "Self-employed",
+              "A director",
+              "Other (eg voluntary worker, studying)"
+            ],
+            "type": "string"
+          },
+          "description": "Your type of employment (select all that apply)",
+          "default": "An employee"
+        },
+        "employerOrBusinessName": {
+          "type": "string",
+          "description": "Employer or Business Name",
+          "default": "XXXXX"
+        },
+        "taxOfficeReferenceNumber": {
+          "type": "string",
+          "description": "Tax Office Reference Number (found on payslip or tax return)",
+          "default": "111/AB11111"
+        }
+      }
+    },
+    "Employment": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isCurrentlyEmployed": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "employmentDetails": {}
+            }
+          }
+        }
+      ],
+      "description": "Employment",
+      "required": ["isCurrentlyEmployed"],
+      "properties": {
+        "isCurrentlyEmployed": {
+          "type": "boolean",
+          "description": "Are you currently employed?",
+          "default": false
+        },
+        "employmentDetails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EmploymentDetail"
+          },
+          "description": "Employment Details"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/language_proof/v1.0.0",
+  "title": "English Language Requirement Schema",
+  "description": "Proof of English language ability through degree or approved language test",
+  "x-llmHint": "English language qualification. Match: IELTS/Trinity SELT certificates, university degree certificates, NARIC equivalency letters, language test confirmations.",
+  "definitions": {
+    "Language": {
+      "type": "object",
+      "properties": {
+        "fluentLanguages": {
+          "type": "array",
+          "description": "What languages do you speak fluently?",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "default": ["English"]
+        },
+        "preferredLanguage": {
+          "type": "string",
+          "description": "We may have to talk to you about your application. Which language would you prefer to use?",
+          "maxLength": 100,
+          "default": "English"
+        },
+        "isExemptFromEnglishRequirement": {
+          "type": "boolean",
+          "description": "Are you exempt from the English language requirement?",
+          "default": false
+        },
+        "exemptionReason": {
+          "type": "string",
+          "description": "Why are you exempt from the English language requirement?",
+          "enum": [
+            "I am aged 65 or over",
+            "I have a physical or mental condition",
+            "There are exceptional circumstances"
+          ],
+          "default": "I am aged 65 or over"
+        },
+        "hasEnglishDegree": {
+          "type": "boolean",
+          "description": "The degree must be equivalent to a UK Bachelor's degree or above. If you have completed a research degree, the research must have been conducted in English.",
+          "default": false
+        },
+        "degreeCountry": {
+          "type": "string",
+          "description": "Country your degree was taught in",
+          "minLength": 1,
+          "maxLength": 100,
+          "default": "United Kingdom"
+        },
+        "degreeMeetsRequirement": {
+          "type": "boolean",
+          "description": "Does your degree meet the English language requirement for this visa?",
+          "default": false
+        },
+        "hasLanguageTest": {
+          "type": "boolean",
+          "description": "Have you passed an approved English language test? Check the list of approved English language tests.",
+          "default": false
+        },
+        "testLevelAdequate": {
+          "type": "boolean",
+          "description": "Did the test assess your speaking and listening skills at a level equivalent to CEFR A1 or higher? Check your certificate or ask your language school if you do not know.",
+          "default": false
+        },
+        "howDidYouGetResult": {
+          "type": "string",
+          "description": "How did you get your result?",
+          "enum": [
+            "Certificate",
+            "Online reference number"
+          ],
+          "default": "Certificate"
+        },
+        "awardingBody": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/OrganisationName"
+            },
+            {
+              "minLength": 1,
+              "maxLength": 200,
+              "default": ""
+            }
+          ],
+          "description": "Awarding body"
+        },
+        "referenceNumber": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/ReferenceNumber"
+            },
+            {
+              "minLength": 1,
+              "maxLength": 200,
+              "default": ""
+            }
+          ],
+          "description": "Reference number"
+        }
+      },
+      "required": [
+        "fluentLanguages",
+        "preferredLanguage",
+        "isExemptFromEnglishRequirement"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isExemptFromEnglishRequirement": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "exemptionReason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isExemptFromEnglishRequirement": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hasEnglishDegree",
+              "hasLanguageTest"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isExemptFromEnglishRequirement": {
+                "const": false
+              },
+              "hasEnglishDegree": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "degreeCountry",
+              "degreeMeetsRequirement"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isExemptFromEnglishRequirement": {
+                "const": false
+              },
+              "hasLanguageTest": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "testLevelAdequate"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isExemptFromEnglishRequirement": {
+                "const": false
+              },
+              "hasLanguageTest": {
+                "const": true
+              },
+              "testLevelAdequate": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "howDidYouGetResult"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isExemptFromEnglishRequirement": {
+                "const": false
+              },
+              "hasLanguageTest": {
+                "const": true
+              },
+              "testLevelAdequate": {
+                "const": true
+              },
+              "howDidYouGetResult": {
+                "const": "Online reference number"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "awardingBody",
+              "referenceNumber"
+            ]
+          }
+        }
+      ],
+      "description": "Proof of English language ability through degree or approved language test"
+    }
+  }
+}

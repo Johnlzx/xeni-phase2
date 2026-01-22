@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/employment/v2.2.0",
+  "title": "Employment Information Schema",
+  "description": "Reusable schema definitions for employment information across UK immigration applications",
+  "x-llmHint": "Current employment information. Match: employment contracts, payslips, P60/P45 forms, employment letters, self-employment records, business registration certificates, tax returns. For sensitive employment history, see EmploymentHistory.json.",
+  "definitions": {
+    "EmploymentStatus": {
+      "type": "array",
+      "description": "Employment status - Can select multiple options. LOGIC: If 'Employed' is selected, employedDetail (employer info + job info) must be provided. If 'Self-employed' is selected, selfEmployedDetail (job + yearly income) must be provided. Other statuses ('A student', 'Retired', 'Unemployed') have no additional requirements.",
+      "items": {
+        "enum": [
+          "Employed",
+          "Self-employed",
+          "A student",
+          "Retired",
+          "Unemployed"
+        ],
+        "type": "string"
+      },
+      "default": ["Employed"]
+    },
+    "EmployerDetail": {
+      "type": "object",
+      "description": "Employer Detail - Employer information",
+      "additionalProperties": false,
+      "required": ["name", "address", "telephoneNumber"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Employer's name",
+          "default": "XXXXX Ltd"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        "telephoneNumber": {
+          "type": "object",
+          "description": "Employer's telephone number",
+          "additionalProperties": false,
+          "required": ["countryCode", "number"],
+          "properties": {
+            "countryCode": {
+              "type": "string",
+              "description": "Country code",
+              "default": "93"
+            },
+            "number": {
+              "type": "string",
+              "description": "Number",
+              "default": "111111"
+            }
+          }
+        }
+      }
+    },
+    "JobDetail": {
+      "type": "object",
+      "description": "Job Detail - Job information. NOTE: monthlyEarnings and yearlyEarnings can be computed from each other if only one is provided by OCR.",
+      "additionalProperties": false,
+      "required": ["jobTitle", "monthlyEarnings", "jobDescription", "startDate"],
+      "properties": {
+        "jobTitle": {
+          "type": "string",
+          "description": "Your job title",
+          "default": "Software Engineer"
+        },
+        "monthlyEarnings": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+            },
+            {
+              "default": {
+                "currency": "GBP",
+                "amount": 2500
+              },
+              "x-computed": {
+                "from": "yearlyEarnings",
+                "formula": "yearlyEarnings.amount / 12",
+                "priority": "ocr-first",
+                "description": "If monthlyEarnings is not provided by OCR, compute from yearlyEarnings by dividing by 12. OCR-extracted values take priority and will NOT be overwritten."
+              }
+            }
+          ]
+        },
+        "yearlyEarnings": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+            },
+            {
+              "default": {
+                "currency": "GBP",
+                "amount": 30000
+              },
+              "x-computed": {
+                "from": "monthlyEarnings",
+                "formula": "monthlyEarnings.amount * 12",
+                "priority": "ocr-first",
+                "description": "If yearlyEarnings is not provided by OCR, compute from monthlyEarnings by multiplying by 12. OCR-extracted values take priority and will NOT be overwritten."
+              }
+            }
+          ]
+        },
+        "jobDescription": {
+          "type": "string",
+          "description": "Describe your job",
+          "default": "Software development and maintenance"
+        },
+        "startDate": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/MonthYearField"
+            },
+            {
+              "default": "01-2020"
+            }
+          ]
+        }
+      }
+    },
+    "EmployedDetail": {
+      "type": "object",
+      "description": "Employed Detail - Complete current employment information. REQUIRED when employmentStatus contains 'Employed'. Includes employer information (name, address, phone) and job details (title, earnings, description, start date).",
+      "additionalProperties": false,
+      "required": ["employer", "job"],
+      "properties": {
+        "employer": {
+          "$ref": "#/definitions/EmployerDetail"
+        },
+        "job": {
+          "$ref": "#/definitions/JobDetail"
+        }
+      }
+    },
+    "SelfEmployedDetail": {
+      "type": "object",
+      "description": "Self-employed Detail - Self-employment information. REQUIRED when employmentStatus contains 'Self-employed'. NOTE: yearlyIncome and monthlyIncome can be computed from each other if only one is provided by OCR.",
+      "additionalProperties": false,
+      "required": ["job", "yearlyIncome"],
+      "properties": {
+        "job": {
+          "type": "string",
+          "description": "What is your job?",
+          "default": "Freelance Consultant"
+        },
+        "yearlyIncome": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+            },
+            {
+              "default": {
+                "currency": "GBP",
+                "amount": 36000
+              },
+              "x-computed": {
+                "from": "monthlyIncome",
+                "formula": "monthlyIncome.amount * 12",
+                "priority": "ocr-first",
+                "description": "If yearlyIncome is not provided by OCR, compute from monthlyIncome by multiplying by 12. OCR-extracted values take priority and will NOT be overwritten."
+              }
+            }
+          ]
+        },
+        "monthlyIncome": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+            },
+            {
+              "default": {
+                "currency": "GBP",
+                "amount": 3000
+              },
+              "x-computed": {
+                "from": "yearlyIncome",
+                "formula": "yearlyIncome.amount / 12",
+                "priority": "ocr-first",
+                "description": "If monthlyIncome is not provided by OCR, compute from yearlyIncome by dividing by 12. OCR-extracted values take priority and will NOT be overwritten."
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Employment": {
+      "type": "object",
+      "description": "Employment - Current employment information only. LOGIC: employmentStatus determines current employment state - if contains 'Employed', employedDetail is required; if contains 'Self-employed', selfEmployedDetail is required. For sensitive employment history, use EmploymentHistory.json separately.",
+      "additionalProperties": false,
+      "required": ["employmentStatus"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "employmentStatus": {
+                "contains": {
+                  "const": "Employed"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["employedDetail"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "employmentStatus": {
+                "contains": {
+                  "const": "Self-employed"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": ["selfEmployedDetail"]
+          }
+        }
+      ],
+      "properties": {
+        "employmentStatus": {
+          "$ref": "#/definitions/EmploymentStatus"
+        },
+        "employedDetail": {
+          "$ref": "#/definitions/EmployedDetail"
+        },
+        "selfEmployedDetail": {
+          "$ref": "#/definitions/SelfEmployedDetail"
+        }
+      }
+    }
+  }
+}

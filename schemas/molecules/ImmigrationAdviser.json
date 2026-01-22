@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/immigrationAdviser/v1.0.0",
+  "title": "Immigration Adviser Schema",
+  "description": "Immigration adviser information for UK visa applications. Optional for all visa types.",
+  "x-llmHint": "Immigration adviser details. Match: OISC registration certificates, adviser contact information, legal representative details.",
+  "definitions": {
+    "ImmigrationAdviser": {
+      "type": "object",
+      "description": "Immigration Adviser - Complete adviser information structure",
+      "additionalProperties": false,
+      "required": ["hasAdviser"],
+      "properties": {
+        "hasAdviser": {
+          "type": "boolean",
+          "description": "Has Adviser",
+          "default": true
+        },
+        "isUKBased": {
+          "type": "boolean",
+          "description": "Is UK Based",
+          "default": true
+        },
+        "adviserDetails": {
+          "$ref": "#/definitions/AdviserDetails"
+        }
+      }
+    },
+    "AdviserDetails": {
+      "type": "object",
+      "description": "Adviser Details - Complete immigration adviser information",
+      "additionalProperties": false,
+      "properties": {
+        "emailBelongTo": {
+          "enum": ["The applicant", "An immigration adviser based in the UK", "Someone else"],
+          "type": "string",
+          "description": "Who does this email belong to?",
+          "default": "An immigration adviser based in the UK"
+        },
+        "cannotBeContactedByEmail": {
+          "type": "boolean",
+          "description": "My immigration adviser cannot be contacted by email",
+          "default": false
+        },
+        "title": {
+          "$ref": "../common/Common.json#/definitions/Title"
+        },
+        "givenName": {
+          "type": "string",
+          "description": "Given Names",
+          "default": "XXXXX"
+        },
+        "surname": {
+          "type": "string",
+          "description": "Surname",
+          "default": "Thompson"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email",
+          "default": "immigration.adviser@ukimmigrationlaw.co.uk"
+        },
+        "telephone": {
+          "type": "string",
+          "description": "Telephone",
+          "default": "02011111111"
+        },
+        "companyName": {
+          "type": "string",
+          "description": "Company Name",
+          "default": "Thompson & Associates Immigration Solicitors Ltd"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddress"
+        },
+        "regulationBody": {
+          "type": "string",
+          "description": "Regulation Body",
+          "default": "The Law Society"
+        },
+        "registrationNumber": {
+          "type": "string",
+          "description": "Registration Number",
+          "default": "11111111"
+        },
+        "notRegulatedAndNotExemptReason": {
+          "type": "string",
+          "description": "Not Regulated And Not Exempt Reason",
+          "default": ""
+        }
+      }
+    }
+  }
+}

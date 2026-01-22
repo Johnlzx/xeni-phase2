@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/finance/v2.1.1",
+  "title": "Financial Information Schema",
+  "description": "Reusable schema definitions for financial information across UK immigration applications",
+  "x-llmHint": "Extract financial information from documents. Match: bank statements, savings account statements, investment portfolios, pension statements, tax returns, P60 forms, payslips showing income. Key fields: monthly/yearly income amounts, savings balances, additional income sources (family allowance, pension, investments), currency types. Documents showing applicant's financial capacity for UK immigration.",
+  "definitions": {
+    "AdditionalIncomeType": {
+      "type": "array",
+      "description": "Types of additional income",
+      "items": {
+        "enum": [
+          "Allowance or regular money from your family",
+          "Pension",
+          "Investments",
+          "Another income"
+        ],
+        "type": "string"
+      },
+      "default": []
+    },
+    "AdditionalIncomeDetail": {
+      "type": "object",
+      "description": "Additional Income Detail - Other sources of income",
+      "additionalProperties": false,
+      "required": ["incomeTypes", "totalAmount"],
+      "properties": {
+        "incomeTypes": {
+          "$ref": "#/definitions/AdditionalIncomeType"
+        },
+        "totalAmount": {
+          "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+        }
+      }
+    },
+    "SavingsDetail": {
+      "type": "object",
+      "description": "Savings Detail",
+      "additionalProperties": false,
+      "required": ["amount"],
+      "properties": {
+        "amount": {
+          "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+        }
+      }
+    },
+    "IncomeAndSavings": {
+      "type": "object",
+      "description": "Income and Savings - Additional income and savings for non-employed/students/retired",
+      "additionalProperties": false,
+      "required": ["hasOtherIncome", "hasSavings"],
+      "properties": {
+        "hasOtherIncome": {
+          "type": "boolean",
+          "description": "Do you have another income? Auto-computed based on additionalIncome presence.",
+          "default": false,
+          "x-computed": "exists(additionalIncome)"
+        },
+        "hasSavings": {
+          "type": "boolean",
+          "description": "Do you have any savings? Auto-computed based on savings presence.",
+          "default": false,
+          "x-computed": "exists(savings)"
+        },
+        "additionalIncome": {
+          "$ref": "#/definitions/AdditionalIncomeDetail"
+        },
+        "savings": {
+          "$ref": "#/definitions/SavingsDetail"
+        }
+      }
+    },
+    "MonthlyExpenditure": {
+      "type": "object",
+      "description": "Monthly Expenditure - Total money spent each month",
+      "additionalProperties": false,
+      "required": ["amount"],
+      "properties": {
+        "amount": {
+          "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+        }
+      }
+    },
+    "TripCost": {
+      "type": "object",
+      "description": "Trip Cost - Cost of the visit to UK",
+      "additionalProperties": false,
+      "required": ["totalCost", "hasFinancialSupport"],
+      "properties": {
+        "totalCost": {
+          "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+        },
+        "hasFinancialSupport": {
+          "type": "boolean",
+          "description": "Will anyone be paying towards the cost of your visit? MUST be set to true if financialSupporters is provided.",
+          "default": false,
+          "x-computed": "exists(financialSupporters)"
+        },
+        "financialSupporters": {
+          "type": "array",
+          "description": "People/organisations paying towards the visit. MUST be provided when hasFinancialSupport is true.",
+          "items": {
+            "$ref": "#/definitions/FinancialSupporter"
+          },
+          "default": []
+        }
+      }
+    },
+    "FinancialSupporter": {
+      "type": "object",
+      "description": "Financial Supporter - Details of someone paying towards the visit",
+      "additionalProperties": false,
+      "required": ["supporterType", "contributionAmount", "reasonForSupport"],
+      "properties": {
+        "supporterType": {
+          "enum": [
+            "someone I know",
+            "my employer or company",
+            "another company or organisation"
+          ],
+          "type": "string",
+          "description": "Who is paying towards the cost of your visit? If 'someone I know': name, address, telephoneNumber are required. If 'another company or organisation': organisationName, address, telephoneNumber are required.",
+          "default": "someone I know"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the person. Required when supporterType is 'someone I know'.",
+          "default": "XXXXX"
+        },
+        "organisationName": {
+          "type": "string",
+          "description": "Name of the organisation. Required when supporterType is 'another company or organisation'.",
+          "default": "XXXXX Ltd"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        "telephoneNumber": {
+          "type": "object",
+          "description": "Telephone number",
+          "additionalProperties": false,
+          "required": ["countryCode", "number"],
+          "properties": {
+            "countryCode": {
+              "type": "string",
+              "description": "Country code",
+              "default": "+44"
+            },
+            "number": {
+              "type": "string",
+              "description": "Number",
+              "default": "2012345678"
+            }
+          }
+        },
+        "contributionAmount": {
+          "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+        },
+        "reasonForSupport": {
+          "type": "string",
+          "description": "Why are they helping to pay for your visit?",
+          "default": "Family support"
+        }
+      }
+    },
+    "PublicFundRecord": {
+      "type": "object",
+      "description": "Single public fund record",
+      "additionalProperties": false,
+      "required": [
+        "fundName",
+        "paymentFrequency",
+        "amountPerPayment",
+        "startDate",
+        "isStillReceiving"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isStillReceiving": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["endDate"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fundName": {
+                "const": "Other"
+              }
+            }
+          },
+          "then": {
+            "required": ["customFundName"]
+          }
+        }
+      ],
+      "properties": {
+        "fundName": {
+          "type": "string",
+          "enum": [
+            "Universal Credit",
+            "State Pension Credit",
+            "Personal Independence Payment",
+            "Attendance Allowance",
+            "Carer's Allowance",
+            "Disability Living Allowance",
+            "Housing Benefit",
+            "Health in Pregnancy Grant",
+            "Maternity Expenses Payment",
+            "Sure Start Maternity Grant Payment",
+            "Funeral Expenses Payment",
+            "Cold Weather Payment",
+            "Winter Fuel Payment",
+            "Budgeting Loan Payment",
+            "Severe Disablement Allowance",
+            "Income Based Employment and Support Allowance",
+            "Income Based Job Seekers Allowance",
+            "Income Support",
+            "Child Tax Credit and Working Tax Credit",
+            "Child Benefit",
+            "Social Housing & Homelessness Assistance",
+            "Council Tax Reduction Schemes",
+            "Social Security Scotland Benefits",
+            "Social Security Scotland Child Disability Payment",
+            "Social Security Scotland Adult Disability Payment",
+            "Social Security Scotland Carer's Allowance Supplement",
+            "Social Security Scotland Scottish Child Payment",
+            "Social Security Scotland Funeral Support Payment",
+            "Social Security Scotland Job Start Payment",
+            "Social Security Scotland Child Winter Heating Assistance",
+            "Social Security Scotland Winter Heating Payment",
+            "Carer Support Payment (Scotland)",
+            "Pension Age Disability Payment (Scotland)",
+            "Pension Age Winter Heating Payment (Scotland)",
+            "Scottish Adult Disability Living Allowance (Scotland)",
+            "Other"
+          ],
+          "description": "Name of public fund. Select 'Other' if your fund is not listed.",
+          "default": "Universal Credit"
+        },
+        "customFundName": {
+          "type": "string",
+          "description": "Custom fund name when 'Other' is selected. Required when fundName is 'Other'.",
+          "default": "Other"
+        },
+        "paymentFrequency": {
+          "type": "string",
+          "enum": ["Weekly", "Monthly"],
+          "description": "Frequency of payment",
+          "default": "Monthly"
+        },
+        "amountPerPayment": {
+          "type": "number",
+          "description": "How much do you receive each time? (GBP)",
+          "minimum": 0,
+          "default": 123
+        },
+        "startDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { 
+              "description": "When did you start receiving this public fund?",
+              "default": "01-01-2020"
+            }
+          ]
+        },
+        "endDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { 
+              "description": "When did you stop receiving this public fund?",
+              "default": "01-01-2024"
+            } 
+          ]
+        },
+        "isStillReceiving": {
+          "type": "boolean",
+          "description": "I still receive this public fund",
+          "default": false
+        }
+      }
+    },
+    "PublicFunds": {
+      "type": "object",
+      "description": "History of receiving public funds in the UK",
+      "additionalProperties": false,
+      "required": ["receivedPublicFunds"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "receivedPublicFunds": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["publicFundRecords"]
+          }
+        }
+      ],
+      "properties": {
+        "receivedPublicFunds": {
+          "type": "boolean",
+          "description": "Have you received any public funds (money) in the UK?",
+          "default": false,
+          "x-computed": "exists(publicFundRecords)"
+        },
+        "publicFundRecords": {
+          "type": "array",
+          "description": "Public fund records",
+          "items": {
+            "$ref": "#/definitions/PublicFundRecord"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

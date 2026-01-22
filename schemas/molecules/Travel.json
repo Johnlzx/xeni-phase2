@@ -1,0 +1,695 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/travel/v2.0.8",
+  "title": "Travel Information Schema",
+  "description": "Reusable schema definitions for travel information across UK immigration applications",
+  "x-llmHint": "Travel history and plans. Match: flight itineraries, booking confirmations, passport visa stamps, travel tickets, hotel reservations.",
+  "x-llmRules": [
+    {
+      "ruleId": "EEA_TRAVEL_CLASSIFICATION",
+      "targetPath": "specialCountryTravelHistory.europeanEconomicArea.visits",
+      "description": "EEA countries: France, Germany, Italy, Spain, Netherlands, Belgium, Austria, Poland, Sweden, Denmark, Finland, Norway, Ireland, Greece, Portugal, and 15 others",
+      "identifiers": ["France", "Germany", "Italy", "Spain", "Netherlands", "Belgium", "Austria", "EEA", "European Economic Area"],
+      "antiPatterns": ["NEVER use worldTravelHistory for EEA countries"]
+    },
+    {
+      "ruleId": "SPECIAL_COUNTRY_TRAVEL",
+      "targetPath": "specialCountryTravelHistory",
+      "description": "Special countries: Australia→australia.visits, Canada→canada.visits, New Zealand→newZealand.visits, USA→usa.visits, Switzerland→switzerland.visits. ONLY for TRAVEL/VISIT history, NOT nationality or citizenship.",
+      "identifiers": ["Australia", "Canada", "New Zealand", "USA", "United States", "Switzerland", "visited", "travel", "trip", "holiday", "tourism"],
+      "antiPatterns": [
+        "NEVER use worldTravelHistory for these countries",
+        "NEVER use specialCountryTravelHistory for NATIONALITY or CITIZENSHIP data - nationality goes to identityDocuments.otherNationalityDetails[]",
+        "If question mentions 'nationality', 'citizenship', 'hold nationality', 'dual nationality', 'other nationality' → use identityDocuments.otherNationalityDetails[], NOT travel history",
+        "Key distinction: 'held nationality from date X to Y' is NATIONALITY data; 'visited country from date X to Y' is TRAVEL data"
+      ]
+    },
+    {
+      "ruleId": "WORLD_TRAVEL_CLASSIFICATION",
+      "targetPath": "worldTravelHistory.visits",
+      "description": "All other countries (Japan, China, India, Brazil, Thailand, Turkey, UAE, etc.) - EXCLUDE UK, USA, Canada, Australia, New Zealand, Switzerland, EEA",
+      "identifiers": ["Japan", "China", "India", "Brazil", "Thailand", "Mexico", "Turkey", "UAE", "Singapore"]
+    }
+  ],
+  "definitions": {
+    "TravelReason": {
+      "enum": [
+        "Tourism (including visiting family and friends)",
+        "Work",
+        "Study",
+        "Transit (travelling through the country)",
+        "Other reason"
+      ],
+      "type": "string",
+      "description": "Reason for travel",
+      "default": "Tourism (including visiting family and friends)"
+    },
+    "PlannedTravelDates": {
+      "type": "object",
+      "description": "Planned Travel Dates - entry and leave dates",
+      "additionalProperties": false,
+      "required": ["entryDate", "leaveDate"],
+      "properties": {
+        "entryDate": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            {
+              "description": "Date you plan to arrive in the UK,  in DD-MM-YYYY format",
+              "default": "31-01-2025",
+              "x-default-expression": "now+30d"
+            }
+          ]
+        },
+        "leaveDate": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            {
+              "description": "Date you plan to leave the UK in DD-MM-YYYY format",
+              "default": "30-06-2025",
+              "x-default-expression": "now+45d"
+            }
+          ]
+        }
+      }
+    },
+    "SpokenLanguagePreference": {
+      "type": "object",
+      "description": "Spoken Language Preference",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "language": {
+                "const": "Other"
+              }
+            }
+          },
+          "then": {
+            "required": ["otherLanguage"]
+          }
+        }
+      ],
+      "required": ["language"],
+      "properties": {
+        "language": {
+          "enum": ["English", "Other"],
+          "type": "string",
+          "description": "Which language would you prefer to use?",
+          "default": "English"
+        },
+        "otherLanguage": {
+          "type": "string",
+          "description": "Language name",
+          "default": "Spanish"
+        }
+      }
+    },
+    "TravelRecordDetail": {
+      "type": "object",
+      "description": "Travel Record Detail - Single trip information",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "const": "Other reason"
+              }
+            }
+          },
+          "then": {
+            "required": ["reasonDetails"]
+          }
+        }
+      ],
+      "required": ["reason", "entryDate", "leaveDate"],
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/TravelReason"
+        },
+        "reasonDetails": {
+          "type": "string",
+          "description": "Details of the reason for visit",
+          "default": "Medical treatment"
+        },
+        "entryDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TravelEntryDate" },
+            { "description": "When did you enter this country?" }
+          ]
+        },
+        "leaveDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TravelLeaveDate" },
+            { "description": "When did you leave this country?", "default": "15-01-2024" }
+          ]
+        },
+        "duration": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TravelDurationComputed" },
+            { "description": "How long were you in the Country?" }
+          ]
+        }
+      }
+    },
+    "UKTravelHistoryRecord": {
+      "type": "object",
+      "description": "UK Travel History Record - Travel to United Kingdom ONLY (England, Scotland, Wales, Northern Ireland). NEVER use for other countries.",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "const": "Other reason"
+              }
+            }
+          },
+          "then": {
+            "required": ["reasonDetails"]
+          }
+        }
+      ],
+      "required": ["reason", "visitDate", "duration"],
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/TravelReason"
+        },
+        "reasonDetails": {
+          "type": "string",
+          "description": "Details of the reason for visit",
+          "default": "Medical treatment"
+        },
+        "entryDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TravelEntryDate" },
+            { "description": "Entry date to UK (DD-MM-YYYY)" }
+          ]
+        },
+        "leaveDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TravelLeaveDate" },
+            { "description": "Leave date from UK (DD-MM-YYYY)" }
+          ]
+        },
+        "duration": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TravelDurationComputed" },
+            { "description": "How long were you in the UK?" }
+          ]
+        }
+      }
+    },
+    "WorldTravelHistoryRecord": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/TravelRecordDetail"
+        },
+        {
+          "type": "object",
+          "description": "World Travel History Record - Travel to countries NOT in special category. EXCLUDE: UK, USA, Canada, Australia, New Zealand, Switzerland, and all 30 EEA countries (Austria, Belgium, Bulgaria, Croatia, Cyprus, Czech Republic, Denmark, Estonia, Finland, France, Germany, Greece, Hungary, Iceland, Ireland, Italy, Latvia, Liechtenstein, Lithuania, Luxembourg, Malta, Netherlands, Norway, Poland, Portugal, Romania, Slovakia, Slovenia, Spain, Sweden). Examples of CORRECT countries: Japan, China, India, Brazil, South Africa, Thailand, Mexico, Russia, Turkey, Egypt, UAE, Singapore.",
+          "additionalProperties": false,
+          "required": ["country"],
+          "properties": {
+            "country": {
+              "type": "string",
+              "description": "Country visited",
+              "default": "Japan"
+            },
+            "reason": {},
+            "reasonDetails": {},
+            "entryDate": {},
+            "leaveDate": {}
+          }
+        }
+      ]
+    },
+    "MedicalTreatmentInUK": {
+      "type": "object",
+      "description": "Medical Treatment in UK - History of medical treatment received",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasReceivedMedicalTreatment": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "wasToldToPayForTreatment",
+              "hasPaidFullAmount",
+              "treatmentRecords"
+            ]
+          }
+        }
+      ],
+      "required": ["hasReceivedMedicalTreatment"],
+      "properties": {
+        "hasReceivedMedicalTreatment": {
+          "type": "boolean",
+          "description": "Have you ever been given medical treatment in the UK?",
+          "default": false,
+          "x-computed": "exists(treatmentRecords)"
+        },
+        "wasToldToPayForTreatment": {
+          "type": "boolean",
+          "description": "Were you told that you had to pay the hospital, clinic or doctor's surgery for your medical treatment?",
+          "default": false
+        },
+        "hasPaidFullAmount": {
+          "type": "boolean",
+          "description": "Have you paid the full amount?",
+          "default": true
+        },
+        "treatmentRecords": {
+          "type": "array",
+          "description": "Medical treatment records",
+          "items": {
+            "$ref": "#/definitions/MedicalTreatmentRecord"
+          },
+          "default": []
+        }
+      }
+    },
+    "MedicalTreatmentRecord": {
+      "type": "object",
+      "description": "Medical Treatment Record - Single treatment record",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isStillReceivingTreatment": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["treatmentEndDate"]
+          }
+        }
+      ],
+      "required": [
+        "treatmentLocation",
+        "facilityName",
+        "address",
+        "treatmentStartDate",
+        "isStillReceivingTreatment"
+      ],
+      "properties": {
+        "treatmentLocation": {
+          "enum": [
+            "Accident and emergency (A&E) at a hospital",
+            "To a doctor, clinic or hospital for non-emergency treatment"
+          ],
+          "type": "string",
+          "description": "Where did you go for your previous medical treatment in the UK?",
+          "default": "To a doctor, clinic or hospital for non-emergency treatment"
+        },
+        "facilityName": {
+          "type": "string",
+          "description": "Name of hospital, clinic or doctors' surgery",
+          "default": "NHS Hospital"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddressBase"
+        },
+        "treatmentStartDate": {
+          "$ref": "../common/Common.json#/definitions/MonthYearField"
+        },
+        "treatmentEndDate": {
+          "$ref": "../common/Common.json#/definitions/MonthYearField"
+        },
+        "isStillReceivingTreatment": {
+          "type": "boolean",
+          "description": "I am still receiving this medical treatment",
+          "default": false
+        }
+      }
+    },
+    "UKTravelHistory": {
+      "type": "object",
+      "description": "UK Travel History - ONLY for visits to United Kingdom (England, Scotland, Wales, Northern Ireland) within the past 10 years. NEVER use for other countries.",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasVisitedUKInPast10Years": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["numberOfVisits", "visits"]
+          }
+        }
+      ],
+      "required": ["hasVisitedUKInPast10Years"],
+      "properties": {
+        "hasVisitedUKInPast10Years": {
+          "type": "boolean",
+          "description": "Have you been to the UK in the past 10 years?",
+          "default": false,
+          "x-computed": "exists(visits)"
+        },
+        "numberOfVisits": {
+          "type": "integer",
+          "description": "How many times have you been to the UK in the past 10 years?",
+          "default": 0,
+          "x-computed": "len(visits)",
+          "readOnly": true
+        },
+        "visits": {
+          "type": "array",
+          "description": "UK visit records within the past 10 years only (most recent first) ",
+          "x-filter": {
+            "arrayField": "visitDate",
+            "rule": "DATE_WITHIN_YEARS",
+            "params": { "years": 10 },
+            "action": "REMOVE_ITEM"
+          },
+          "items": {
+            "$ref": "#/definitions/UKTravelHistoryRecord"
+          },
+          "default": []
+        },
+        "medicalTreatmentInUK": {
+          "$ref": "#/definitions/MedicalTreatmentInUK"
+        },
+        "hasUKNationalInsuranceNumber": {
+          "type": "boolean",
+          "description": "Do you have a UK national insurance number?",
+          "default": false,
+          "x-computed": "exists(ukNationalInsuranceNumber)"
+        },
+        "ukNationalInsuranceNumber": {
+          "type": "string",
+          "description": "National Insurance number",
+          "default": "AA111111A"
+        },
+        "hasUKDrivingLicence": {
+          "type": "boolean",
+          "description": "Do you have a UK driving licence?",
+          "default": false,
+          "x-computed": "exists(ukDrivingLicenceNumber)"
+        },
+        "ukDrivingLicenceNumber": {
+          "type": "string",
+          "description": "Driving licence number",
+          "default": "MORGA657054SM9IJ"
+        }
+      }
+    },
+    "WorldTravelHistory": {
+      "type": "object",
+      "description": "World Travel History - Travel to countries NOT in special category within the past 10 years. EXCLUDE: UK, USA, Canada, Australia, New Zealand, Switzerland, and all 30 EEA countries (including France, Germany, Italy, Spain). ONLY include: Japan, China, India, Brazil, South Africa, Thailand, Mexico, Russia, Turkey, Egypt, UAE, Singapore, and similar non-special countries.",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasVisitedOtherCountries": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["visits"]
+          }
+        }
+      ],
+      "required": ["hasVisitedOtherCountries"],
+      "properties": {
+        "hasVisitedOtherCountries": {
+          "type": "boolean",
+          "description": "Have you been to any other countries in the past 10 years? (Do not include visits to the UK, USA, Canada, Australia, New Zealand, Switzerland or the European Economic Area)",
+          "default": false,
+          "x-computed": "exists(visits)"
+        },
+        "numberOfVisits": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/VisitCountCategory"
+            },
+            {
+              "description": "How many times?",
+              "x-computed": "mapVisitCount(len(visits))",
+              "readOnly": true
+            }
+          ]
+        },
+        "visits": {
+          "type": "array",
+          "description": "Travel records within the past 10 years only.",
+          "x-filter": {
+            "arrayField": "entryDate",
+            "rule": "DATE_WITHIN_YEARS",
+            "params": { "years": 10 },
+            "action": "REMOVE_ITEM"
+          },
+          "items": {
+            "$ref": "#/definitions/WorldTravelHistoryRecord"
+          },
+          "default": []
+        }
+      }
+    },
+    "SpecialCountryTravelHistory": {
+      "type": "object",
+      "description": "Travel history to SPECIAL countries ONLY: Australia, Canada, New Zealand, USA, Switzerland, and all 30 EEA countries (Austria, Belgium, Bulgaria, Croatia, Cyprus, Czech Republic, Denmark, Estonia, Finland, France, Germany, Greece, Hungary, Iceland, Ireland, Italy, Latvia, Liechtenstein, Lithuania, Luxembourg, Malta, Netherlands, Norway, Poland, Portugal, Romania, Slovakia, Slovenia, Spain, Sweden). NEVER use for other countries - those go to worldTravelHistory.",
+      "additionalProperties": false,
+      "required": [
+        "numberOfVisits",
+        "australia",
+        "canada",
+        "newZealand",
+        "usa",
+        "switzerland",
+        "europeanEconomicArea"
+      ],
+      "properties": {
+        "numberOfVisits": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/VisitCountCategory"
+            },
+            {
+              "description": "How many times have you visited the following places (Australia, Canada, New Zealand, USA, Switzerland, European Economic Area) in the past 10 years? (Total count)",
+              "x-computed": "mapVisitCount(len(australia.visits) + len(canada.visits) + len(newZealand.visits) + len(usa.visits) + len(switzerland.visits) + len(europeanEconomicArea.visits))",
+              "readOnly": true
+            }
+          ]
+        },
+        "australia": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SpecialCountryVisits"
+            },
+            {
+              "description": "Australia - Visit frequency and details"
+            }
+          ]
+        },
+        "canada": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SpecialCountryVisits"
+            },
+            {
+              "description": "Canada - Visit frequency and details"
+            }
+          ]
+        },
+        "newZealand": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SpecialCountryVisits"
+            },
+            {
+              "description": "New Zealand - Visit frequency and details"
+            }
+          ]
+        },
+        "usa": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SpecialCountryVisits"
+            },
+            {
+              "description": "USA - Visit frequency and details"
+            }
+          ]
+        },
+        "switzerland": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/MultiCountryRegionVisits"
+            },
+            {
+              "description": "Switzerland - Visit frequency and details"
+            }
+          ]
+        },
+        "europeanEconomicArea": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/MultiCountryRegionVisits"
+            },
+            {
+              "description": "European Economic Area (do not include travel to the UK) - Visit frequency and details"
+            }
+          ]
+        }
+      }
+    },
+    "SpecialCountryVisits": {
+      "type": "object",
+      "description": "Visit details for a single specific country ONLY (Australia, Canada, New Zealand, or USA) within the past 10 years. Do NOT include country field as it's already known from parent context.",
+      "additionalProperties": false,
+      "properties": {
+        "visits": {
+          "type": "array",
+          "description": "Details of each visit to this country within the past 10 years.",
+          "x-filter": {
+            "arrayField": "visitDate",
+            "rule": "DATE_WITHIN_YEARS",
+            "params": { "years": 10 },
+            "action": "REMOVE_ITEM"
+          },
+          "items": {
+            "$ref": "#/definitions/SingleCountryVisitDetail"
+          },
+          "default": []
+        }
+      }
+    },
+    "MultiCountryRegionVisits": {
+      "type": "object",
+      "description": "Visit details for multi-country regions (Switzerland or any of 30 EEA countries: Austria, Belgium, Bulgaria, Croatia, Cyprus, Czech Republic, Denmark, Estonia, Finland, France, Germany, Greece, Hungary, Iceland, Ireland, Italy, Latvia, Liechtenstein, Lithuania, Luxembourg, Malta, Netherlands, Norway, Poland, Portugal, Romania, Slovakia, Slovenia, Spain, Sweden) within the past 10 years. MUST include country field.",
+      "additionalProperties": false,
+      "properties": {
+        "visits": {
+          "type": "array",
+          "description": "Details of each visit to this region within the past 10 years.",
+          "x-filter": {
+            "arrayField": "visitDate",
+            "rule": "DATE_WITHIN_YEARS",
+            "params": { "years": 10 },
+            "action": "REMOVE_ITEM"
+          },
+          "items": {
+            "$ref": "#/definitions/MultiCountryRegionVisitDetail"
+          },
+          "default": []
+        }
+      }
+    },
+    "SingleCountryVisitDetail": {
+      "type": "object",
+      "description": "Details of a visit to a single specific country ONLY (Australia, Canada, New Zealand, or USA). No country field needed as it's determined by parent context.",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "const": "Other reason"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reasonDetails"
+            ]
+          }
+        }
+      ],
+      "required": [
+        "reason",
+        "visitDate",
+        "duration"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/TravelReason"
+        },
+        "reasonDetails": {
+          "type": "string",
+          "description": "What was the reason for your past visit?",
+          "maxLength": 500,
+          "default": "xxx"
+        },
+        "entryDate": {
+          "$ref": "../common/Common.json#/definitions/TravelEntryDate"
+        },
+        "leaveDate": {
+          "$ref": "../common/Common.json#/definitions/TravelLeaveDate"
+        },
+        "duration": {
+          "$ref": "../common/Common.json#/definitions/TravelDurationComputed"
+        }
+      }
+    },
+    "MultiCountryRegionVisitDetail": {
+      "type": "object",
+      "description": "Details of a visit to Switzerland OR any EEA country (France, Germany, Italy, Spain, etc.). MUST include country field to specify which country within the region.",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "const": "Other reason"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reasonDetails"
+            ]
+          }
+        }
+      ],
+      "required": [
+        "country",
+        "reason",
+        "visitDate",
+        "duration"
+      ],
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "Which country did you visit?",
+          "default": "Italy"
+        },
+        "reason": {
+          "$ref": "#/definitions/TravelReason"
+        },
+        "reasonDetails": {
+          "type": "string",
+          "description": "What was the reason for your past visit?",
+          "maxLength": 500,
+          "default": "xxx"
+        },
+        "entryDate": {
+          "$ref": "../common/Common.json#/definitions/TravelEntryDate"
+        },
+        "leaveDate": {
+          "$ref": "../common/Common.json#/definitions/TravelLeaveDate"
+        },
+        "duration": {
+          "$ref": "../common/Common.json#/definitions/TravelDurationComputed"
+        }
+      }
+    }
+  }
+}

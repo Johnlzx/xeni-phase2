@@ -1,0 +1,1218 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/visitor-specific/v2.0.1",
+  "title": "Visitor Visa Specific Schema",
+  "description": "Visitor visa specific schema definitions for UK immigration applications",
+  "x-llmHint": "UK visit visa purpose details. Match: invitation letters, itineraries, hotel bookings, conference/meeting invites, hospital appointments, course enrolment. Purposes: tourism/family visit, business/sports, transit, academic, marriage, medical treatment, short-term study. Key: visit reason, UK host/organisation, trip funding, travel companions.",
+  "definitions": {
+    "VisitPurposeType": {
+      "enum": [
+        "Tourism (including visiting family and friends)",
+        "Business (including sports and entertainment)",
+        "Transit through the UK",
+        "Academic visit (including teaching, exchange and visiting as a dependant of an academic visitor)",
+        "Marriage or civil partnership",
+        "Private medical treatment or organ donation",
+        "Short-term study (up to 6 months), including recreational course",
+        "Other - I am visiting for another reason"
+      ],
+      "type": "string",
+      "description": "Main reason for visit to the UK",
+      "default": "Tourism (including visiting family and friends)"
+    },
+    "OrganisationVisitDetail": {
+      "type": "object",
+      "description": "Organisation Visit Detail - Reusable structure for visiting UK organisations",
+      "additionalProperties": false,
+      "required": [
+        "organisationName",
+        "hasInviter",
+        "organisationType",
+        "telephoneNumber",
+        "address"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasInviter": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["inviterGivenName", "inviterFamilyName"]
+          }
+        }
+      ],
+      "properties": {
+        "organisationName": {
+          "type": "string",
+          "description": "Organisation name",
+          "default": "XXXXX University"
+        },
+        "hasInviter": {
+          "type": "boolean",
+          "description": "Have you been invited to visit by someone who works there?",
+          "default": false
+        },
+        "inviterGivenName": {
+          "type": "string",
+          "description": "Given names of inviter",
+          "default": "XXXXX"
+        },
+        "inviterFamilyName": {
+          "type": "string",
+          "description": "Family name of inviter",
+          "default": "XXXXX"
+        },
+        "organisationType": {
+          "type": "string",
+          "description": "What sort of work does the organisation do?",
+          "default": "Higher education"
+        },
+        "telephoneNumber": {
+          "type": "string",
+          "description": "Telephone number",
+          "default": "02012345678"
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddressBase"
+        }
+      }
+    },
+    "PaymentInUKDetail": {
+      "type": "object",
+      "description": "Payment in UK Detail - Payment received while in the UK",
+      "additionalProperties": false,
+      "required": ["willBePaid"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "willBePaid": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["payerName", "paymentAmount", "paymentReason"]
+          }
+        }
+      ],
+      "properties": {
+        "willBePaid": {
+          "type": "boolean",
+          "description": "Will you be paid for any of your activities while in the UK?",
+          "default": false
+        },
+        "payerName": {
+          "type": "string",
+          "description": "Who will be paying you while you are in the UK?",
+          "default": "XXXXX Ltd"
+        },
+        "paymentAmount": {
+          "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+        },
+        "paymentReason": {
+          "type": "string",
+          "description": "What are you being paid for?",
+          "default": "Speaking engagement"
+        }
+      }
+    },
+    "ActivitiesDetail": {
+      "type": "object",
+      "description": "Activities Detail - Description of activities during visit",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Give details of the main purpose of your visit and what you will be doing",
+          "default": "Visiting tourist attractions and exploring local culture"
+        }
+      }
+    },
+    "TourismVisitDetail": {
+      "type": "object",
+      "description": "Tourism Visit Detail - Tourism visit information",
+      "additionalProperties": false,
+      "required": ["subReason", "activities"],
+      "properties": {
+        "subReason": {
+          "enum": ["Tourist", "Visiting family", "Visiting friends"],
+          "type": "string",
+          "description": "Main reason for your holiday visit",
+          "default": "Tourist"
+        },
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        }
+      }
+    },
+    "BusinessVisitSubReason": {
+      "enum": [
+        "Attend business meetings",
+        "Research or fact finding",
+        "Business-related training",
+        "Attend lectures",
+        "Perform at an entertainment event",
+        "Perform at a sporting event",
+        "Religious activities",
+        "Secure funding to start, take over, join or run a business",
+        "Take the Professional and Linguistic Assessment Board (PLAB) test or the Objective Structured Clinical Examination (OSCE)",
+        "Clinical attachments or dental observer posts",
+        "Permitted Paid Engagement",
+        "Other"
+      ],
+      "type": "string",
+      "description": "Reason for your business visit",
+      "default": "Attend business meetings"
+    },
+    "BusinessVisitDetail": {
+      "type": "object",
+      "description": "Business Visit Detail - Business visit information",
+      "additionalProperties": false,
+      "required": ["subReason", "paymentInUK", "willVisitOrganisation"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "subReason": {
+                "const": "Other"
+              }
+            }
+          },
+          "then": {
+            "required": ["businessDescription"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "willVisitOrganisation": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["organisations"]
+          }
+        }
+      ],
+      "properties": {
+        "subReason": {
+          "$ref": "#/definitions/BusinessVisitSubReason"
+        },
+        "businessDescription": {
+          "type": "string",
+          "description": "What business will you be doing in the UK?",
+          "default": "Consulting services"
+        },
+        "paymentInUK": {
+          "$ref": "#/definitions/PaymentInUKDetail"
+        },
+        "willVisitOrganisation": {
+          "type": "boolean",
+          "description": "Will you be visiting a company or organisation in the UK?",
+          "default": false
+        },
+        "organisations": {
+          "type": "array",
+          "description": "Organisations you will visit",
+          "items": {
+            "$ref": "#/definitions/OrganisationVisitDetail"
+          },
+          "default": []
+        },
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        }
+      }
+    },
+    "TransitVisitSubReason": {
+      "enum": [
+        "To go through UK border control and leave the UK within 48 hours",
+        "To change flights in the UK within 24 hours, without going through UK border control",
+        "To start work on a ship or aircraft"
+      ],
+      "type": "string",
+      "description": "Reason for your transit visit",
+      "default": "To go through UK border control and leave the UK within 48 hours"
+    },
+    "TransitDestinationDetail": {
+      "type": "object",
+      "description": "Transit Destination Detail - Country traveling to and visa information",
+      "additionalProperties": false,
+      "required": [
+        "country",
+        "reasonForVisit",
+        "reasonForTransitingUK",
+        "hasValidVisa"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reasonForVisit": {
+                "const": "Other"
+              }
+            }
+          },
+          "then": {
+            "required": ["visitDetails"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasValidVisa": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["visaReferenceNumber", "visaIssueDate", "visaIssueLocation"]
+          }
+        }
+      ],
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "Which country are you travelling on to from the UK?",
+          "default": "France"
+        },
+        "reasonForVisit": {
+          "enum": [
+            "Tourism",
+            "Business",
+            "Visit family",
+            "Returning to my country of nationality",
+            "Other"
+          ],
+          "type": "string",
+          "description": "Why are you going to this country?",
+          "default": "Tourism"
+        },
+        "visitDetails": {
+          "type": "string",
+          "description": "Details of your visit",
+          "default": "Medical treatment"
+        },
+        "reasonForTransitingUK": {
+          "type": "string",
+          "description": "Why are you travelling through the UK?",
+          "default": "Convenient connection"
+        },
+        "hasValidVisa": {
+          "type": "boolean",
+          "description": "Do you have a valid visa or residence permit for the country you are travelling to?",
+          "default": false
+        },
+        "visaReferenceNumber": {
+          "type": "string",
+          "description": "Reference number of your permit or visa",
+          "default": "FR123456"
+        },
+        "visaIssueDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        },
+        "visaIssueLocation": {
+          "type": "string",
+          "description": "Where was the visa issued?",
+          "default": "Paris"
+        }
+      }
+    },
+    "TransitVisitDetail": {
+      "type": "object",
+      "description": "Transit Visit Detail - Transit visit information",
+      "additionalProperties": false,
+      "required": [
+        "subReason",
+        "arrivalTransport",
+        "departureTransport",
+        "destination",
+        "willReturnThroughUK"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "subReason": {
+                "const": "To start work on a ship or aircraft"
+              }
+            }
+          },
+          "then": {
+            "required": ["shipOrAircraftWork"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "willReturnThroughUK": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["returnArrivalTransport", "returnDepartureTransport"]
+          }
+        }
+      ],
+      "properties": {
+        "subReason": {
+          "$ref": "#/definitions/TransitVisitSubReason"
+        },
+        "arrivalTransport": {
+          "$ref": "../common/Common.json#/definitions/TransportDetails"
+        },
+        "departureTransport": {
+          "$ref": "../common/Common.json#/definitions/TransportDetails"
+        },
+        "destination": {
+          "$ref": "#/definitions/TransitDestinationDetail"
+        },
+        "willReturnThroughUK": {
+          "type": "boolean",
+          "description": "Will you be travelling back through the UK following your visit to another country?",
+          "default": false
+        },
+        "returnArrivalTransport": {
+          "$ref": "../common/Common.json#/definitions/TransportDetails"
+        },
+        "returnDepartureTransport": {
+          "$ref": "../common/Common.json#/definitions/TransportDetails"
+        },
+        "shipOrAircraftWork": {
+          "$ref": "#/definitions/ShipOrAircraftWorkDetail"
+        }
+      }
+    },
+    "ShipOrAircraftWorkDetail": {
+      "type": "object",
+      "description": "Ship or Aircraft Work Detail - Work on ship or aircraft",
+      "additionalProperties": false,
+      "required": [
+        "organisationOrAgent",
+        "expectedDepartureDate",
+        "departureLocation",
+        "transportInfo",
+        "workDescription",
+        "paymentInUK",
+        "willVisitOrganisation"
+      ],
+      "properties": {
+        "organisationOrAgent": {
+          "type": "string",
+          "description": "Which organisation or agent has arranged this trip?",
+          "default": "XXXXX Shipping Ltd"
+        },
+        "expectedDepartureDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        },
+        "departureLocation": {
+          "type": "string",
+          "description": "Where will you depart the UK from?",
+          "default": "Southampton"
+        },
+        "transportInfo": {
+          "type": "string",
+          "description": "What is the flight number or name of the ship that you will leave the UK on?",
+          "default": "Queen Mary 2"
+        },
+        "workDescription": {
+          "type": "string",
+          "description": "What work will you be doing on the aircraft or ship?",
+          "default": "Engineer"
+        },
+        "paymentInUK": {
+          "$ref": "#/definitions/PaymentInUKDetail"
+        },
+        "willVisitOrganisation": {
+          "type": "boolean",
+          "description": "Will you be visiting a company or organisation in the UK?",
+          "default": false
+        },
+        "organisations": {
+          "type": "array",
+          "description": "Organisations you will visit",
+          "items": {
+            "$ref": "#/definitions/OrganisationVisitDetail"
+          },
+          "default": []
+        }
+      }
+    },
+    "AcademicVisitSubReason": {
+      "enum": [
+        "Research",
+        "Teaching",
+        "Clinical Practice",
+        "Formal Exchange",
+        "Collaborate on an international project",
+        "Dependant of an academic visitor"
+      ],
+      "type": "string",
+      "description": "Main reason for your academic visit",
+      "default": "Research"
+    },
+    "AcademicQualifications": {
+      "type": "object",
+      "description": "Academic Qualifications - Academic expertise and institution",
+      "additionalProperties": false,
+      "required": [
+        "fieldOfExpertise",
+        "isWorkingAtInstitution",
+        "qualifications",
+        "benefitsFromTrip"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isWorkingAtInstitution": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["institutionName", "institutionAddress"]
+          }
+        }
+      ],
+      "properties": {
+        "fieldOfExpertise": {
+          "type": "string",
+          "description": "What is your field of academic expertise?",
+          "default": "Computer Science"
+        },
+        "isWorkingAtInstitution": {
+          "type": "boolean",
+          "description": "Are you currently working in this field at an academic institution or higher education facility overseas?",
+          "default": false
+        },
+        "institutionName": {
+          "type": "string",
+          "description": "Name of the academic institution or higher education facility",
+          "default": "XXXXX University"
+        },
+        "institutionAddress": {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        "qualifications": {
+          "type": "string",
+          "description": "What professional qualifications or experience do you hold?",
+          "default": "PhD in Computer Science, 10 years research experience"
+        },
+        "benefitsFromTrip": {
+          "type": "string",
+          "description": "What benefits will you gain from this trip to the UK?",
+          "default": "Collaboration opportunities, access to research facilities"
+        }
+      }
+    },
+    "AcademicVisitDetail": {
+      "type": "object",
+      "description": "Academic Visit Detail - Academic visit information",
+      "additionalProperties": false,
+      "required": [
+        "subReason",
+        "academicQualifications",
+        "paymentInUK",
+        "willVisitOrganisation",
+        "plannedLengthOfStay"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "willVisitOrganisation": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["organisations"]
+          }
+        }
+      ],
+      "properties": {
+        "subReason": {
+          "$ref": "#/definitions/AcademicVisitSubReason"
+        },
+        "academicQualifications": {
+          "$ref": "#/definitions/AcademicQualifications"
+        },
+        "paymentInUK": {
+          "$ref": "#/definitions/PaymentInUKDetail"
+        },
+        "willVisitOrganisation": {
+          "type": "boolean",
+          "description": "Will you be visiting a company or organisation in the UK?",
+          "default": false
+        },
+        "organisations": {
+          "type": "array",
+          "description": "Organisations you will visit",
+          "items": {
+            "$ref": "#/definitions/OrganisationVisitDetail"
+          },
+          "default": []
+        },
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        },
+        "plannedLengthOfStay": {
+          "enum": ["Up to and including 6 months", "Over 6 months"],
+          "type": "string",
+          "description": "How long do you plan to come to the UK for?",
+          "default": "Up to and including 6 months"
+        }
+      }
+    },
+    "MarriageVisitDetail": {
+      "type": "object",
+      "description": "Marriage Visit Detail - Marriage or civil partnership visit",
+      "additionalProperties": false,
+      "required": [
+        "futureSpouseOrPartner",
+        "ceremonyDate",
+        "ceremonyAddress",
+        "hasGivenNoticeAtRegisterOffice",
+        "hasBeenMarriedBefore",
+        "activities"
+      ],
+      "properties": {
+        "futureSpouseOrPartner": {
+          "type": "object",
+          "description": "Future spouse or civil partner",
+          "additionalProperties": false,
+          "required": ["givenName", "familyName", "passportNumber", "countryOfNationality"],
+          "properties": {
+            "givenName": {
+              "type": "string",
+              "description": "Given names",
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "type": "string",
+              "description": "Family name",
+              "default": "XXXXX"
+            },
+            "passportNumber": {
+              "type": "string",
+              "description": "Passport number",
+              "default": "123456789"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": "United Kingdom"
+            }
+          }
+        },
+        "ceremonyDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        },
+        "ceremonyAddress": {
+          "$ref": "../common/Common.json#/definitions/UKAddressBase"
+        },
+        "hasGivenNoticeAtRegisterOffice": {
+          "type": "boolean",
+          "description": "Have you given notice at a Register Office in the UK?",
+          "default": false
+        },
+        "hasBeenMarriedBefore": {
+          "type": "boolean",
+          "description": "Have you been married or in a civil partnership before?",
+          "default": false
+        },
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        }
+      }
+    },
+    "ShortTermStudyDetail": {
+      "type": "object",
+      "description": "Short-term Study Detail - Short-term study visit (up to 6 months)",
+      "additionalProperties": false,
+      "required": [
+        "isEnrolledOrAccepted",
+        "needsATASPermission",
+        "courseDetails",
+        "activities"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isEnrolledOrAccepted": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "isRecreationalCourse": {}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "needsATASPermission": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["atasReferenceNumber"]
+          }
+        }
+      ],
+      "properties": {
+        "isEnrolledOrAccepted": {
+          "type": "boolean",
+          "description": "Are you enrolled or accepted on a UK course, at an accredited institution?",
+          "default": false
+        },
+        "isRecreationalCourse": {
+          "type": "boolean",
+          "description": "Is the course you plan on studying a recreational course lasting no longer than 30 days?",
+          "default": false
+        },
+        "needsATASPermission": {
+          "type": "boolean",
+          "description": "Do you need to obtain permission from the ATAS?",
+          "default": false
+        },
+        "atasReferenceNumber": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/ReferenceNumber"
+            },
+            {
+              "default": "ATAS123456"
+            }
+          ],
+          "description": "What is your Academic Technology Approval Scheme (ATAS) reference number?"
+        },
+        "courseDetails": {
+          "type": "array",
+          "description": "Course details",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "institutionName",
+              "courseName",
+              "qualificationToGet",
+              "startDate",
+              "endDate"
+            ],
+            "properties": {
+              "institutionName": {
+                "type": "string",
+                "description": "Institution name",
+                "default": "XXXXX University"
+              },
+              "courseName": {
+                "type": "string",
+                "description": "Course name",
+                "default": "English Language Course"
+              },
+              "qualificationToGet": {
+                "type": "string",
+                "description": "Qualification you will get",
+                "default": "Certificate"
+              },
+              "startDate": {
+                "$ref": "../common/Common.json#/definitions/DateField"
+              },
+              "endDate": {
+                "$ref": "../common/Common.json#/definitions/DateField"
+              }
+            }
+          },
+          "default": []
+        },
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        }
+      }
+    },
+    "OtherVisitDetail": {
+      "type": "object",
+      "description": "Other Visit Detail - Other reason for visit",
+      "additionalProperties": false,
+      "required": ["activities"],
+      "properties": {
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        }
+      }
+    },
+    "TravelArrangements": {
+      "type": "object",
+      "description": "Travel Arrangements - Information about how applicant is travelling to the UK",
+      "additionalProperties": false,
+      "required": ["isTravellingAsPartOfOrganisedGroup", "isTravellingWithOtherPerson"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isTravellingAsPartOfOrganisedGroup": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["groupName"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isTravellingWithOtherPerson": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["travelCompanion"]
+          }
+        }
+      ],
+      "properties": {
+        "isTravellingAsPartOfOrganisedGroup": {
+          "type": "boolean",
+          "description": "Will you be travelling to the UK as part of an organised group?",
+          "default": false
+        },
+        "groupName": {
+          "type": "string",
+          "description": "Company or group name",
+          "default": "XXXXX Tours"
+        },
+        "isTravellingWithOtherPerson": {
+          "type": "boolean",
+          "description": "Will you be travelling to the UK with someone who is not your partner, spouse, or dependant?",
+          "default": false
+        },
+        "travelCompanion": {
+          "type": "object",
+          "description": "Travel companion details - Person travelling with applicant who is not partner, spouse, or dependant",
+          "additionalProperties": false,
+          "required": ["givenName", "familyName", "countryOfNationality", "relationshipToYou"],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "relationshipToYou": {
+                    "const": "Other"
+                  }
+                }
+              },
+              "then": {
+                "required": ["otherRelationshipDescription"]
+              }
+            }
+          ],
+          "properties": {
+            "givenName": {
+              "type": "string",
+              "description": "Given names",
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "type": "string",
+              "description": "Family name",
+              "default": "XXXXX"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": "Afghanistan"
+            },
+            "relationshipToYou": {
+              "enum": [
+                "Parent",
+                "Fiance or Fiancee",
+                "Son or Daughter",
+                "Friend",
+                "Work colleague",
+                "Employer",
+                "Other"
+              ],
+              "type": "string",
+              "description": "Relationship to you",
+              "default": "Other"
+            },
+            "otherRelationshipDescription": {
+              "type": "string",
+              "description": "Enter their relationship to you",
+              "maxLength": 500,
+              "default": "XXXXX"
+            }
+          }
+        }
+      }
+    },
+    "MedicalTreatmentDetail": {
+      "type": "object",
+      "description": "Medical Treatment Detail - Private medical treatment visit",
+      "additionalProperties": false,
+      "required": [
+        "hospitalOrClinic",
+        "treatmentDetails",
+        "paymentForTreatment",
+        "activities",
+        "plannedLengthOfStay"
+      ],
+      "properties": {
+        "hospitalOrClinic": {
+          "type": "object",
+          "description": "Hospital or clinic details",
+          "additionalProperties": false,
+          "required": ["name", "address", "telephoneNumber"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of hospital or clinic",
+              "default": "XXXXX Hospital"
+            },
+            "address": {
+              "$ref": "../common/Common.json#/definitions/UKAddressBase"
+            },
+            "telephoneNumber": {
+              "type": "string",
+              "description": "Telephone number",
+              "default": "02012345678"
+            }
+          }
+        },
+        "treatmentDetails": {
+          "type": "object",
+          "description": "Treatment details",
+          "additionalProperties": false,
+          "required": ["involvesOrganDonation", "startDate", "endDate"],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "involvesOrganDonation": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "required": ["treatmentDescription"]
+              }
+            }
+          ],
+          "properties": {
+            "involvesOrganDonation": {
+              "type": "boolean",
+              "description": "Does your medical treatment involve organ donation?",
+              "default": false
+            },
+            "treatmentDescription": {
+              "type": "string",
+              "description": "Provide details about the treatment you will have",
+              "default": "Kidney transplant surgery"
+            },
+            "startDate": {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            "endDate": {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            }
+          }
+        },
+        "paymentForTreatment": {
+          "type": "object",
+          "description": "Payment for treatment",
+          "additionalProperties": false,
+          "required": ["willPayYourself"],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "willPayYourself": {
+                    "const": false
+                  }
+                }
+              },
+              "then": {
+                "required": ["payerDetails"]
+              }
+            }
+          ],
+          "properties": {
+            "willPayYourself": {
+              "type": "boolean",
+              "description": "Will you pay for the medical treatment yourself?",
+              "default": true
+            },
+            "payerDetails": {
+              "type": "object",
+              "description": "Who is paying towards the cost of your treatment",
+              "additionalProperties": false,
+              "required": ["payerType", "amountPaying", "reasonForPayment"],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "payerType": {
+                        "const": "a charity"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": ["charityDetails"]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "payerType": {
+                        "const": "other"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": ["otherPayerDetails"]
+                  }
+                }
+              ],
+              "properties": {
+                "payerType": {
+                  "enum": ["my employer", "my government", "a charity", "other"],
+                  "type": "string",
+                  "description": "Who is paying towards the cost of your treatment?",
+                  "default": "my employer"
+                },
+                "charityDetails": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["charityName", "address", "telephoneNumber"],
+                  "properties": {
+                    "charityName": {
+                      "type": "string",
+                      "description": "Charity name",
+                      "default": "XXXXX Charity"
+                    },
+                    "contactPerson": {
+                      "type": "string",
+                      "description": "Name of the person you have contact with in the charity (if known)",
+                      "default": "XXXXX"
+                    },
+                    "address": {
+                      "$ref": "../common/Common.json#/definitions/AddressBase"
+                    },
+                    "telephoneNumber": {
+                      "type": "string",
+                      "description": "Telephone number",
+                      "default": "+44 20 1234 5678"
+                    }
+                  }
+                },
+                "otherPayerDetails": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "address", "telephoneNumber"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Name",
+                      "default": "XXXXX"
+                    },
+                    "address": {
+                      "$ref": "../common/Common.json#/definitions/AddressBase"
+                    },
+                    "telephoneNumber": {
+                      "type": "string",
+                      "description": "Telephone number",
+                      "default": "+44 20 1234 5678"
+                    }
+                  }
+                },
+                "amountPaying": {
+                  "$ref": "../common/Common.json#/definitions/CurrencyAmount"
+                },
+                "reasonForPayment": {
+                  "type": "string",
+                  "description": "Why are they helping to pay for your treatment?",
+                  "default": "Employee medical benefit"
+                }
+              }
+            }
+          }
+        },
+        "activities": {
+          "$ref": "#/definitions/ActivitiesDetail"
+        },
+        "plannedLengthOfStay": {
+          "enum": ["Up to and including 6 months", "Over 6 months"],
+          "type": "string",
+          "description": "How long do you plan to come to the UK for?",
+          "default": "Up to and including 6 months"
+        }
+      }
+    },
+    "VisitPurpose": {
+      "type": "object",
+      "description": "Visit Purpose - Main reason for visit and sub-details",
+      "additionalProperties": false,
+      "required": [
+        "mainReason"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Tourism (including visiting family and friends)"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "tourismVisitDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Business (including sports and entertainment)"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "businessVisitDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Transit through the UK"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "transitVisitDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Academic visit (including teaching, exchange and visiting as a dependant of an academic visitor)"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "academicVisitDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Marriage or civil partnership"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "marriageVisitDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Private medical treatment or organ donation"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "medicalTreatmentDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Short-term study (up to 6 months), including recreational course"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "shortTermStudyDetail"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mainReason": {
+                "const": "Other - I am visiting for another reason"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "otherVisitDetail"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "mainReason": {
+          "$ref": "#/definitions/VisitPurposeType"
+        },
+        "tourismVisitDetail": {
+          "$ref": "#/definitions/TourismVisitDetail"
+        },
+        "businessVisitDetail": {
+          "$ref": "#/definitions/BusinessVisitDetail"
+        },
+        "transitVisitDetail": {
+          "$ref": "#/definitions/TransitVisitDetail"
+        },
+        "academicVisitDetail": {
+          "$ref": "#/definitions/AcademicVisitDetail"
+        },
+        "marriageVisitDetail": {
+          "$ref": "#/definitions/MarriageVisitDetail"
+        },
+        "medicalTreatmentDetail": {
+          "$ref": "#/definitions/MedicalTreatmentDetail"
+        },
+        "shortTermStudyDetail": {
+          "$ref": "#/definitions/ShortTermStudyDetail"
+        },
+        "otherVisitDetail": {
+          "$ref": "#/definitions/OtherVisitDetail"
+        }
+      }
+    }
+  }
+}

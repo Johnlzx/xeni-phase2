@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/uk_medical_treatment/v1.0.0",
+  "title": "UK Medical Treatment Schema",
+  "description": "History of medical treatment received in the United Kingdom",
+  "x-llmHint": "UK medical treatment. Match: NHS hospital letters, medical bills/invoices, GP records, treatment receipts.",
+  "definitions": {
+    "UKMedicalTreatmentRecord": {
+      "type": "object",
+      "description": "Single UK medical treatment record",
+      "additionalProperties": false,
+      "required": [
+        "treatmentLocation",
+        "facilityName",
+        "address",
+        "treatmentStartDate",
+        "isStillReceivingTreatment"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isStillReceivingTreatment": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "treatmentEndDate"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "treatmentLocation": {
+          "type": "string",
+          "enum": [
+            "Accident and Emergency (A&E) at a hospital",
+            "To a doctor, clinic or hospital for non-emergency treatment"
+          ],
+          "description": "Where did you go for your previous medical treatment in the UK?",
+          "default": "To a doctor, clinic or hospital for non-emergency treatment"
+        },
+        "facilityName": {
+          "type": "string",
+          "description": "Name of hospital, clinic or doctor's surgery",
+          "maxLength": 200,
+          "default": ""
+        },
+        "address": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/UKAddressBase" },
+            { "description": "Address of the medical facility" }
+          ]
+        },
+        "treatmentStartDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/MonthYearField" },
+            { "description": "When did you start receiving this medical treatment? (Month/Year)" }
+          ]
+        },
+        "treatmentEndDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/MonthYearField" },
+            { "description": "When did you stop receiving this medical treatment? (Month/Year)" }
+          ]
+        },
+        "isStillReceivingTreatment": {
+          "type": "boolean",
+          "description": "I am still receiving this medical treatment",
+          "default": false
+        }
+      }
+    },
+    "UKMedical": {
+      "type": "object",
+      "description": "History of medical treatment received in the United Kingdom",
+      "additionalProperties": false,
+      "required": [
+        "receivedMedicalTreatment"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "receivedMedicalTreatment": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "wasToldToPayForTreatment",
+              "treatmentRecords"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "wasToldToPayForTreatment": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hasPaidFullAmount"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "receivedMedicalTreatment": {
+          "type": "boolean",
+          "description": "Have you ever been given medical treatment in the UK?",
+          "default": false,
+          "x-computed": "exists(treatmentRecords)"
+        },
+        "wasToldToPayForTreatment": {
+          "type": "boolean",
+          "description": "Were you told that you had to pay the hospital, clinic or doctor's surgery for your medical treatment?",
+          "default": false
+        },
+        "hasPaidFullAmount": {
+          "type": "boolean",
+          "description": "Have you paid the full amount?",
+          "default": true
+        },
+        "treatmentRecords": {
+          "type": "array",
+          "description": "Medical treatment records in the UK",
+          "items": {
+            "$ref": "#/definitions/UKMedicalTreatmentRecord"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/immigration_history/v1.0.0",
+  "title": "Immigration History Schema",
+  "description": "History of immigration refusals, deportations, and related issues",
+  "x-llmHint": "Immigration problems history. Match: visa refusal letters, deportation orders, removal notices, entry ban notifications, previous refusal letters.",
+  "definitions": {
+    "ImmigrationHistory": {
+      "type": "object",
+      "description": "History of immigration refusals, deportations, and related issues",
+      "additionalProperties": false,
+      "required": ["hasImmigrationProblems"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasImmigrationProblems": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["immigrationProblems"],
+            "properties": {
+              "immigrationProblems": { "minItems": 1 }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "hasImmigrationProblems": {
+          "type": "boolean",
+          "description": "For either the UK or any other country, have you ever been: refused a visa, refused entry at the border, refused permission to stay or remain, refused asylum, deported, removed, required to leave, or excluded or banned from entry?",
+          "default": false
+        },
+        "immigrationProblems": {
+          "type": "array",
+          "description": "Immigration problems",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["problemType", "country", "date", "details"],
+            "properties": {
+              "problemType": {
+                "enum": [
+                  "An application for a visa was refused",
+                  "I was refused entry at the border",
+                  "I was refused permission to stay or remain",
+                  "I was refused asylum",
+                  "I was deported",
+                  "I was removed",
+                  "I was required to leave",
+                  "I was excluded or banned from entry"
+                ],
+                "type": "string",
+                "description": "What happened?",
+                "default": "An application for a visa was refused"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country",
+                "default": "United Kingdom"
+              },
+              "date": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/MonthYearField" },
+                  { "description": "When did this immigration problem happen? (MM-YYYY)" }
+                ]
+              },
+              "details": {
+                "type": "string",
+                "description": "Give more details of what happened",
+                "maxLength": 2500,
+                "default": ""
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

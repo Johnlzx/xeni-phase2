@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_knowledge/v1.0.0",
+  "title": "Naturalisation Knowledge Requirements Schema",
+  "description": "Life in UK test and English language knowledge requirements for British naturalisation application",
+  "x-llmHint": "Life in UK test and English language evidence. Match: Life in UK test pass certificates, IELTS/Trinity SELT certificates, university degree certificates taught in English.",
+  "definitions": {
+    "LifeInUKTest": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasPassedTest": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["testUniqueReferenceNumber"]
+          }
+        }
+      ],
+      "description": "Life in the UK Test",
+      "required": ["hasPassedTest", "isClaimingExemption"],
+      "properties": {
+        "hasPassedTest": {
+          "type": "boolean",
+          "description": "Have you passed the Life in the UK test?",
+          "default": false
+        },
+        "isClaimingExemption": {
+          "type": "boolean",
+          "description": "Are you claiming exemption from this requirement?",
+          "default": false
+        },
+        "testUniqueReferenceNumber": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/ReferenceNumber"
+            },
+            {
+              "default": "ABC/111111/111111/111111111"
+            }
+          ],
+          "description": "Enter your Life in the UK test unique reference number"
+        }
+      }
+    },
+    "EnglishTestDetails": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "English Test Details",
+      "required": [
+        "assessedSpeakingAndListeningAtB1OrHigher",
+        "resultDeliveryMethod"
+      ],
+      "properties": {
+        "resultDeliveryMethod": {
+          "enum": ["Certificate", "Online", "Email", "Post"],
+          "type": "string",
+          "description": "How did you get your result?",
+          "default": "Certificate"
+        },
+        "assessedSpeakingAndListeningAtB1OrHigher": {
+          "type": "boolean",
+          "description": "Did the test assess speaking and listening at CEFR B1 or higher?",
+          "default": true
+        }
+      },
+      "x-docTypes": ["ENGLISH_LANGUAGE_EVIDENCE"]
+    },
+    "KnowledgeOfEnglish": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasPassedEnglishTest": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["englishTestDetails"]
+          }
+        }
+      ],
+      "description": "Knowledge of English",
+      "required": [
+        "hasPreviousVisaWithEnglishProof",
+        "metRequirementInIndefiniteLeaveApplication",
+        "hasDegreeInEnglish",
+        "hasPassedEnglishTest",
+        "isClaimingMedicalExemption"
+      ],
+      "properties": {
+        "englishTestDetails": {
+          "$ref": "#/definitions/EnglishTestDetails"
+        },
+        "hasDegreeInEnglish": {
+          "type": "boolean",
+          "description": "Do you have a degree taught in English?",
+          "default": false
+        },
+        "hasPassedEnglishTest": {
+          "type": "boolean",
+          "description": "Have you passed an approved English language test?",
+          "default": false
+        },
+        "isClaimingMedicalExemption": {
+          "type": "boolean",
+          "description": "Are you claiming an exemption from the English language test due to a medical or mental condition?",
+          "default": false
+        },
+        "hasPreviousVisaWithEnglishProof": {
+          "type": "boolean",
+          "description": "Do you have a previous visa where you had to prove English knowledge?",
+          "default": false
+        },
+        "metRequirementInIndefiniteLeaveApplication": {
+          "type": "boolean",
+          "description": "Did you meet the English requirement in indefinite leave application (on or after 28 Oct 2013)?",
+          "default": true
+        }
+      }
+    }
+  }
+}

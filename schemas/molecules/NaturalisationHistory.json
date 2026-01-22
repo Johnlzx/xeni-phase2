@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_history/v1.0.0",
+  "title": "Naturalisation Previous Applications Schema",
+  "description": "Previous UK immigration applications history for British naturalisation application",
+  "x-llmHint": "Previous UK immigration applications. Match: previous visa grant letters, BRP cards, previous application reference numbers, biometrics appointment records.",
+  "definitions": {
+    "PreviousApplicationDetail": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "wasApplicationInUK": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["applicationLocation"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "wereFingerprintsTaken": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["fingerprintsDate"]
+          }
+        }
+      ],
+      "description": "Previous Application Detail",
+      "required": [
+        "applicationName",
+        "wasApplicationInUK",
+        "wereFingerprintsTaken"
+      ],
+      "properties": {
+        "applicationDate": {
+          "type": "string",
+          "description": "Date of Application (DD-MM-YYYY), if known",
+          "default": "01-01-2001"
+        },
+        "applicationName": {
+          "type": "string",
+          "description": "Name in which you made the application",
+          "default": "XXXXX"
+        },
+        "fingerprintsDate": {
+          "type": "string",
+          "description": "Date fingerprints were taken (DD-MM-YYYY), if known",
+          "default": "01-01-2001"
+        },
+        "wasApplicationInUK": {
+          "type": "boolean",
+          "description": "Was this application made in the UK?",
+          "default": false
+        },
+        "applicationLocation": {
+          "type": "string",
+          "description": "Where was it made?",
+          "default": "XXXXX"
+        },
+        "wereFingerprintsTaken": {
+          "type": "boolean",
+          "description": "Were your fingerprints taken as part of this application?",
+          "default": false
+        },
+        "applicationReferenceNumber": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/ReferenceNumber"
+            },
+            {
+              "default": "111111"
+            }
+          ],
+          "description": "Enter your reference number if known"
+        }
+      }
+    },
+    "PreviousApplications": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasMadePreviousUKApplications": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "applicationDetails": {}
+            }
+          }
+        }
+      ],
+      "description": "Previous Applications",
+      "required": ["hasMadePreviousUKApplications"],
+      "properties": {
+        "hasMadePreviousUKApplications": {
+          "type": "boolean",
+          "description": "Have you made any previous UK immigration applications in the UK or abroad?",
+          "default": false
+        },
+        "applicationDetails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviousApplicationDetail"
+          },
+          "description": "Previous Application Details"
+        }
+      }
+    }
+  }
+}

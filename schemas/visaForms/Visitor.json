@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/forms/visitor/v2.2.0",
+  "type": "object",
+  "title": "UK Visitor Visa Application Profile Schema",
+  "description": "Comprehensive schema for automated pre-fill of UK visitor visa application, using modular molecules for better maintainability and reduced LLM context",
+  "x-llmHint": "Complete UK Standard Visitor Visa application. This is the main schema combining all sections. Match documents for: applicant identity (passport, ID), visit purpose and itinerary, UK accommodation bookings, financial evidence (bank statements, payslips), employment proof, travel history, sponsor/host invitation letters. Covers entire visitor visa online application form.",
+  "additionalProperties": false,
+  "required": [
+    "biometrics",
+    "currentImmigrationStatus",
+    "contactInformation",
+    "personalDetails",
+    "addressInformation",
+    "identityDocuments",
+    "employment",
+    "employmentHistory",
+    "incomeAndSavings",
+    "financialSituation",
+    "tripCost",
+    "publicFunds",
+    "plannedTravel",
+    "spokenLanguagePreference",
+    "visitPurpose",
+    "travelArrangements",
+    "accommodationInUK",
+    "specialCountryTravelHistory",
+    "ukTravelHistory",
+    "worldTravelHistory",
+    "ukVisaApplications",
+    "ukLeaveToRemain",
+    "immigrationHistory",
+    "characterAndCriminality"
+  ],
+  "properties": {
+    "biometrics": {
+      "$ref": "../molecules/Biometrics.json#/definitions/Biometrics"
+    },
+    "currentImmigrationStatus": {
+      "$ref": "../molecules/CurrentImmigrationStatus.json#/definitions/CurrentImmigrationStatus"
+    },
+    "contactInformation": {
+      "$ref": "../molecules/Contact.json#/definitions/ContactInformation"
+    },
+    "personalDetails": {
+      "$ref": "../molecules/Base.json#/definitions/PersonalDetails"
+    },
+    "addressInformation": {
+      "$ref": "../molecules/Address.json#/definitions/AddressInformation"
+    },
+    "identityDocuments": {
+      "$ref": "../molecules/Base.json#/definitions/IdentityDocuments"
+    },
+    "employment": {
+      "$ref": "../molecules/Employment.json#/definitions/Employment"
+    },
+    "employmentHistory": {
+      "$ref": "../molecules/EmploymentHistory.json#/definitions/EmploymentHistory"
+    },
+    "incomeAndSavings": {
+      "$ref": "../molecules/Finance.json#/definitions/IncomeAndSavings"
+    },
+    "financialSituation": {
+      "$ref": "../molecules/Finance.json#/definitions/MonthlyExpenditure"
+    },
+    "tripCost": {
+      "$ref": "../molecules/Finance.json#/definitions/TripCost"
+    },
+    "publicFunds": {
+      "$ref": "../molecules/Finance.json#/definitions/PublicFunds"
+    },
+    "plannedTravel": {
+      "$ref": "../molecules/Travel.json#/definitions/PlannedTravelDates"
+    },
+    "spokenLanguagePreference": {
+      "$ref": "../molecules/Travel.json#/definitions/SpokenLanguagePreference"
+    },
+    "visitPurpose": {
+      "$ref": "../molecules/VisitorSpecific.json#/definitions/VisitPurpose"
+    },
+    "travelArrangements": {
+      "$ref": "../molecules/VisitorSpecific.json#/definitions/TravelArrangements"
+    },
+    "familyInformation": {
+      "$ref": "../molecules/Family.json#/definitions/FamilyInformation"
+    },
+    "accommodationInUK": {
+      "$ref": "../molecules/VisitorAccommodation.json#/definitions/AccommodationInUK"
+    },
+    "specialCountryTravelHistory": {
+      "$ref": "../molecules/Travel.json#/definitions/SpecialCountryTravelHistory"
+    },
+    "ukTravelHistory": {
+      "$ref": "../molecules/Travel.json#/definitions/UKTravelHistory"
+    },
+    "worldTravelHistory": {
+      "$ref": "../molecules/Travel.json#/definitions/WorldTravelHistory"
+    },
+    "ukVisaApplications": {
+      "$ref": "../molecules/Base.json#/definitions/UKVisaApplications"
+    },
+    "ukLeaveToRemain": {
+      "$ref": "../molecules/Base.json#/definitions/UKLeaveToRemain"
+    },
+    "immigrationHistory": {
+      "$ref": "../molecules/ImmigrationHistory.json#/definitions/ImmigrationHistory"
+    },
+    "characterAndCriminality": {
+      "$ref": "../molecules/Character.json#/definitions/CriminalityAndCharacter"
+    }
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/forms/partner_visa_outside_uk/v1.0.0",
+  "title": "UK Partner Visa (Outside UK) Application Schema",
+  "description": "Complete application form for UK family visa - partner route for applicants currently outside the United Kingdom",
+  "x-llmHint": "UK Partner Visa (Appendix FM) for applicants outside UK. Match: VAF4A application forms, partner visa questionnaire responses.",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "visaType",
+    "biometrics",
+    "currentImmigrationStatus",
+    "contactInformation",
+    "personalDetails",
+    "identityDocuments",
+    "sexRelationship",
+    "addressInformation",
+    "plannedTravel",
+    "language",
+    "familyInformation",
+    "crownDependency",
+    "ukMedical",
+    "nationalInsurance",
+    "applicantPublicFunds",
+    "specialCountryTravelHistory",
+    "ukTravelHistory",
+    "worldTravelHistory",
+    "immigrationHistory",
+    "immigrationBreach",
+    "convictions",
+    "character",
+    "employmentHistory",
+    "sponsor",
+    "sponsorFinance",
+    "accommodation",
+    "immigrationAdviser",
+    "feeWaiver"
+  ],
+  "properties": {
+    "visaType": {
+      "$ref": "../molecules/VisaType.json#/definitions/VisaType"
+    },
+    "biometrics": {
+      "$ref": "../molecules/Biometrics.json#/definitions/Biometrics"
+    },
+    "contactInformation": {
+      "$ref": "../molecules/Contact.json#/definitions/ContactInformation"
+    },
+    "personalDetails": {
+      "$ref": "../molecules/Base.json#/definitions/PersonalDetails"
+    },
+    "identityDocuments": {
+      "$ref": "../molecules/Base.json#/definitions/IdentityDocuments"
+    },
+    "sexRelationship": {
+      "$ref": "../molecules/SexRelationship.json#/definitions/SexRelationship"
+    },
+    "addressInformation": {
+      "$ref": "../molecules/Address.json#/definitions/AddressInformation"
+    },
+    "currentImmigrationStatus": {
+      "$ref": "../molecules/CurrentImmigrationStatus.json#/definitions/CurrentImmigrationStatus"
+    },
+    "plannedTravel": {
+      "$ref": "../molecules/Travel.json#/definitions/PlannedTravelDates"
+    },
+    "language": {
+      "$ref": "../molecules/Language.json#/definitions/Language"
+    },
+    "familyInformation": {
+      "$ref": "../molecules/Family.json#/definitions/FamilyInformation"
+    },
+    "crownDependency": {
+      "$ref": "../molecules/CrownDependency.json#/definitions/CrownDependency"
+    },
+    "ukMedical": {
+      "$ref": "../molecules/UKMedical.json#/definitions/UKMedical"
+    },
+    "nationalInsurance": {
+      "$ref": "../molecules/NationalInsurance.json#/definitions/NationalInsurance"
+    },
+    "applicantPublicFunds": {
+      "$ref": "../molecules/PartnerFinance.json#/definitions/PublicFunds"
+    },
+    "specialCountryTravelHistory": {
+      "$ref": "../molecules/Travel.json#/definitions/SpecialCountryTravelHistory"
+    },
+    "ukTravelHistory": {
+      "$ref": "../molecules/Travel.json#/definitions/UKTravelHistory"
+    },
+    "worldTravelHistory": {
+      "$ref": "../molecules/Travel.json#/definitions/WorldTravelHistory"
+    },
+    "immigrationHistory": {
+      "$ref": "../molecules/ImmigrationHistory.json#/definitions/ImmigrationHistory"
+    },
+    "immigrationBreach": {
+      "$ref": "../molecules/ImmigrationBreach.json#/definitions/ImmigrationBreach"
+    },
+    "convictions": {
+      "$ref": "../molecules/Convictions.json#/definitions/Convictions"
+    },
+    "character": {
+      "$ref": "../molecules/Character.json#/definitions/CriminalityAndCharacter"
+    },
+    "employmentHistory": {
+      "$ref": "../molecules/EmploymentHistory.json#/definitions/EmploymentHistory"
+    },
+    "sponsor": {
+      "$ref": "../molecules/Sponsor.json#/definitions/Sponsor"
+    },
+    "sponsorFinance": {
+      "$ref": "../molecules/PartnerFinance.json#/definitions/Finance"
+    },
+    "accommodation": {
+      "$ref": "../molecules/Accommodation.json#/definitions/Accommodation"
+    },
+    "immigrationAdviser": {
+      "$ref": "../molecules/ImmigrationAdviser.json#/definitions/ImmigrationAdviser"
+    },
+    "feeWaiver": {
+      "$ref": "../molecules/FeeWaiver.json#/definitions/FeeWaiver"
+    }
+  }
+}

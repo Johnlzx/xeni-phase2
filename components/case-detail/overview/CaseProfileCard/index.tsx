@@ -151,9 +151,9 @@ export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-4 py-4 overflow-y-auto scrollbar-hide flex flex-col gap-4">
+      <div className="flex-1 px-4 py-3 overflow-y-auto scrollbar-hide">
         {/* Case Notes Summary */}
-        <div className="flex-1">
+        <div>
           <div className="flex items-center gap-1.5 mb-2">
             <FileText className="size-3.5 text-stone-400" />
             <p className="text-xs font-medium text-stone-500 uppercase tracking-wider">

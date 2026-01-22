@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_residence/v1.0.0",
+  "title": "Naturalisation Residence Requirements Schema",
+  "description": "Residence requirements for British naturalisation application",
+  "x-llmHint": "Residence requirements and special circumstances. Match: Crown service employment records, designated service letters, absence explanations.",
+  "definitions": {
+    "MainHomeInUK": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Main Home in UK Details",
+      "required": [
+        "countryToLiveIn",
+        "planToWorkForUKEntities",
+        "willProvideEvidenceLetter"
+      ],
+      "properties": {
+        "countryToLiveIn": {
+          "type": "string",
+          "description": "Which country will you live in?",
+          "default": "Italy"
+        },
+        "planToWorkForUKEntities": {
+          "type": "boolean",
+          "description": "Do you plan to work (or continue working) for any of the following: the UK government in a different country (known as Crown service) / an international organisation the UK is a member of / a company established in the UK",
+          "default": false
+        },
+        "willProvideEvidenceLetter": {
+          "type": "boolean",
+          "description": "I can confirm that I will provide a letter explaining why you are not planning to live in the UK",
+          "default": true
+        }
+      }
+    },
+    "CrownServiceDetails": {
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Crown Service or Designated Service Details",
+      "required": [
+        "whoIsWorking",
+        "employerName",
+        "wasRecruitedInUK",
+        "role",
+        "startDate",
+        "endDate",
+        "staffOrServiceIdNumber"
+      ],
+      "properties": {
+        "whoIsWorking": {
+          "enum": ["You", "Your partner"],
+          "type": "string",
+          "description": "Who is working in Crown or designated service?",
+          "default": "You"
+        },
+        "employerName": {
+          "type": "string",
+          "description": "Who were you working for?",
+          "default": "XXXXX"
+        },
+        "wasRecruitedInUK": {
+          "type": "boolean",
+          "description": "Were you recruited in the UK?",
+          "default": true
+        },
+        "role": {
+          "type": "string",
+          "description": "What was the role?",
+          "default": "XXXXX"
+        },
+        "startDate": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            {
+              "description": "Start date",
+              "default": "15-06-2018"
+            }
+          ]
+        },
+        "endDate": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/DateField"
+            },
+            {
+              "description": "End date",
+              "default": "30-08-2023"
+            }
+          ]
+        },
+        "staffOrServiceIdNumber": {
+          "type": "string",
+          "description": "Staff or service ID number",
+          "default": "MOD-1111111"
+        }
+      }
+    },
+    "ResidenceRequirements": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "planMainHomeInUK": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["mainHomeDetails"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "meetsResidenceRequirements": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["reasonsForNotMeetingDetails"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isWorkingInCrownOrDesignatedService": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["crownServiceDetails"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasReasonsForNotMeetingRequirements": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["reasonsForNotMeetingRequirementsDetails"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasSpecialCircumstances": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["specialCircumstancesDetails"]
+          }
+        }
+      ],
+      "description": "Residence Requirements",
+      "required": [
+        "planMainHomeInUK",
+        "meetsResidenceRequirements",
+        "isWorkingInCrownOrDesignatedService",
+        "hasReasonsForNotMeetingRequirements",
+        "hasSpecialCircumstances",
+        "hasOtherInformation"
+      ],
+      "properties": {
+        "planMainHomeInUK": {
+          "type": "boolean",
+          "description": "Do you plan for your main home to be in the UK if your application is successful?",
+          "default": true
+        },
+        "mainHomeDetails": {
+          "$ref": "#/definitions/MainHomeInUK"
+        },
+        "meetsResidenceRequirements": {
+          "type": "boolean",
+          "description": "Do you meet the residence requirements?",
+          "default": true
+        },
+        "reasonsForNotMeetingDetails": {
+          "type": "string",
+          "description": "Provide details about why you do not meet the residence requirements",
+          "default": "I do not meet the requirement for total absences. During my 5-year qualifying period, I was outside the UK for approximately 470 days due to work commitments and family visits, which exceeds the 450-day limit."
+        },
+        "isWorkingInCrownOrDesignatedService": {
+          "type": "boolean",
+          "description": "Are you one of the following: working for the UK government in a different country (known as Crown service) / married to, or the civil partner of, someone who is working in Crown service / married to, or the civil partner of, someone who is working in activities closely linked to the UK government (known as designated service)",
+          "default": false
+        },
+        "crownServiceDetails": {
+          "$ref": "#/definitions/CrownServiceDetails"
+        },
+        "hasReasonsForNotMeetingRequirements": {
+          "type": "boolean",
+          "description": "Are there any reasons why you cannot meet the requirements to become a British citizen (for example, you have had too many absences from the UK)?",
+          "default": false
+        },
+        "reasonsForNotMeetingRequirementsDetails": {
+          "type": "string",
+          "description": "Please provide further details",
+          "default": "XXXXX"
+        },
+        "hasSpecialCircumstances": {
+          "type": "boolean",
+          "description": "If you do not meet the statutory requirements to become a British citizen, are there any special circumstances why you think the Home Secretary should still grant your application?",
+          "default": false
+        },
+        "specialCircumstancesDetails": {
+          "type": "string",
+          "description": "Please confirm which requirement(s) you think you fail to meet and what special circumstances should be considered",
+          "default": "XXXXX"
+        },
+        "hasOtherInformation": {
+          "type": "boolean",
+          "description": "Do you have any other details to be considered?",
+          "default": false
+        }
+      }
+    }
+  }
+}

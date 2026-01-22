@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/visitor-accommodation/v1.0.0",
+  "title": "Visitor Accommodation Schema",
+  "description": "UK accommodation information for visitor visa applications",
+  "x-llmHint": "Visitor accommodation in UK. Match: hotel booking confirmations, Airbnb/vacation rental confirmations, hostel bookings, guest house reservations, serviced apartment bookings, accommodation receipts showing check-in/check-out dates and UK addresses, booking reference numbers, host invitation letters with accommodation details, booking.com/Expedia confirmations, visa application forms with accommodation sections, private residence arrangements with friends or family, sponsor accommodation declarations, form entries showing 'Where are you planning to stay in the UK', 'Accommodation address', arrival/departure dates for UK stay. Key fields: hotel name, check-in date, check-out date, address, booking reference, host details, private residence address, accommodation type (hotel/private residence/friend's home).",
+  "definitions": {
+    "AccommodationInUK": {
+      "type": "object",
+      "description": "Accommodation in UK",
+      "additionalProperties": false,
+      "required": [
+        "willStayWithFamily",
+        "hasOtherAccommodation"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "willStayWithFamily": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "familyAccommodation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasOtherAccommodation": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "otherAccommodation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasOtherAccommodation": {
+                "const": false
+              },
+              "willStayWithFamily": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "planToStayIn"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "willStayWithFamily": {
+          "type": "boolean",
+          "description": "Will you be staying with family in the UK?",
+          "default": false
+        },
+        "familyAccommodation": {
+          "type": "array",
+          "description": "Family members you will stay with (select from family in UK)",
+          "items": {
+            "$ref": "../molecules/StayDetails.json#/definitions/RelativeDetails"
+          },
+          "default": []
+        },
+        "hasOtherAccommodation": {
+          "type": "boolean",
+          "description": "Will you be staying anywhere else in the UK?",
+          "default": false
+        },
+        "otherAccommodation": {
+          "type": "array",
+          "description": "Other accommodation",
+          "items": {
+            "$ref": "../molecules/StayDetails.json#/definitions/AccommodationDetails"
+          },
+          "default": []
+        },
+        "planToStayIn": {
+          "type": "string",
+          "description": "Where do you plan to stay in the UK?",
+          "default": "XXXXX"
+        }
+      }
+    }
+  }
+}

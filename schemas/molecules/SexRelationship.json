@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/sex_relationship/v1.3.0",
+  "title": "Sex and Relationship Status Schema",
+  "description": "Sex as shown in travel document, current relationship status, previous partner history, and marriage/civil partnership intentions in the UK for unmarried partners.",
+  "x-llmHint": "Sex and relationship status for the VISA APPLICANT. Match when content includes questionnaire fields or documents covering: sex (as in passport/travel document), relationship status (e.g., unmarried partner/single/married/civil partner), questions about being currently married or in a civil partnership, previous marriage/civil partnership history, former partner details, divorce/dissolved civil partnership, and intention to marry/enter civil partnership in the UK (including wedding/civil ceremony date/venue). NOTE: current partner details belong to molecules/Family; sponsor's own previous relationships usually belong to molecules/Sponsor.",
+  "x-llmRules": [
+    {
+      "ruleId": "APPLICANT_PREVIOUS_PARTNERS_CLASSIFICATION",
+      "targetPath": "sexRelationship.previousPartners",
+      "description": "Previous partners/spouses of THE VISA APPLICANT - ex-wives, ex-husbands, former civil partners (not the UK sponsor's previous relationships)",
+      "identifiers": ["your previous partner", "your ex-wife", "your ex-husband", "Have you been married before", "your previous marriage", "your previous relationships", "former spouse", "divorced from", "separated from"],
+      "antiPatterns": ["NEVER place current partner here - use familyInformation.currentPartner", "NEVER place sponsor's previous partners here", "NEVER confuse with sponsor.sponsorPreviousPartners"],
+      "outputFields": ["partnerName", "countryOfNationality", "dateOfMarriage", "placeOfMarriage", "dateOfDivorce"]
+    }
+  ],
+  "definitions": {
+    "PreviousPartnerDetail": {
+      "type": "object",
+      "description": "Previous Partner Detail - Former spouse or partner information",
+      "additionalProperties": false,
+      "required": [
+        "partnerName",
+        "countryOfNationality",
+        "dateOfMarriage",
+        "placeOfMarriage"
+      ],
+      "properties": {
+        "partnerName": {
+          "type": "string",
+          "description": "Name of other/former partner",
+          "maxLength": 200,
+          "default": "XXXXX"
+        },
+        "countryOfNationality": {
+          "type": "string",
+          "description": "Country of nationality of other/former partner",
+          "maxLength": 100,
+          "default": "Afghanistan"
+        },
+        "dateOfMarriage": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Date of marriage/civil partnership (DD-MM-YYYY)",
+              "default": "01-01-2010"
+            }
+          ]
+        },
+        "placeOfMarriage": {
+          "type": "string",
+          "description": "Place of marriage/civil partnership",
+          "maxLength": 200,
+          "default": "XXXXX"
+        },
+        "dateOfDivorce": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "Date of divorce (if applicable, DD-MM-YYYY)"
+            }
+          ]
+        }
+      }
+    },
+    "SexRelationship": {
+      "type": "object",
+      "properties": {
+        "sex": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/Sex" },
+            { "description": "What is your sex, as shown in your passport or travel document?", "default": "Male" }
+          ]
+        },
+        "relationshipStatus": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/RelationshipStatus" },
+            { "description": "What is your relationship status?", "default": "Single" }
+          ]
+        },
+        "hasBeenMarriedOrCivilPartner": {
+          "type": "boolean",
+          "description": "Have you ever been married or in a civil partnership?",
+          "default": false
+        },
+        "hasHadOtherPartner": {
+          "type": "boolean",
+          "description": "Have you had any other partner you have not already told us about?",
+          "default": false
+        },
+        "previousPartners": {
+          "type": "array",
+          "description": "Other or former partner details",
+          "items": {
+            "$ref": "#/definitions/PreviousPartnerDetail"
+          },
+          "default": []
+        },
+        "intendingToMarryInUK": {
+          "type": "boolean",
+          "description": "Are you intending to get married or enter a civil partnership in the UK?",
+          "default": false
+        },
+        "weddingCeremonyDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "Date of your wedding or civil ceremony (if known). This must be a future date. Format: DD-MM-YYYY" }
+          ]
+        },
+        "weddingVenueAddress": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/UKAddress" },
+            { "description": "Address of your wedding or civil ceremony venue in the UK (if known). This must be a UK address." }
+          ]
+        }
+      },
+      "required": [
+        "sex",
+        "relationshipStatus",
+        "hasBeenMarriedOrCivilPartner",
+        "hasHadOtherPartner"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "hasBeenMarriedOrCivilPartner": {
+                    "const": true
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "hasHadOtherPartner": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "previousPartners"
+            ],
+            "properties": {
+              "previousPartners": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relationshipStatus": {
+                "const": "Unmarried partner"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "intendingToMarryInUK"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relationshipStatus": {
+                "const": "Unmarried partner"
+              },
+              "intendingToMarryInUK": {
+                "const": true
+              }
+            },
+            "required": ["intendingToMarryInUK"]
+          },
+          "then": {
+            "required": [
+              "weddingCeremonyDate",
+              "weddingVenueAddress"
+            ]
+          }
+        }
+      ],
+      "description": "Sex as shown in travel document, current relationship status, and previous partner history. Uses consistent relationship status values with naturalisation schema."
+    }
+  }
+}

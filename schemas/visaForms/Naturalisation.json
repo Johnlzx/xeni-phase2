@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/forms/naturalisation/v1.1.0",
+  "type": "object",
+  "title": "UK Naturalisation Application Profile Schema",
+  "description": "Comprehensive schema for automated pre-fill of British naturalisation application, using modular molecules for better maintainability and reduced LLM context",
+  "x-llmHint": "Complete British Naturalisation (AN) application. This is the main schema combining all sections. Match documents for: ILR/settled status proof, passport/ID, residence history (5 years continuous), Life in UK test pass certificate, English language evidence, employment records, character references, travel history showing UK presence, criminal record certificates. Covers Form AN naturalisation application.",
+  "additionalProperties": false,
+  "required": [
+    "biometrics",
+    "immigrationAdviser",
+    "personalDetails",
+    "contactInformation",
+    "addressInformation",
+    "relationship",
+    "identityDocuments",
+    "indefiniteLeave",
+    "nationalInsurance",
+    "lifeInUKTest",
+    "knowledgeOfEnglish",
+    "parentsDetails",
+    "criminalityAndCharacter",
+    "referees",
+    "previousApplications",
+    "partnerDetails",
+    "employment",
+    "ukArrivalAndTravel",
+    "residenceRequirements"
+  ],
+  "properties": {
+    "biometrics": {
+      "$ref": "../molecules/NaturalisationBiometrics.json#/definitions/Biometrics"
+    },
+    "immigrationAdviser": {
+      "$ref": "../molecules/ImmigrationAdviser.json#/definitions/ImmigrationAdviser"
+    },
+    "personalDetails": {
+      "$ref": "../molecules/Base.json#/definitions/PersonalDetails"
+    },
+    "contactInformation": {
+      "$ref": "../molecules/NaturalisationContact.json#/definitions/ContactInformation"
+    },
+    "addressInformation": {
+      "$ref": "../molecules/NaturalisationAddress.json#/definitions/AddressInformation"
+    },
+    "relationship": {
+      "$ref": "../molecules/NaturalisationRelationship.json#/definitions/Relationship"
+    },
+    "identityDocuments": {
+      "$ref": "../molecules/Base.json#/definitions/IdentityDocuments"
+    },
+    "indefiniteLeave": {
+      "$ref": "../molecules/NaturalisationIndefiniteLeave.json#/definitions/IndefiniteLeave"
+    },
+    "nationalInsurance": {
+      "$ref": "../molecules/NationalInsurance.json#/definitions/NationalInsurance"
+    },
+    "lifeInUKTest": {
+      "$ref": "../molecules/NaturalisationKnowledge.json#/definitions/LifeInUKTest"
+    },
+    "knowledgeOfEnglish": {
+      "$ref": "../molecules/NaturalisationKnowledge.json#/definitions/KnowledgeOfEnglish"
+    },
+    "parentsDetails": {
+      "$ref": "../molecules/Family.json#/definitions/ParentDetails"
+    },
+    "criminalityAndCharacter": {
+      "$ref": "../molecules/Character.json#/definitions/CriminalityAndCharacter"
+    },
+    "referees": {
+      "$ref": "../molecules/NaturalisationReferees.json#/definitions/Referees"
+    },
+    "previousApplications": {
+      "$ref": "../molecules/NaturalisationHistory.json#/definitions/PreviousApplications"
+    },
+    "partnerDetails": {
+      "$ref": "../molecules/NaturalisationRelationship.json#/definitions/PartnerDetails"
+    },
+    "employment": {
+      "$ref": "../molecules/NaturalisationEmployment.json#/definitions/Employment"
+    },
+    "ukArrivalAndTravel": {
+      "$ref": "../molecules/NaturalisationTravel.json#/definitions/UKArrivalAndTravel"
+    },
+    "residenceRequirements": {
+      "$ref": "../molecules/NaturalisationResidence.json#/definitions/ResidenceRequirements"
+    }
+  }
+}

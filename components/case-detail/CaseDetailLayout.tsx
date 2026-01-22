@@ -34,8 +34,8 @@ export function CaseDetailLayout({ caseId }: CaseDetailLayoutProps) {
         onHeightChange={setHeaderHeight}
       />
 
-      {/* Scrollable Content Area */}
-      <main ref={contentRef} className="flex-1 overflow-auto">
+      {/* Content Area - pages handle their own scroll */}
+      <main ref={contentRef} className="flex-1 overflow-hidden">
         <CaseDetailContent />
       </main>
     </div>

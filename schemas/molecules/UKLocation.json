@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/uk_location/v2.0.0",
+  "title": "UK Location Schema",
+  "description": "Where you will stay in the UK - for visitor and non-partner visa applications",
+  "x-llmHint": "UK accommodation for visitor visas. Match: hotel bookings, Airbnb confirmations, invitation letters from friends/family.",
+  "definitions": {
+    "UKStayContact": {
+      "type": "object",
+      "description": "Contact person at the UK stay address",
+      "additionalProperties": false,
+      "required": [
+        "givenName",
+        "familyName",
+        "relationship",
+        "telephoneNumber"
+      ],
+      "properties": {
+        "givenName": {
+          "type": "string",
+          "description": "Given names",
+          "default": ""
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family name",
+          "default": ""
+        },
+        "relationship": {
+          "type": "string",
+          "description": "Their relationship to you",
+          "default": ""
+        },
+        "telephoneNumber": {
+          "$ref": "../common/Common.json#/definitions/TelephoneNumber"
+        }
+      }
+    },
+    "OtherStayLocation": {
+      "type": "object",
+      "description": "Details of other places you will stay while in the UK",
+      "additionalProperties": false,
+      "required": [
+        "stayingWithName",
+        "address",
+        "arrivalDate",
+        "departureDate"
+      ],
+      "properties": {
+        "stayingWithName": {
+          "type": "string",
+          "description": "Where are you planning to stay? If staying with someone, give their full name.",
+          "maxLength": 200,
+          "default": "XXXXX"
+        },
+        "address": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/UKAddress" },
+            { "description": "UK address where you will be staying" }
+          ]
+        },
+        "arrivalDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "When will you arrive there? (DD-MM-YYYY)" }
+          ]
+        },
+        "departureDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "When will you leave there? (DD-MM-YYYY)" }
+          ]
+        }
+      }
+    },
+    "UKLocation": {
+      "type": "object",
+      "description": "Where you will stay in the UK (for visitor visas)",
+      "additionalProperties": false,
+      "required": [
+        "knowsWhereStaying",
+        "isHomeOfKnownPerson",
+        "hasOtherPlacesToStay"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "knowsWhereStaying": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "address"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isHomeOfKnownPerson": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "contactPerson"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasOtherPlacesToStay": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "otherLocations"
+            ],
+            "properties": {
+              "otherLocations": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "knowsWhereStaying": {
+          "type": "boolean",
+          "description": "Do you know where you will be staying in the UK?",
+          "default": false
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddress"
+        },
+        "isHomeOfKnownPerson": {
+          "type": "boolean",
+          "description": "Is this the home of a family member, friend or another person you know?",
+          "default": false
+        },
+        "contactPerson": {
+          "allOf": [
+            { "$ref": "#/definitions/UKStayContact" },
+            { "description": "Details of the person whose home you will be staying at" }
+          ]
+        },
+        "hasOtherPlacesToStay": {
+          "type": "boolean",
+          "description": "Will you be living anywhere else in the UK? (includes: hotel/B&B, employer-provided, private home with friends/colleagues, educational institution, any other type of accommodation)",
+          "default": false
+        },
+        "otherLocations": {
+          "type": "array",
+          "description": "Other places you will stay while in the UK",
+          "items": {
+            "$ref": "#/definitions/OtherStayLocation"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

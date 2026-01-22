@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/naturalisation_contact/v1.0.0",
+  "title": "Naturalisation Contact Information Schema",
+  "description": "Contact information for British naturalisation application",
+  "x-llmHint": "Naturalisation contact information. Match: email confirmations, telephone records, application correspondence.",
+  "definitions": {
+    "ContactInformation": {
+      "additionalProperties": false,
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "confirmEmailAddress": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["newEmailAddress"]
+          }
+        }
+      ],
+      "description": "Contact Information",
+      "required": ["confirmEmailAddress", "telephoneNumber"],
+      "properties": {
+        "newEmailAddress": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/Email" },
+            { "description": "New Email Address", "default": "newmail@example.com" }
+          ]
+        },
+        "telephoneNumber": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/PhoneNumber" },
+            { "description": "Telephone Number", "default": "02011111111" }
+          ]
+        },
+        "confirmEmailAddress": {
+          "type": "boolean",
+          "description": "Confirm Email Address",
+          "default": true
+        },
+        "telephoneUsageLocation": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TelephoneUsageLocationSingle" },
+            { "description": "Where do you use this telephone number?", "default": "For use whilst in the UK" }
+          ]
+        },
+        "cannotBeContactedByEmail": {
+          "type": "boolean",
+          "description": "Cannot be contacted by email",
+          "default": false
+        },
+        "cannotBeContactedByTelephone": {
+          "type": "boolean",
+          "description": "Cannot be contacted by telephone",
+          "default": false
+        }
+      }
+    }
+  }
+}

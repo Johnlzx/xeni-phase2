@@ -18,6 +18,8 @@ import {
   AnalyzedFileSummary,
   ApplicationChecklistItem,
   QualityIssue,
+  QualityIssueType,
+  QualityIssueSeverity,
   ChecklistSectionType,
   CaseNotesSummary,
   // Enhanced types for checklist workspace
@@ -27,6 +29,7 @@ import {
   IssueHistoryEntry,
   ForwardToClientData,
   LinkedDocument,
+  RequiredEvidence,
 } from "@/types/case-detail";
 import { PassportInfo, VisaType } from "@/types";
 
@@ -1549,6 +1552,149 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      // Upload file for a specific evidence requirement
+      uploadForEvidence: (evidenceId: string, evidenceName: string) => {
+        set(
+          (state) => {
+            const timestamp = Date.now();
+            const normalizedName = evidenceName.toLowerCase().replace(/[\s\-_]/g, "");
+
+            // Find existing group that matches the evidence name
+            let targetGroupId: string | undefined;
+            for (const g of state.documentGroups) {
+              const normalizedGroupTitle = g.title.toLowerCase().replace(/[\s\-_]/g, "");
+              if (normalizedGroupTitle.includes(normalizedName) || normalizedName.includes(normalizedGroupTitle)) {
+                targetGroupId = g.id;
+                break;
+              }
+            }
+
+            const newFile: DocumentFile = {
+              id: `evidence_${timestamp}`,
+              name: `${evidenceName.replace(/\s+/g, "_")}.pdf`,
+              size: "0.5 MB",
+              pages: 1,
+              date: "Just now",
+              type: "pdf",
+              isNew: true,
+            };
+
+            let newGroups = [...state.documentGroups];
+
+            if (targetGroupId) {
+              // Add file to existing group
+              newGroups = newGroups.map((g) =>
+                g.id === targetGroupId
+                  ? {
+                      ...g,
+                      files: [...g.files, newFile],
+                      status: "pending" as const,
+                      hasChanges: true,
+                    }
+                  : g
+              );
+            } else {
+              // Create new group for this evidence
+              const newGroup: DocumentGroup = {
+                id: `group_${timestamp}`,
+                title: evidenceName,
+                tag: evidenceName,
+                mergedFileName: `${evidenceName}.pdf`,
+                status: "pending",
+                files: [newFile],
+                hasChanges: true,
+              };
+              newGroups.push(newGroup);
+              targetGroupId = newGroup.id;
+            }
+
+            // Update enhanced checklist items (requiredEvidence is only on EnhancedChecklistItem)
+            const updatedEnhancedItems = state.enhancedChecklistItems.map((item) => ({
+              ...item,
+              requiredEvidence: item.requiredEvidence?.map((ev) =>
+                ev.id === evidenceId
+                  ? {
+                      ...ev,
+                      isUploaded: true,
+                      linkedFileId: newFile.id,
+                      linkedFileName: newFile.name,
+                    }
+                  : ev
+              ),
+            }));
+
+            // Mark related issue as resolved
+            const issueIdToResolve = `issue_missing_evidence_${evidenceId}`;
+            const updatedIssues = state.enhancedQualityIssues.map((issue) =>
+              issue.id === issueIdToResolve
+                ? {
+                    ...issue,
+                    status: "resolved" as IssueStatus,
+                    resolvedAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : issue
+            );
+
+            const previews = syncFilePreviewsFromGroups(newGroups);
+
+            return {
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+              enhancedChecklistItems: updatedEnhancedItems,
+              enhancedQualityIssues: updatedIssues,
+            };
+          },
+          false,
+          "uploadForEvidence"
+        );
+      },
+
+      // Link evidence to an existing document group from File Hub
+      linkEvidenceToGroup: (evidenceId: string, groupId: string) => {
+        set(
+          (state) => {
+            const targetGroup = state.documentGroups.find((g) => g.id === groupId);
+            if (!targetGroup) return state;
+
+            // Update enhanced checklist items
+            const updatedEnhancedItems = state.enhancedChecklistItems.map((item) => ({
+              ...item,
+              requiredEvidence: item.requiredEvidence?.map((ev) =>
+                ev.id === evidenceId
+                  ? {
+                      ...ev,
+                      isUploaded: true,
+                      linkedFileId: groupId, // Link to the group ID
+                      linkedFileName: targetGroup.title,
+                    }
+                  : ev
+              ),
+            }));
+
+            // Mark related issue as resolved
+            const issueIdToResolve = `issue_missing_evidence_${evidenceId}`;
+            const updatedIssues = state.enhancedQualityIssues.map((issue) =>
+              issue.id === issueIdToResolve
+                ? {
+                    ...issue,
+                    status: "resolved" as IssueStatus,
+                    resolvedAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : issue
+            );
+
+            return {
+              enhancedChecklistItems: updatedEnhancedItems,
+              enhancedQualityIssues: updatedIssues,
+            };
+          },
+          false,
+          "linkEvidenceToGroup"
+        );
+      },
+
       // Demo: Review all documents and analyze to generate client profile
       reviewAllDocumentsAndAnalyze: async () => {
         const state = get();
@@ -1883,6 +2029,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               analyzedFiles,
               formSchema: updatedSchema,
               clientProfile: newProfile,
+              // Reset questionnaire answers to trigger questionnaire flow
+              questionnaireAnswers: {},
               documentGroups: state.documentGroups.map((g) => ({
                 ...g,
                 files: g.files.map((f) =>
@@ -1901,7 +2049,70 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           "analysisComplete"
         );
 
-        get().evolveChecklist();
+        // Don't auto-generate checklist - wait for questionnaire to be completed
+        // Checklist will be generated when user submits questionnaire answers
+      },
+
+      // Re-analyze: only updates analyzed files without regenerating checklist
+      // Used when new files are added after initial checklist generation
+      reAnalyze: async () => {
+        const state = get();
+
+        // Get all currently reviewed file IDs
+        const reviewedGroups = state.documentGroups.filter(
+          (g) => g.id !== "unclassified" && g.status === "reviewed"
+        );
+        const allReadyFileIds = reviewedGroups.flatMap((g) =>
+          g.files.filter((f) => !f.isRemoved).map((f) => f.id)
+        );
+
+        // Find new files that haven't been analyzed
+        const newFileIds = allReadyFileIds.filter(
+          (id) => !state.analyzedFileIds.includes(id)
+        );
+
+        if (newFileIds.length === 0) {
+          return;
+        }
+
+        // Brief analyzing state
+        set(
+          { isAnalyzingDocuments: true, analysisProgress: 0 },
+          false,
+          "reAnalyze:start"
+        );
+
+        // Simulate quick analysis
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        set({ analysisProgress: 50 }, false, "reAnalyze:progress");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Update analyzed file IDs to include new files
+        const updatedAnalyzedFileIds = [...state.analyzedFileIds, ...newFileIds];
+
+        set(
+          (currentState) => ({
+            isAnalyzingDocuments: false,
+            analysisProgress: 100,
+            lastAnalysisAt: new Date().toISOString(),
+            analyzedFileIds: updatedAnalyzedFileIds,
+            // Mark new files as analyzed in document groups
+            documentGroups: currentState.documentGroups.map((g) => ({
+              ...g,
+              files: g.files.map((f) =>
+                newFileIds.includes(f.id)
+                  ? {
+                      ...f,
+                      isAnalyzed: true,
+                      analyzedAt: new Date().toISOString(),
+                    }
+                  : f
+              ),
+            })),
+          }),
+          false,
+          "reAnalyze:complete"
+        );
       },
 
       // Launch Form Pilot (opens mock form with auto-fill)
@@ -2058,31 +2269,54 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
       // Submit questionnaire answers and proceed to checklist
       submitQuestionnaireAnswers: (answers: Record<string, string>) => {
+        const state = get();
+
+        // Get all currently reviewed file IDs to mark as analyzed
+        const analyzedFileIds = state.documentGroups
+          .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
+          .flatMap((g) => g.files.filter((f) => !f.isRemoved).map((f) => f.id));
+
         set(
-          { questionnaireAnswers: answers },
+          {
+            questionnaireAnswers: answers,
+            applicationPhase: "checklist",
+            // Mark analysis as complete when questionnaire is submitted
+            lastAnalysisAt: new Date().toISOString(),
+            // Track which files were analyzed
+            analyzedFileIds,
+          },
           false,
           "submitQuestionnaireAnswers"
         );
-        // Automatically generate checklist after submitting answers
+        // First generate the base checklist items (mock data)
         get().generateChecklist();
+        // Then convert to enhanced format with issues
+        get().generateEnhancedChecklist();
       },
 
       // Generate checklist with mock data and quality issues
       generateChecklist: () => {
         const state = get();
+        const passport = state.clientProfile.passport;
 
-        // Mock checklist items based on visa type
+        // Get passport file ID from document groups
+        const passportGroup = state.documentGroups.find(g => g.id === "passport");
+        const passportFileId = passportGroup?.files[0]?.id || "pp_1";
+
+        // Mock checklist items based on UK Skilled Worker Visa requirements
         const mockChecklistItems: ApplicationChecklistItem[] = [
-          // Personal Information
+          // ==========================================
+          // PERSONAL INFORMATION
+          // ==========================================
           {
             id: "given_names",
             section: "personal",
             field: "givenNames",
             label: "Given Names",
-            value: state.clientProfile.passport?.givenNames || null,
-            source: state.clientProfile.passport?.givenNames ? "extracted" : null,
-            linkedFileIds: ["pp_2"],
-            status: state.clientProfile.passport?.givenNames ? "complete" : "missing",
+            value: passport?.givenNames || null,
+            source: passport?.givenNames ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.givenNames ? "complete" : "missing",
             isRequired: true,
           },
           {
@@ -2090,10 +2324,10 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             section: "personal",
             field: "surname",
             label: "Surname",
-            value: state.clientProfile.passport?.surname || null,
-            source: state.clientProfile.passport?.surname ? "extracted" : null,
-            linkedFileIds: ["pp_2"],
-            status: state.clientProfile.passport?.surname ? "complete" : "missing",
+            value: passport?.surname || null,
+            source: passport?.surname ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.surname ? "complete" : "missing",
             isRequired: true,
           },
           {
@@ -2101,10 +2335,32 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             section: "personal",
             field: "dateOfBirth",
             label: "Date of Birth",
-            value: state.clientProfile.passport?.dateOfBirth || null,
-            source: state.clientProfile.passport?.dateOfBirth ? "extracted" : null,
-            linkedFileIds: ["pp_2"],
-            status: state.clientProfile.passport?.dateOfBirth ? "complete" : "missing",
+            value: passport?.dateOfBirth || null,
+            source: passport?.dateOfBirth ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.dateOfBirth ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "place_of_birth",
+            section: "personal",
+            field: "placeOfBirth",
+            label: "Place of Birth",
+            value: passport?.countryOfBirth || "Beijing, China",
+            source: passport?.countryOfBirth ? "extracted" : "extracted",
+            linkedFileIds: [passportFileId],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "gender",
+            section: "personal",
+            field: "gender",
+            label: "Gender",
+            value: passport?.sex || null,
+            source: passport?.sex ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.sex ? "complete" : "missing",
             isRequired: true,
           },
           {
@@ -2112,10 +2368,32 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             section: "personal",
             field: "passportNumber",
             label: "Passport Number",
-            value: state.clientProfile.passport?.passportNumber || null,
-            source: state.clientProfile.passport?.passportNumber ? "extracted" : null,
-            linkedFileIds: ["pp_2"],
-            status: state.clientProfile.passport?.passportNumber ? "complete" : "missing",
+            value: passport?.passportNumber || null,
+            source: passport?.passportNumber ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.passportNumber ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "passport_issue_date",
+            section: "personal",
+            field: "passportIssueDate",
+            label: "Passport Issue Date",
+            value: passport?.dateOfIssue || null,
+            source: passport?.dateOfIssue ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.dateOfIssue ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "passport_expiry_date",
+            section: "personal",
+            field: "passportExpiryDate",
+            label: "Passport Expiry Date",
+            value: passport?.dateOfExpiry || null,
+            source: passport?.dateOfExpiry ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.dateOfExpiry ? "complete" : "missing",
             isRequired: true,
           },
           {
@@ -2123,18 +2401,54 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             section: "personal",
             field: "nationality",
             label: "Nationality",
-            value: state.clientProfile.passport?.nationality || null,
-            source: state.clientProfile.passport?.nationality ? "extracted" : null,
-            linkedFileIds: ["pp_2"],
-            status: state.clientProfile.passport?.nationality ? "complete" : "missing",
+            value: passport?.nationality || null,
+            source: passport?.nationality ? "extracted" : null,
+            linkedFileIds: [passportFileId],
+            status: passport?.nationality ? "complete" : "missing",
             isRequired: true,
           },
-          // Employment
+          {
+            id: "current_address",
+            section: "personal",
+            field: "currentAddress",
+            label: "Current Residential Address",
+            value: "15 Maple Street, London SW1A 1AA",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "phone_number",
+            section: "personal",
+            field: "phoneNumber",
+            label: "Contact Phone Number",
+            value: "+44 7700 900123",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "email_address",
+            section: "personal",
+            field: "emailAddress",
+            label: "Email Address",
+            value: "john.smith@email.com",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+
+          // ==========================================
+          // EMPLOYMENT DETAILS
+          // ==========================================
           {
             id: "cos_number",
             section: "employment",
             field: "cosNumber",
-            label: "Certificate of Sponsorship Number",
+            label: "Certificate of Sponsorship (CoS) Number",
             value: null,
             source: null,
             linkedFileIds: [],
@@ -2148,7 +2462,29 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             label: "Sponsor Name",
             value: "ACME Technology Ltd",
             source: "extracted",
-            linkedFileIds: ["emp_1"],
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "sponsor_license_number",
+            section: "employment",
+            field: "sponsorLicenseNumber",
+            label: "Sponsor License Number",
+            value: "A1B2C3D4E5F6",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "sponsor_address",
+            section: "employment",
+            field: "sponsorAddress",
+            label: "Sponsor Address",
+            value: "100 Tech Park, Cambridge CB1 2AB",
+            source: "extracted",
+            linkedFileIds: [],
             status: "complete",
             isRequired: true,
           },
@@ -2159,7 +2495,18 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             label: "Job Title",
             value: "Senior Software Engineer",
             source: "extracted",
-            linkedFileIds: ["emp_1"],
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "soc_code",
+            section: "employment",
+            field: "socCode",
+            label: "SOC Code",
+            value: "2136",
+            source: "extracted",
+            linkedFileIds: [],
             status: "complete",
             isRequired: true,
           },
@@ -2167,60 +2514,190 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             id: "salary",
             section: "employment",
             field: "annualSalary",
-            label: "Annual Salary",
+            label: "Annual Salary (GBP)",
             value: "£65,000",
             source: "extracted",
-            linkedFileIds: ["emp_1", "emp_3"],
+            linkedFileIds: [],
             status: "complete",
             isRequired: true,
           },
-          // Financial
+          {
+            id: "employment_start_date",
+            section: "employment",
+            field: "employmentStartDate",
+            label: "Employment Start Date",
+            value: "2024-04-01",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "working_hours",
+            section: "employment",
+            field: "workingHoursPerWeek",
+            label: "Working Hours per Week",
+            value: "37.5",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "work_address",
+            section: "employment",
+            field: "workAddress",
+            label: "Work Location Address",
+            value: "100 Tech Park, Cambridge CB1 2AB",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+
+          // ==========================================
+          // FINANCIAL EVIDENCE
+          // ==========================================
+          {
+            id: "bank_account_holder",
+            section: "financial",
+            field: "bankAccountHolder",
+            label: "Bank Account Holder Name",
+            value: passport?.givenNames && passport?.surname ? `${passport.givenNames} ${passport.surname}` : null,
+            source: "extracted",
+            linkedFileIds: [],
+            status: passport?.givenNames ? "complete" : "missing",
+            isRequired: true,
+          },
+          {
+            id: "bank_name",
+            section: "financial",
+            field: "bankName",
+            label: "Bank Name",
+            value: "HSBC UK",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "account_number",
+            section: "financial",
+            field: "accountNumber",
+            label: "Account Number (Last 4 digits)",
+            value: "****4521",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: false,
+          },
           {
             id: "bank_balance",
             section: "financial",
             field: "bankBalance",
-            label: "Bank Balance",
+            label: "Current Balance",
             value: "£28,450.00",
             source: "extracted",
-            linkedFileIds: ["bs_12"],
-            status: "complete",
-            isRequired: false,
-          },
-          {
-            id: "savings_evidence",
-            section: "financial",
-            field: "savingsEvidence",
-            label: "Savings Evidence (28 days)",
-            value: "Verified",
-            source: "extracted",
-            linkedFileIds: ["bs_1", "bs_12"],
+            linkedFileIds: [],
             status: "complete",
             isRequired: true,
           },
-          // Travel
+          {
+            id: "funds_held_period",
+            section: "financial",
+            field: "fundsHeldPeriod",
+            label: "Funds Held for 28 Consecutive Days",
+            value: "Yes - Verified",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "statement_date",
+            section: "financial",
+            field: "statementDate",
+            label: "Bank Statement Date",
+            value: "2024-01-15",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "maintenance_requirement",
+            section: "financial",
+            field: "maintenanceRequirement",
+            label: "Maintenance Requirement Met (£1,270)",
+            value: "Yes",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+
+          // ==========================================
+          // TRAVEL HISTORY
+          // ==========================================
           {
             id: "previous_uk_visa",
             section: "travel",
             field: "previousUKVisa",
-            label: "Previous UK Visa",
-            value: "Tier 4 Student (2015-2018)",
+            label: "Previous UK Visa History",
+            value: "Tier 4 Student Visa (2015-2018)",
             source: "extracted",
-            linkedFileIds: ["pp_3"],
+            linkedFileIds: [passportFileId],
             status: "complete",
             isRequired: false,
           },
           {
-            id: "travel_history",
+            id: "current_immigration_status",
             section: "travel",
-            field: "travelHistory",
-            label: "Travel History (Last 10 Years)",
+            field: "currentImmigrationStatus",
+            label: "Current Immigration Status",
+            value: "Outside UK",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "travel_history_10_years",
+            section: "travel",
+            field: "travelHistory10Years",
+            label: "Countries Visited (Last 10 Years)",
             value: null,
             source: null,
             linkedFileIds: [],
             status: "partial",
             isRequired: true,
           },
-          // Education
+          {
+            id: "visa_refusals",
+            section: "travel",
+            field: "visaRefusals",
+            label: "Previous Visa Refusals",
+            value: "None",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "deportation_history",
+            section: "travel",
+            field: "deportationHistory",
+            label: "Deportation or Removal History",
+            value: "None",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+
+          // ==========================================
+          // EDUCATION & QUALIFICATIONS
+          // ==========================================
           {
             id: "highest_qualification",
             section: "education",
@@ -2228,42 +2705,165 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             label: "Highest Qualification",
             value: "BSc Computer Science",
             source: "extracted",
-            linkedFileIds: ["edu_1"],
+            linkedFileIds: [],
             status: "complete",
             isRequired: false,
           },
           {
-            id: "english_test",
+            id: "institution_name",
             section: "education",
-            field: "englishTest",
-            label: "English Language Test",
-            value: "IELTS 7.5",
+            field: "institutionName",
+            label: "Institution Name",
+            value: "University of Manchester",
             source: "extracted",
-            linkedFileIds: ["edu_5"],
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "graduation_date",
+            section: "education",
+            field: "graduationDate",
+            label: "Graduation Date",
+            value: "July 2018",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "english_test_type",
+            section: "education",
+            field: "englishTestType",
+            label: "English Language Test Type",
+            value: "IELTS Academic",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "english_test_score",
+            section: "education",
+            field: "englishTestScore",
+            label: "English Test Score",
+            value: "Overall 7.5 (L:8.0, R:7.5, W:7.0, S:7.5)",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "english_test_date",
+            section: "education",
+            field: "englishTestDate",
+            label: "English Test Date",
+            value: "2023-06-15",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "cefr_level",
+            section: "education",
+            field: "cefrLevel",
+            label: "CEFR Level",
+            value: "B1 (Minimum Required)",
+            source: "extracted",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+
+          // ==========================================
+          // FAMILY INFORMATION
+          // ==========================================
+          {
+            id: "marital_status",
+            section: "family",
+            field: "maritalStatus",
+            label: "Marital Status",
+            value: "Married",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "spouse_name",
+            section: "family",
+            field: "spouseName",
+            label: "Spouse Full Name",
+            value: "Jane Smith",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "spouse_nationality",
+            section: "family",
+            field: "spouseNationality",
+            label: "Spouse Nationality",
+            value: "Chinese",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: false,
+          },
+          {
+            id: "dependants_count",
+            section: "family",
+            field: "dependantsCount",
+            label: "Number of Dependants",
+            value: "1 (Spouse applying separately)",
+            source: "questionnaire",
+            linkedFileIds: [],
+            status: "complete",
+            isRequired: true,
+          },
+          {
+            id: "children_count",
+            section: "family",
+            field: "childrenCount",
+            label: "Number of Children",
+            value: "0",
+            source: "questionnaire",
+            linkedFileIds: [],
             status: "complete",
             isRequired: true,
           },
         ];
 
-        // Mock quality issues
+        // Mock quality issues based on common Skilled Worker visa issues
         const mockQualityIssues: QualityIssue[] = [
           {
             id: "issue_cos",
             type: "missing",
             severity: "error",
             title: "CoS Number Required",
-            description: "Certificate of Sponsorship number is missing. Please obtain from your sponsor and enter manually.",
+            description: "Certificate of Sponsorship number is missing. This is mandatory for Skilled Worker visa applications. Please obtain from your sponsor.",
             linkedChecklistItemId: "cos_number",
             isResolved: false,
           },
           {
-            id: "issue_travel",
+            id: "issue_travel_history",
             type: "missing",
             severity: "warning",
             title: "Incomplete Travel History",
-            description: "Travel history for the last 10 years is incomplete. Consider uploading additional passport pages or old passports.",
-            linkedChecklistItemId: "travel_history",
-            linkedFileId: "travel_1",
+            description: "Travel history for the last 10 years is incomplete. UKVI requires full travel history including all countries visited.",
+            linkedChecklistItemId: "travel_history_10_years",
+            isResolved: false,
+          },
+          {
+            id: "issue_passport_validity",
+            type: "validity",
+            severity: "info",
+            title: "Passport Validity Check",
+            description: "Ensure passport is valid for the duration of intended stay. Recommended to have at least 6 months validity beyond visa end date.",
+            linkedChecklistItemId: "passport_expiry_date",
+            linkedFileId: passportFileId,
             isResolved: false,
           },
         ];
@@ -2534,6 +3134,156 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           return null;
         };
 
+        // Get passport file info
+        const passportGroup = state.documentGroups.find(g => g.id === "passport");
+        const passportFile = passportGroup?.files[0];
+
+        // Required evidence configuration per section (UK Skilled Worker Visa)
+        const SECTION_REQUIRED_EVIDENCE: Record<ChecklistSectionType, RequiredEvidence[]> = {
+          personal: [
+            {
+              id: "ev_passport",
+              name: "Valid Passport",
+              description: "Current passport with at least 1 blank page for visa vignette",
+              isUploaded: !!passportFile,
+              linkedFileId: passportFile?.id,
+              linkedFileName: passportFile?.name,
+              isMandatory: true,
+              acceptedFormats: ["PDF", "JPEG", "PNG"],
+              validityPeriod: "Must be valid for duration of stay",
+            },
+            {
+              id: "ev_photo",
+              name: "Passport-sized Photograph",
+              description: "Recent photo meeting UK visa photo requirements (45mm x 35mm)",
+              isUploaded: false,
+              isMandatory: true,
+              acceptedFormats: ["JPEG", "PNG"],
+            },
+            {
+              id: "ev_previous_passport",
+              name: "Previous Passports (if applicable)",
+              description: "Any previous passports showing UK immigration history",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF", "JPEG"],
+            },
+          ],
+          employment: [
+            {
+              id: "ev_cos",
+              name: "Certificate of Sponsorship (CoS)",
+              description: "CoS reference number from licensed UK sponsor",
+              isUploaded: false,
+              isMandatory: true,
+            },
+            {
+              id: "ev_employment_contract",
+              name: "Employment Contract / Job Offer Letter",
+              description: "Signed contract showing job title, salary, and start date",
+              isUploaded: false,
+              isMandatory: true,
+              acceptedFormats: ["PDF"],
+            },
+            {
+              id: "ev_sponsor_letter",
+              name: "Sponsor Confirmation Letter",
+              description: "Letter from sponsor confirming employment details",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF"],
+            },
+          ],
+          financial: [
+            {
+              id: "ev_bank_statements",
+              name: "Bank Statements (28 days)",
+              description: "Showing funds held for 28 consecutive days ending within 31 days of application",
+              isUploaded: false,
+              isMandatory: true,
+              acceptedFormats: ["PDF"],
+              validityPeriod: "Must be dated within 31 days of application",
+            },
+            {
+              id: "ev_bank_letter",
+              name: "Bank Confirmation Letter",
+              description: "Official letter from bank confirming account details and balance",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF"],
+            },
+          ],
+          travel: [
+            {
+              id: "ev_travel_history",
+              name: "Travel History Documentation",
+              description: "Evidence of travel history for last 10 years (passport stamps, boarding passes)",
+              isUploaded: false,
+              isMandatory: true,
+              acceptedFormats: ["PDF", "JPEG"],
+            },
+            {
+              id: "ev_old_visas",
+              name: "Previous UK Visas (if any)",
+              description: "Copies of any previous UK visas or BRPs",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF", "JPEG"],
+            },
+          ],
+          education: [
+            {
+              id: "ev_english_cert",
+              name: "English Language Test Certificate",
+              description: "IELTS, TOEFL, or approved SELT certificate (CEFR B1 minimum)",
+              isUploaded: false,
+              isMandatory: true,
+              acceptedFormats: ["PDF"],
+              validityPeriod: "Must be within 2 years of application date",
+            },
+            {
+              id: "ev_degree_cert",
+              name: "Degree Certificate / Academic Qualification",
+              description: "Original or certified copy of highest qualification",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF"],
+            },
+            {
+              id: "ev_atas",
+              name: "ATAS Certificate (if applicable)",
+              description: "Academic Technology Approval Scheme certificate for certain fields",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF"],
+            },
+          ],
+          family: [
+            {
+              id: "ev_marriage_cert",
+              name: "Marriage Certificate (if applicable)",
+              description: "Official marriage certificate if applying with spouse",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF"],
+            },
+            {
+              id: "ev_birth_cert",
+              name: "Birth Certificates (if applicable)",
+              description: "For any dependent children",
+              isUploaded: false,
+              isMandatory: false,
+              acceptedFormats: ["PDF"],
+            },
+          ],
+          other: [],
+        };
+
+        // Get required evidence for a section
+        const getRequiredEvidence = (section: ChecklistSectionType): RequiredEvidence[] => {
+          return SECTION_REQUIRED_EVIDENCE[section] || [];
+        };
+
         // Convert existing checklist items to enhanced format
         const enhancedItems: EnhancedChecklistItem[] = state.applicationChecklistItems.map((item) => ({
           id: item.id,
@@ -2545,6 +3295,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           linkedDocuments: item.linkedFileIds
             .map(createLinkedDocument)
             .filter((doc): doc is LinkedDocument => doc !== null),
+          requiredEvidence: getRequiredEvidence(item.section),
           status: item.status,
           isRequired: item.isRequired,
           isEditable: true,
@@ -2552,7 +3303,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         }));
 
         // Convert existing quality issues to enhanced format
-        const enhancedIssues: EnhancedQualityIssue[] = state.qualityIssues.map((issue) => ({
+        const existingEnhancedIssues: EnhancedQualityIssue[] = state.qualityIssues.map((issue) => ({
           id: issue.id,
           type: issue.type,
           severity: issue.severity,
@@ -2573,6 +3324,77 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }));
+
+        // Generate issues for missing fields (checklist items with status "missing")
+        const missingFieldIssues: EnhancedQualityIssue[] = enhancedItems
+          .filter((item) => item.status === "missing" && item.isRequired)
+          .map((item) => ({
+            id: `issue_missing_field_${item.id}`,
+            type: "missing" as QualityIssueType,
+            severity: "warning" as QualityIssueSeverity,
+            status: "open" as IssueStatus,
+            title: `Missing: ${item.label}`,
+            description: `The field "${item.label}" is required but has not been provided. Please fill in this information or upload supporting documents.`,
+            linkedChecklistItemId: item.id,
+            linkedFileIds: [],
+            history: [
+              {
+                id: `history_missing_field_${item.id}_created`,
+                timestamp: new Date().toISOString(),
+                action: "created" as const,
+                performedBy: { id: "system", name: "System" },
+              },
+            ],
+            notes: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }));
+
+        // Generate issues for missing required evidence
+        const allRequiredEvidence = Object.values(SECTION_REQUIRED_EVIDENCE).flat();
+        const missingEvidenceIssues: EnhancedQualityIssue[] = allRequiredEvidence
+          .filter((ev) => ev.isMandatory && !ev.isUploaded)
+          .map((ev) => {
+            // Find a related checklist item in the same section
+            const sectionType = Object.entries(SECTION_REQUIRED_EVIDENCE)
+              .find(([, evidenceList]) => evidenceList.some((e) => e.id === ev.id))?.[0] as ChecklistSectionType | undefined;
+            const relatedItem = enhancedItems.find((item) => item.section === sectionType);
+
+            return {
+              id: `issue_missing_evidence_${ev.id}`,
+              type: "missing" as QualityIssueType,
+              severity: "error" as QualityIssueSeverity,
+              status: "open" as IssueStatus,
+              title: `Missing Document: ${ev.name}`,
+              description: ev.description || `The document "${ev.name}" is required but has not been uploaded.`,
+              suggestedAction: "Upload the required document",
+              linkedChecklistItemId: relatedItem?.id || enhancedItems[0]?.id || "",
+              linkedFileIds: [],
+              history: [
+                {
+                  id: `history_missing_evidence_${ev.id}_created`,
+                  timestamp: new Date().toISOString(),
+                  action: "created" as const,
+                  performedBy: { id: "system", name: "System" },
+                },
+              ],
+              notes: [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+        // Combine all issues (filter out duplicates by checking if similar issue exists)
+        const existingIssueIds = new Set(existingEnhancedIssues.map((i) => i.linkedChecklistItemId));
+        const filteredMissingFieldIssues = missingFieldIssues.filter(
+          (i) => !existingIssueIds.has(i.linkedChecklistItemId)
+        );
+
+        const enhancedIssues: EnhancedQualityIssue[] = [
+          ...existingEnhancedIssues,
+          ...filteredMissingFieldIssues,
+          ...missingEvidenceIssues,
+        ];
 
         set(
           {
@@ -2669,8 +3491,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         set(
           {
-            // Navigation - always land on overview page after case creation
-            activeNav: "overview",
+            // Navigation - land on application page to start case assessment
+            activeNav: "application",
             selectedVisaType: data.visaType,
             clientProfile: profileWithPassport,
             caseReference: data.referenceNumber || "REF-2024-001",
@@ -2683,6 +3505,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             analyzedFiles: [],
             isAnalyzingDocuments: false,
             analysisProgress: 0,
+            // Reset questionnaire to trigger case assessment form
+            questionnaireAnswers: {},
             // Reset application phase to analyzing (ready to start analysis)
             applicationPhase: "analyzing",
             formSchema: null,
@@ -2825,4 +3649,23 @@ export const useHasNewFilesAfterAnalysis = () =>
     );
 
     return hasNewReadyFiles;
+  });
+
+// Returns the count of new ready document groups that have unanalyzed files
+export const useNewFilesCount = () =>
+  useCaseDetailStore((state) => {
+    if (!state.lastAnalysisAt) return 0;
+
+    const analyzedFileIds = state.analyzedFileIds;
+
+    // Count document groups that have at least one new unanalyzed file
+    const groupsWithNewFiles = state.documentGroups.filter((g) => {
+      if (g.id === "unclassified" || g.status !== "reviewed") return false;
+
+      // Check if this group has any files that weren't analyzed
+      const activeFiles = g.files.filter((f) => !f.isRemoved);
+      return activeFiles.some((f) => !analyzedFileIds.includes(f.id));
+    });
+
+    return groupsWithNewFiles.length;
   });

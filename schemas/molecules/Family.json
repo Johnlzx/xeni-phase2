@@ -1,0 +1,527 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/family/v2.0.3",
+  "title": "Family Information Schema",
+  "description": "Reusable schema definitions for family information across UK immigration applications",
+  "x-llmHint": "Family information. Match: marriage certificates, birth certificates, civil partnership documents, death certificates, household registration documents. NOTE: Divorce decrees belong to SexRelationship schema for previous partners.",
+  "x-llmRules": [
+    {
+      "ruleId": "CURRENT_PARTNER_CLASSIFICATION",
+      "targetPath": "familyInformation.currentPartner",
+      "description": "Current spouse/partner of THE VISA APPLICANT - the person they are currently in a relationship with",
+      "identifiers": ["your partner", "your spouse", "your husband", "your wife", "current partner", "who are you in a relationship with", "partner's name", "partner's details"],
+      "antiPatterns": ["NEVER place ex-partners here", "NEVER include previous marriages", "Previous partners go to sexRelationship.previousPartners"],
+      "outputFields": ["givenName", "familyName", "dateOfBirth", "countryOfNationality", "livesWith", "address", "travellingTogetherToUK", "passportNumber"]
+    },
+    {
+      "ruleId": "CURRENT_PARTNER_ADDRESS_EXTRACTION",
+      "targetPath": "familyInformation.currentPartner.address",
+      "description": "Extract address for current partner regardless of livesWith value. When livesWith=true, this is the shared address where both applicant and partner live together.",
+      "identifiers": ["Where do you and [partner] intend to live", "your current address", "address where you live together", "shared address", "partner's address"],
+      "rule": "ALWAYS extract the address when available. For UK partner visa applications, the 'Where do you and [partner] intend to live in the UK?' question should be extracted to BOTH currentPartner.address AND accommodation.ukStayAddresses[].",
+      "outputFields": ["addressLine1", "addressLine2", "townOrCity", "county", "postCode", "country"]
+    },
+    {
+      "ruleId": "APPLICANT_DEPENDANTS_CLASSIFICATION",
+      "targetPath": "familyInformation.dependants",
+      "description": "People financially dependent on THE VISA APPLICANT (not the UK sponsor's children)",
+      "identifiers": ["your dependants", "your children", "people dependent on you", "applicant's children", "Do you have any dependants", "people financially dependent on you"],
+      "antiPatterns": ["NEVER place sponsor's children here", "NEVER include UK partner's children here", "These are NOT sponsor.sponsorChildren"],
+      "outputFields": ["givenName", "familyName", "dateOfBirth", "relationship", "livesWith", "travellingTogetherToUK"]
+    }
+  ],
+  "definitions": {
+    "CurrentPartner": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "type": "object",
+          "description": "Current Partner - Current spouse or partner information",
+          "additionalProperties": false,
+          "required": [
+            "countryOfNationality",
+            "livesWith",
+            "travellingTogetherToUK"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "travellingTogetherToUK": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "required": ["passportNumber"]
+              }
+            }
+          ],
+          "properties": {
+            "givenName": {
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "default": "XXXXX"
+            },
+            "dateOfBirth": {
+              "default": "01-01-1990"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": "Afghanistan"
+            },
+            "livesWith": {
+              "type": "boolean",
+              "description": "Do they currently live with you?",
+              "default": true
+            },
+            "address": {
+              "allOf": [
+                { "$ref": "../common/Common.json#/definitions/AddressBase" },
+                { "description": "Partner's address. When livesWith=true, this is the shared address where you both live together." }
+              ]
+            },
+            "travellingTogetherToUK": {
+              "type": "boolean",
+              "description": "Will they be travelling with you to the UK?",
+              "default": false
+            },
+            "passportNumber": {
+              "type": "string",
+              "description": "Their passport number",
+              "default": "P1111111"
+            }
+          }
+        }
+      ]
+    },
+    "DependantDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "type": "object",
+          "description": "Dependant Detail - Person financially dependent on applicant",
+          "additionalProperties": false,
+          "required": [
+            "relationship",
+            "livesWith",
+            "travellingTogetherToUK"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "livesWith": {
+                    "const": false
+                  }
+                }
+              },
+              "then": {
+                "required": ["address"]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "travellingTogetherToUK": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "required": ["countryOfNationality", "passportNumber"]
+              }
+            }
+          ],
+          "properties": {
+            "givenName": {
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "default": "XXXXX"
+            },
+            "dateOfBirth": {
+              "default": "01-01-2010"
+            },
+            "relationship": {
+              "type": "string",
+              "description": "What is this person's relationship to you?",
+              "default": "Child"
+            },
+            "livesWith": {
+              "type": "boolean",
+              "description": "Does this person currently live with you?",
+              "default": true
+            },
+            "address": {
+              "$ref": "../common/Common.json#/definitions/AddressBase"
+            },
+            "travellingTogetherToUK": {
+              "type": "boolean",
+              "description": "Is this person travelling with you to the UK?",
+              "default": false
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": "Afghanistan"
+            },
+            "passportNumber": {
+              "type": "string",
+              "description": "Passport number",
+              "default": "P1111111"
+            }
+          }
+        }
+      ]
+    },
+    "ParentDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "type": "object",
+          "description": "Parent Detail - Parent information",
+          "additionalProperties": false,
+          "required": [
+            "relationship",
+            "countryOfNationality",
+            "hasAlwaysHadSameNationality"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "hasAlwaysHadSameNationality": {
+                    "const": false
+                  }
+                }
+              },
+              "then": {
+                "required": ["nationalityWhenYouWereBorn"]
+              }
+            }
+          ],
+          "properties": {
+            "givenName": {
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "default": "XXXXX"
+            },
+            "dateOfBirth": {
+              "default": "01-01-1960"
+            },
+            "relationship": {
+              "enum": ["Mother", "Father"],
+              "type": "string",
+              "description": "Relationship to applicant",
+              "default": "Mother"
+            },
+            "townOfBirth": {
+              "type": "string",
+              "description": "Town of birth",
+              "default": "XXXXX"
+            },
+            "countryOfBirth": {
+              "type": "string",
+              "description": "Country of birth",
+              "default": "Afghanistan"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": "Afghanistan"
+            },
+            "hasAlwaysHadSameNationality": {
+              "type": "boolean",
+              "description": "Have they always had the same nationality?",
+              "default": true
+            },
+            "nationalityWhenYouWereBorn": {
+              "type": "string",
+              "description": "Their country of nationality when you were born",
+              "default": "Afghanistan"
+            }
+          }
+        }
+      ]
+    },
+    "ParentDetails": {
+      "type": "object",
+      "description": "Details of both parents - reusable across visa types",
+      "additionalProperties": false,
+      "required": ["hasFirstParent", "hasAnotherParent"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasFirstParent": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["firstParent"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasAnotherParent": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["anotherParent"]
+          }
+        }
+      ],
+      "properties": {
+        "hasFirstParent": {
+          "type": "boolean",
+          "description": "Set to true when firstParent details are provided",
+          "default": false,
+          "x-computed": "exists(firstParent)"
+        },
+        "firstParent": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/ParentDetail"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "relationship": {
+                  "default": "Father"
+                }
+              }
+            }
+          ]
+        },
+        "hasAnotherParent": {
+          "type": "boolean",
+          "description": "Set to true when anotherParent details are provided",
+          "default": false,
+          "x-computed": "exists(anotherParent)"
+        },
+        "anotherParent": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/ParentDetail"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "relationship": {
+                  "default": "Mother"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "FamilyInUKDetail": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "type": "object",
+          "description": "Family in UK Detail - Relative living in the UK",
+          "additionalProperties": false,
+          "required": [
+            "relationship",
+            "countryOfNationality",
+            "ukPermissionType"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "ukPermissionType": {
+                    "enum": [
+                      "They have a temporary visa",
+                      "They are in the UK permanently"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": ["passportNumber"]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "ukPermissionType": {
+                    "const": "They do not have a visa and are not in the UK permanently"
+                  }
+                }
+              },
+              "then": {
+                "required": ["moreInformation"]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "ukPermissionType": {
+                    "const": "I cannot contact my relative"
+                  }
+                }
+              },
+              "then": {
+                "required": ["cannotContactReason"]
+              }
+            }
+          ],
+          "properties": {
+            "givenName": {
+              "default": "XXXXX"
+            },
+            "familyName": {
+              "default": "XXXXX"
+            },
+            "relationship": {
+              "type": "string",
+              "description": "Their relationship to you",
+              "default": "Brother"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": "British"
+            },
+            "ukPermissionType": {
+              "enum": [
+                "They have a temporary visa",
+                "They are in the UK permanently",
+                "They do not have a visa and are not in the UK permanently",
+                "I cannot contact my relative"
+              ],
+              "type": "string",
+              "description": "What permission do they have to be in the UK?",
+              "default": "They are in the UK permanently"
+            },
+            "passportNumber": {
+              "type": "string",
+              "description": "Their passport number",
+              "default": "123456789"
+            },
+            "moreInformation": {
+              "type": "string",
+              "description": "Give as much information as possible about your relative",
+              "default": "British citizen by birth"
+            },
+            "cannotContactReason": {
+              "type": "string",
+              "description": "Why can you not ask your relative?",
+              "default": "Lost contact"
+            }
+          }
+        }
+      ]
+    },
+    "FamilyInformation": {
+      "type": "object",
+      "description": "Family Information - Complete family details",
+      "additionalProperties": false,
+      "required": [
+        "hasCurrentPartner",
+        "hasDependants",
+        "parentDetails",
+        "hasFamilyInUK"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasCurrentPartner": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["currentPartner"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasDependants": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["dependants"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasFamilyInUK": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["familyInUK"]
+          }
+        }
+      ],
+      "properties": {
+        "hasCurrentPartner": {
+          "type": "boolean",
+          "description": "Do you have a current partner?",
+          "default": false,
+          "x-computed": "exists(currentPartner)"
+        },
+        "currentPartner": {
+          "$ref": "#/definitions/CurrentPartner"
+        },
+        "hasDependants": {
+          "type": "boolean",
+          "description": "Does anyone rely on you for financial support?",
+          "default": false,
+          "x-computed": "exists(dependants)"
+        },
+        "dependants": {
+          "type": "array",
+          "description": "People financially dependent on you",
+          "items": {
+            "$ref": "#/definitions/DependantDetail"
+          },
+          "default": []
+        },
+        "parentDetails": {
+          "$ref": "#/definitions/ParentDetails"
+        },
+        "hasFamilyInUK": {
+          "type": "boolean",
+          "description": "Do you have any family in the UK?",
+          "default": false,
+          "x-computed": "exists(familyInUK)"
+        },
+        "familyInUK": {
+          "type": "array",
+          "description": "Family members living in the UK",
+          "items": {
+            "$ref": "#/definitions/FamilyInUKDetail"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

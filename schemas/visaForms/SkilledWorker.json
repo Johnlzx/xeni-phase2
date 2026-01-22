@@ -1,0 +1,739 @@
+{
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://api.cosxai.com/schemas/forms/skilledWorker/v2.0.0",
+  "title": "UK Skilled Worker Visa Application Schema",
+  "description": "Complete application form for UK Skilled Worker visa (formerly Tier 2 General)",
+  "x-llmHint": "Complete UK Skilled Worker Visa application. This is the main schema combining all sections. Match documents for: Certificate of Sponsorship (CoS) reference, job offer details, salary information, employer details, qualifications (degree certificates, professional qualifications), English language test results (IELTS/equivalent), maintenance funds evidence, passport/ID. Covers PBS Skilled Worker route application.",
+  "required": [
+    "applicationDetails",
+    "statusInApplicationCountry",
+    "personalDetails",
+    "contactInformation",
+    "ukAccommodation",
+    "identityDocuments",
+    "currentUKStatus",
+    "sponsorshipDetails",
+    "qualifications",
+    "language",
+    "travelHistory",
+    "immigrationHistory",
+    "familyInformation",
+    "familyApplication",
+    "healthAndMedical",
+    "financialDetails",
+    "characterAndSecurity",
+    "immigrationAdviser"
+  ],
+  "properties": {
+    "applicationDetails": {
+      "$ref": "#/definitions/ApplicationDetails"
+    },
+    "statusInApplicationCountry": {
+      "$ref": "#/definitions/StatusInApplicationCountry"
+    },
+    "personalDetails": {
+      "$ref": "../molecules/Base.json#/definitions/PersonalDetails"
+    },
+    "contactInformation": {
+      "$ref": "#/definitions/ContactInformation"
+    },
+    "ukAccommodation": {
+      "$ref": "#/definitions/UKAccommodation"
+    },
+    "identityDocuments": {
+      "$ref": "../molecules/Base.json#/definitions/IdentityDocuments"
+    },
+    "currentUKStatus": {
+      "$ref": "#/definitions/CurrentUKStatus"
+    },
+    "sponsorshipDetails": {
+      "$ref": "#/definitions/SponsorshipDetails"
+    },
+    "qualifications": {
+      "$ref": "#/definitions/Qualifications"
+    },
+    "language": {
+      "$ref": "../molecules/Language.json#/definitions/Language"
+    },
+    "travelHistory": {
+      "$ref": "#/definitions/TravelHistory"
+    },
+    "immigrationHistory": {
+      "$ref": "../molecules/ImmigrationHistory.json#/definitions/ImmigrationHistory"
+    },
+    "familyInformation": {
+      "$ref": "../molecules/Family.json#/definitions/FamilyInformation"
+    },
+    "familyApplication": {
+      "$ref": "#/definitions/FamilyApplication"
+    },
+    "healthAndMedical": {
+      "$ref": "#/definitions/HealthAndMedical"
+    },
+    "financialDetails": {
+      "$ref": "#/definitions/FinancialDetails"
+    },
+    "characterAndSecurity": {
+      "$ref": "#/definitions/CharacterAndSecurity"
+    },
+    "immigrationAdviser": {
+      "$ref": "../molecules/ImmigrationAdviser.json#/definitions/ImmigrationAdviser"
+    }
+  },
+  "definitions": {
+    "ApplicationDetails": {
+      "type": "object",
+      "title": "Application Details",
+      "additionalProperties": false,
+      "required": [
+        "intendedArrivalDate",
+        "visaLength",
+        "applicationLocation"
+      ],
+      "properties": {
+        "intendedArrivalDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "Intended Arrival Date", "default": "01-01-2025" }
+          ]
+        },
+        "visaLength": {
+          "type": "string",
+          "description": "Visa Length",
+          "maxLength": 50,
+          "minLength": 1,
+          "default": "3 years"
+        },
+        "applicationLocation": {
+          "$ref": "../common/Common.json#/definitions/CountryName"
+        }
+      }
+    },
+    "StatusInApplicationCountry": {
+      "type": "object",
+      "title": "Status in Application Country",
+      "additionalProperties": false,
+      "required": [
+        "permissionType",
+        "statusDetails"
+      ],
+      "properties": {
+        "permissionType": {
+          "type": "string",
+          "description": "Permission Type",
+          "maxLength": 100,
+          "minLength": 2,
+          "default": "Permanent residence"
+        },
+        "statusDetails": {
+          "type": "string",
+          "description": "Status Details",
+          "maxLength": 255,
+          "minLength": 2,
+          "default": "Permanent resident"
+        }
+      }
+    },
+    "ContactInformation": {
+      "type": "object",
+      "title": "Contact Information",
+      "additionalProperties": false,
+      "required": [
+        "emails",
+        "telephones",
+        "currentAddress",
+        "addressHistory",
+        "contactPreferences"
+      ],
+      "properties": {
+        "emails": {
+          "type": "array",
+          "description": "Email addresses",
+          "items": {
+            "$ref": "../common/Common.json#/definitions/EmailBasic"
+          },
+          "minItems": 1,
+          "default": []
+        },
+        "telephones": {
+          "type": "array",
+          "description": "Telephone numbers",
+          "items": {
+            "$ref": "../common/Common.json#/definitions/PhoneBasic"
+          },
+          "minItems": 1,
+          "default": []
+        },
+        "currentAddress": {
+          "$ref": "../molecules/Address.json#/definitions/CurrentAddress"
+        },
+        "addressHistory": {
+          "$ref": "../molecules/Address.json#/definitions/AddressHistory"
+        },
+        "contactPreferences": {
+          "$ref": "../common/Common.json#/definitions/ContactPreferences"
+        }
+      }
+    },
+    "UKAccommodation": {
+      "type": "object",
+      "title": "UK Accommodation",
+      "additionalProperties": false,
+      "required": [
+        "hasAccommodationArranged"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasAccommodationArranged": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["address"]
+          }
+        }
+      ],
+      "properties": {
+        "hasAccommodationArranged": {
+          "type": "boolean",
+          "description": "Has Accommodation Arranged",
+          "default": false
+        },
+        "address": {
+          "$ref": "../common/Common.json#/definitions/UKAddress"
+        }
+      }
+    },
+    "CurrentUKStatus": {
+      "type": "object",
+      "title": "Current UK Status",
+      "additionalProperties": false,
+      "required": [
+        "hasCurrentLeave"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasCurrentLeave": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "currentVisaType",
+              "expiryDate"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "hasCurrentLeave": {
+          "type": "boolean",
+          "description": "Has Current Leave",
+          "default": false
+        },
+        "currentVisaType": {
+          "type": "string",
+          "description": "Current Visa Type",
+          "maxLength": 100,
+          "default": ""
+        },
+        "expiryDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        }
+      }
+    },
+    "SponsorshipDetails": {
+      "type": "object",
+      "title": "Sponsorship Details",
+      "additionalProperties": false,
+      "required": [
+        "hasCoS",
+        "certificateOfSponsorshipNumber",
+        "sponsorName",
+        "sponsorLicenceNumber",
+        "sponsorAddress",
+        "jobTitle",
+        "socCode",
+        "isSocCodeConfirmed",
+        "isJobOnImmigrationSalaryList",
+        "grossAnnualSalary",
+        "workStartDate",
+        "workEndDate"
+      ],
+      "properties": {
+        "hasCoS": {
+          "type": "boolean",
+          "description": "Has Certificate of Sponsorship",
+          "default": true
+        },
+        "certificateOfSponsorshipNumber": {
+          "$ref": "../common/Common.json#/definitions/CertificateOfSponsorshipNumber"
+        },
+        "sponsorName": {
+          "$ref": "../common/Common.json#/definitions/OrganisationName"
+        },
+        "sponsorLicenceNumber": {
+          "$ref": "../common/Common.json#/definitions/SponsorLicenceNumber"
+        },
+        "sponsorAddress": {
+          "$ref": "../common/Common.json#/definitions/AddressBase"
+        },
+        "jobTitle": {
+          "$ref": "../common/Common.json#/definitions/JobTitle"
+        },
+        "socCode": {
+          "$ref": "../common/Common.json#/definitions/SocCode"
+        },
+        "isSocCodeConfirmed": {
+          "type": "boolean",
+          "description": "Is SOC Code Confirmed",
+          "default": true
+        },
+        "isJobOnImmigrationSalaryList": {
+          "type": "boolean",
+          "description": "Is Job on Immigration Salary List",
+          "default": false
+        },
+        "grossAnnualSalary": {
+          "type": "number",
+          "description": "Gross Annual Salary (GBP)",
+          "minimum": 0,
+          "default": 38700
+        },
+        "workStartDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        },
+        "workEndDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        }
+      }
+    },
+    "Qualifications": {
+      "type": "object",
+      "title": "Qualifications",
+      "additionalProperties": false,
+      "required": [
+        "hasRelevantPhD"
+      ],
+      "properties": {
+        "hasRelevantPhD": {
+          "type": "boolean",
+          "description": "Has Relevant PhD",
+          "default": false
+        },
+        "phdDetails": {
+          "$ref": "#/definitions/DegreeDetails"
+        }
+      }
+    },
+    "DegreeDetails": {
+      "type": "object",
+      "title": "Degree Details",
+      "additionalProperties": false,
+      "properties": {
+        "degreeTitle": {
+          "type": "string",
+          "description": "Degree Title",
+          "maxLength": 150,
+          "minLength": 2,
+          "default": ""
+        },
+        "yearOfAward": {
+          "type": "string",
+          "description": "Year of Award",
+          "pattern": "^\\d{4}$",
+          "default": "2020"
+        },
+        "countryOfAward": {
+          "$ref": "../common/Common.json#/definitions/CountryName"
+        },
+        "awardingInstitution": {
+          "$ref": "../common/Common.json#/definitions/OrganisationName"
+        }
+      }
+    },
+    "TravelHistory": {
+      "type": "object",
+      "title": "Travel History",
+      "description": "Combined travel history using reusable definitions from molecules",
+      "additionalProperties": false,
+      "required": ["ukTravelHistory"],
+      "properties": {
+        "ukTravelHistory": {
+          "$ref": "../molecules/Travel.json#/definitions/UKTravelHistory"
+        },
+        "worldTravelHistory": {
+          "$ref": "../molecules/Travel.json#/definitions/WorldTravelHistory"
+        },
+        "specialCountryTravelHistory": {
+          "$ref": "../molecules/Travel.json#/definitions/SpecialCountryTravelHistory"
+        }
+      }
+    },
+    "FamilyApplication": {
+      "type": "object",
+      "title": "Family Application",
+      "additionalProperties": false,
+      "required": [
+        "partnerOrChildrenApplying",
+        "willOthersApply",
+        "isJoiningExistingGroup"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "partnerOrChildrenApplying": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["membersApplyingWithYou"],
+            "properties": {
+              "membersApplyingWithYou": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isJoiningExistingGroup": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "familyLinkingCode",
+              "leadApplicantName"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "partnerOrChildrenApplying": {
+          "type": "boolean",
+          "description": "Partner or Children Applying",
+          "default": false
+        },
+        "membersApplyingWithYou": {
+          "type": "array",
+          "description": "Members Applying With You",
+          "items": {
+            "$ref": "#/definitions/FamilyMemberApplying"
+          },
+          "default": []
+        },
+        "willOthersApply": {
+          "type": "boolean",
+          "description": "Will Others Apply",
+          "default": false
+        },
+        "isJoiningExistingGroup": {
+          "type": "boolean",
+          "description": "Is Joining Existing Group",
+          "default": false
+        },
+        "familyLinkingCode": {
+          "type": "string",
+          "description": "Family Linking Code",
+          "maxLength": 50,
+          "default": ""
+        },
+        "leadApplicantName": {
+          "type": "string",
+          "description": "Lead Applicant Name",
+          "maxLength": 200,
+          "default": ""
+        }
+      }
+    },
+    "FamilyMemberApplying": {
+      "type": "object",
+      "title": "Family Member Applying",
+      "additionalProperties": false,
+      "required": [
+        "givenName",
+        "familyName",
+        "relationshipToApplicant"
+      ],
+      "properties": {
+        "givenName": {
+          "type": "string",
+          "description": "Given Name",
+          "maxLength": 100,
+          "minLength": 1,
+          "default": "XXXXX"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family Name",
+          "maxLength": 100,
+          "minLength": 1,
+          "default": "XXXXX"
+        },
+        "relationshipToApplicant": {
+          "type": "string",
+          "description": "Relationship to Applicant",
+          "maxLength": 100,
+          "minLength": 1,
+          "default": "Spouse"
+        }
+      }
+    },
+    "HealthAndMedical": {
+      "type": "object",
+      "title": "Health & Medical",
+      "additionalProperties": false,
+      "required": [
+        "tuberculosisTest",
+        "ukMedicalHistory"
+      ],
+      "properties": {
+        "tuberculosisTest": {
+          "$ref": "#/definitions/TuberculosisTest"
+        },
+        "ukMedicalHistory": {
+          "$ref": "#/definitions/UKMedicalHistory"
+        }
+      }
+    },
+    "TuberculosisTest": {
+      "type": "object",
+      "title": "Tuberculosis Test",
+      "additionalProperties": false,
+      "required": [
+        "hasLivedInRequiredCountry",
+        "isRequired"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isRequired": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["hasCertificate"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "isRequired": {
+                "const": true
+              },
+              "hasCertificate": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": ["reasonForNoCertificate"],
+            "properties": {
+              "reasonForNoCertificate": {
+                "minLength": 10
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "hasLivedInRequiredCountry": {
+          "type": "boolean",
+          "description": "Has Lived in Required Country",
+          "default": false
+        },
+        "isRequired": {
+          "type": "boolean",
+          "description": "Is Required",
+          "default": false
+        },
+        "hasCertificate": {
+          "type": "boolean",
+          "description": "Has Certificate",
+          "default": false
+        },
+        "reasonForNoCertificate": {
+          "type": "string",
+          "description": "Reason for No Certificate",
+          "maxLength": 2500,
+          "default": ""
+        }
+      }
+    },
+    "UKMedicalHistory": {
+      "type": "object",
+      "title": "UK Medical History",
+      "additionalProperties": false,
+      "required": [
+        "hasReceivedTreatment"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasReceivedTreatment": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "treatments": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "hasReceivedTreatment": {
+          "type": "boolean",
+          "description": "Has Received Treatment",
+          "default": false
+        },
+        "treatments": {
+          "type": "array",
+          "description": "Treatments",
+          "items": {
+            "$ref": "#/definitions/MedicalTreatment"
+          },
+          "default": []
+        }
+      }
+    },
+    "MedicalTreatment": {
+      "type": "object",
+      "title": "Medical Treatment",
+      "additionalProperties": false,
+      "required": [
+        "facilityName",
+        "startDate",
+        "wasRequiredToPay"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "wasRequiredToPay": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["hasPaidInFull"]
+          }
+        }
+      ],
+      "properties": {
+        "facilityName": {
+          "type": "string",
+          "description": "Facility Name",
+          "maxLength": 150,
+          "minLength": 1,
+          "default": ""
+        },
+        "startDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        },
+        "endDate": {
+          "$ref": "../common/Common.json#/definitions/DateField"
+        },
+        "wasRequiredToPay": {
+          "type": "boolean",
+          "description": "Was Required to Pay",
+          "default": false
+        },
+        "hasPaidInFull": {
+          "type": "boolean",
+          "description": "Has Paid in Full",
+          "default": false
+        }
+      }
+    },
+    "FinancialDetails": {
+      "type": "object",
+      "title": "Financial Details",
+      "additionalProperties": false,
+      "required": [
+        "nationalInsuranceNumber",
+        "publicFunds",
+        "maintenanceCertification"
+      ],
+      "properties": {
+        "nationalInsuranceNumber": {
+          "$ref": "../molecules/NationalInsurance.json#/definitions/NationalInsuranceNumber"
+        },
+        "publicFunds": {
+          "$ref": "../molecules/Finance.json#/definitions/PublicFunds"
+        },
+        "maintenanceCertification": {
+          "$ref": "#/definitions/MaintenanceCertification"
+        }
+      }
+    },
+    "MaintenanceCertification": {
+      "type": "object",
+      "title": "Maintenance Certification",
+      "additionalProperties": false,
+      "required": [
+        "isCertifiedByCompany",
+        "isFamilyCertifiedByCompany"
+      ],
+      "properties": {
+        "isCertifiedByCompany": {
+          "type": "boolean",
+          "description": "Is Certified by Company",
+          "default": false
+        },
+        "isFamilyCertifiedByCompany": {
+          "type": "boolean",
+          "description": "Is Family Certified by Company",
+          "default": false
+        }
+      }
+    },
+    "CharacterAndSecurity": {
+      "type": "object",
+      "title": "Character & Security",
+      "additionalProperties": false,
+      "required": [
+        "criminalHistory",
+        "warCrimes",
+        "terroristActivities",
+        "extremistActivities",
+        "personOfGoodCharacter"
+      ],
+      "properties": {
+        "criminalHistory": {
+          "$ref": "../molecules/Convictions.json#/definitions/ConvictionsHistory"
+        },
+        "warCrimes": {
+          "$ref": "../molecules/Character.json#/definitions/StandardWarCrimes"
+        },
+        "terroristActivities": {
+          "$ref": "../molecules/Character.json#/definitions/StandardTerroristActivities"
+        },
+        "extremistActivities": {
+          "$ref": "../molecules/Character.json#/definitions/StandardExtremistActivities"
+        },
+        "personOfGoodCharacter": {
+          "$ref": "../molecules/Character.json#/definitions/StandardPersonOfGoodCharacter"
+        }
+      }
+    }
+  }
+}

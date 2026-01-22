@@ -277,6 +277,7 @@ export function ChecklistWorkspace() {
               >
                 <ChecklistDetailPanel
                   sectionTitle={selectedSection.title}
+                  sectionId={selectedSection.id}
                   items={selectedSection.items}
                   issues={selectedSectionIssues}
                 />

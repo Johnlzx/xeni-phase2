@@ -1,0 +1,582 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/sponsor_information/v1.2.0",
+  "title": "Sponsor Information Schema",
+  "description": "Comprehensive sponsor information including identity, relationship history, previous partners, and living arrangements. This is a complex molecule with deep conditional logic (up to level 3 nesting).",
+  "x-llmHint": "UK sponsor details for partner visa. Match: sponsor's passport/ID, British citizenship/settled status proof (ILR letter, naturalisation certificate), relationship evidence, sponsor's employment/income documents, sponsor's divorce documents.",
+  "x-llmRules": [
+    {
+      "ruleId": "SPONSOR_CHILDREN_CLASSIFICATION",
+      "targetPath": "sponsor.children",
+      "description": "Children belonging to THE UK SPONSOR (partner/spouse), NOT the visa applicant's dependants",
+      "identifiers": ["sponsor's children", "your partner's children", "partner has children", "sponsor has children", "Does [sponsor name] have any children"],
+      "antiPatterns": ["NEVER place sponsor's children in familyInformation.dependants[]", "NEVER confuse with applicant's own children or dependants"],
+      "outputFields": ["givenName", "familyName", "dateOfBirth", "countryOfNationality", "monthlySpendAmount"]
+    },
+    {
+      "ruleId": "SPONSOR_PREVIOUS_PARTNERS_CLASSIFICATION",
+      "targetPath": "sponsor.previousPartners",
+      "description": "Previous partners/spouses of THE UK SPONSOR, NOT the visa applicant's previous relationships",
+      "identifiers": ["sponsor's previous partner", "sponsor's ex-wife", "sponsor's ex-husband", "Has [sponsor name] been married", "sponsor's previous marriage", "partner's previous relationships"],
+      "antiPatterns": ["NEVER place sponsor's previous partners in familyInformation.previousPartners[]", "NEVER confuse with applicant's previous relationships"],
+      "outputFields": ["givenName", "familyName", "countryOfNationality", "dateOfBirth", "relationshipDetail", "marriageBeginDate", "ceremonyCityOrTown", "marriageEndDate", "willProvideDivorceCertificate", "notDivorcedReason"]
+    }
+  ],
+  "definitions": {
+    "SponsorPreviousPartner": {
+      "type": "object",
+      "description": "Sponsor's previous partner details with relationship status and conditional fields",
+      "additionalProperties": false,
+      "required": [
+        "givenName",
+        "familyName",
+        "countryOfNationality",
+        "dateOfBirth",
+        "relationshipDetail"
+      ],
+      "properties": {
+        "givenName": {
+          "type": "string",
+          "description": "Given name of sponsor's other/former partner",
+          "maxLength": 100,
+          "default": "XXXXX"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Family name of sponsor's other/former partner",
+          "maxLength": 100,
+          "default": "XXXXX"
+        },
+        "countryOfNationality": {
+          "type": "string",
+          "description": "Country of nationality of sponsor's other/former partner",
+          "maxLength": 100,
+          "default": "Afghanistan"
+        },
+        "dateOfBirth": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "Date of birth of sponsor's other/former partner", "default": "01-01-1990" }
+          ]
+        },
+        "relationshipDetail": {
+          "type": "string",
+          "description": "What is the current relationship between sponsor and this person?",
+          "enum": [
+            "Divorced or dissolved civil partnership (with or without children)",
+            "Widowed or surviving civil partner (with or without children)",
+            "Had children together but were not married or in a civil partnership",
+            "Still married or in a civil partnership"
+          ],
+          "default": "Divorced or dissolved civil partnership (with or without children)"
+        },
+        "marriageBeginDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "When did the marriage or civil partnership begin?" }
+          ]
+        },
+        "ceremonyCityOrTown": {
+          "type": "string",
+          "description": "Town or city where the ceremony took place",
+          "maxLength": 200
+        },
+        "marriageEndDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "description": "When did the marriage or civil partnership end?" }
+          ]
+        },
+        "willProvideDivorceCertificate": {
+          "type": "boolean",
+          "description": "I confirm that I will provide a divorce or dissolution certificate",
+          "default": true
+        },
+        "notDivorcedReason": {
+          "type": "string",
+          "description": "Please explain why they have not divorced or dissolved their partnership",
+          "maxLength": 500
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "relationshipDetail": {
+                "const": "Divorced or dissolved civil partnership (with or without children)"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "marriageBeginDate",
+              "ceremonyCityOrTown",
+              "marriageEndDate",
+              "willProvideDivorceCertificate"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relationshipDetail": {
+                "const": "Still married or in a civil partnership"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "notDivorcedReason"
+            ]
+          }
+        }
+      ]
+    },
+    "SponsorChild": {
+      "allOf": [
+        {
+          "$ref": "../common/Common.json#/definitions/PersonBase"
+        },
+        {
+          "type": "object",
+          "description": "Sponsor's child details",
+          "additionalProperties": false,
+          "required": [
+            "countryOfNationality",
+            "monthlySpendAmount"
+          ],
+          "properties": {
+            "givenName": {
+              "default": ""
+            },
+            "familyName": {
+              "default": ""
+            },
+            "dateOfBirth": {
+              "default": "01-01-2010"
+            },
+            "countryOfNationality": {
+              "type": "string",
+              "description": "Country of nationality",
+              "default": ""
+            },
+            "monthlySpendAmount": {
+              "type": "number",
+              "description": "How much money is spent on this dependant each month in GBP?",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        }
+      ]
+    },
+    "Sponsor": {
+      "type": "object",
+      "properties": {
+        "isPartnerSponsor": {
+          "type": "boolean",
+          "description": "Your sponsor should be your partner who has British citizenship, settled status, refugee status, humanitarian protection, Turkish ECAA status, or stateless person permission",
+          "default": true
+        },
+        "name": {
+          "$ref": "../common/Common.json#/definitions/FullName"
+        },
+        "birthDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "default": "01-01-1990" }
+          ]
+        },
+        "nationality": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/NationalityDemonym"
+            },
+            {
+              "minLength": 1,
+              "maxLength": 100,
+              "default": "British"
+            }
+          ],
+          "description": "Country of nationality"
+        },
+        "travelingWithYou": {
+          "type": "boolean",
+          "description": "Is your sponsor travelling to the UK with you?",
+          "default": false
+        },
+        "relationshipToSponsor": {
+          "type": "string",
+          "description": "What is your relationship to [sponsor name]?",
+          "enum": [
+            "Fiancé(e)",
+            "Proposed civil partner",
+            "Unmarried partner"
+          ],
+          "default": "Fiancé(e)"
+        },
+        "homeOfficeReferenceNumbers": {
+          "type": "string",
+          "description": "Does [sponsor name] have any Home Office reference numbers? Enter any Home Office reference numbers",
+          "maxLength": 50,
+          "default": ""
+        },
+        "hasHomeOfficeReferenceNumber": {
+          "type": "boolean",
+          "description": "[Sponsor name] does have a Home Office reference number",
+          "default": false
+        },
+        "nationalInsuranceNumber": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/UKNationalInsuranceNumber"
+            },
+            {
+              "pattern": "^[A-Z]{2}[0-9]{6}[A-Z]$",
+              "minLength": 9,
+              "maxLength": 9,
+              "default": ""
+            }
+          ],
+          "description": "What is [sponsor name]'s current National Insurance number? It is on [sponsor name]'s National Insurance card, benefit letter, payslip or P60. For example, 'QQ 12 34 56 C'"
+        },
+        "hasNationalInsuranceNumber": {
+          "type": "boolean",
+          "description": "[Sponsor name] does have a National Insurance number",
+          "default": false
+        },
+        "emailAddress": {
+          "allOf": [
+            {
+              "$ref": "../common/Common.json#/definitions/Email"
+            },
+            {
+              "default": "sponsor@example.com"
+            }
+          ],
+          "description": "Provide [sponsor name]'s email address"
+        },
+        "telephoneNumber": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/TelephoneNumber" },
+            { "description": "Provide [sponsor name]'s telephone number" }
+          ]
+        },
+        "haveMet": {
+          "type": "boolean",
+          "description": "Have you met [sponsor name]?",
+          "default": false 
+        },
+        "firstMetDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did you first meet [sponsor name]? (DD-MM-YYYY)",
+              "default": "01-01-2018"
+            }
+          ]
+        },
+        "relationshipBeginDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did your relationship begin? (DD-MM-YYYY)",
+              "default": "01-06-2018"
+            }
+          ]
+        },
+        "meetingFrequency": {
+          "type": "string",
+          "description": "How often do you usually see (meet) [sponsor name]? For example, weekly, monthly, three times a year",
+          "maxLength": 200,
+          "default": "weekly"
+        },
+        "lastSeenDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did you last see [sponsor name]? (DD-MM-YYYY)",
+              "default": "01-12-2024"
+            }
+          ]
+        },
+        "currentlyLiveTogether": {
+          "type": "boolean",
+          "description": "Do you and [sponsor name] currently live together?",
+          "default": false
+        },
+        "notLivingTogetherReason": {
+          "type": "string",
+          "description": "Explain why you do not live together",
+          "maxLength": 500,
+          "default": ""
+        },
+        "haveLivedTogether": {
+          "type": "boolean",
+          "description": "Have you ever lived with [sponsor name]?",
+          "default": false
+        },
+        "previousLivingAddress": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/InternationalAddress" },
+            { "description": "Provide the address where you lived together for the longest amount of time" }
+          ]
+        },
+        "livingTogetherStartDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did you start living at this address together? (DD-MM-YYYY)",
+              "default": "01-01-2020"
+            }
+          ]
+        },
+        "livingTogetherEndDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            {
+              "description": "When did you stop living at this address together? (DD-MM-YYYY)",
+              "default": "01-01-2024"
+            }
+          ]
+        },
+        "hasChildren": {
+          "type": "boolean",
+          "description": "Does [sponsor name] have any children?",
+          "default": false,
+          "x-computed": "exists(children)"
+        },
+        "children": {
+          "type": "array",
+          "description": "Sponsor's children",
+          "items": {
+            "$ref": "#/definitions/SponsorChild"
+          },
+          "default": []
+        },
+        "hasPreviousPartners": {
+          "type": "boolean",
+          "description": "Has [sponsor name] been married, in a civil partnership or had any other partner?",
+          "default": false,
+          "x-computed": "exists(previousPartners)"
+        },
+        "previousPartners": {
+          "type": "array",
+          "description": "Sponsor's previous partners",
+          "items": {
+            "$ref": "#/definitions/SponsorPreviousPartner"
+          },
+          "default": []
+        },
+        "hasSharedFinancialResponsibilities": {
+          "type": "boolean",
+          "description": "Do you and your partner have any shared financial responsibilities? For example, utility bills, mortgage or rent, childcare costs, loan payments",
+          "default": false,
+          "x-computed": "exists(sharedFinancialResponsibilitiesDetails)"
+        },
+        "sharedFinancialResponsibilitiesDetails": {
+          "type": "string",
+          "description": "List your shared financial responsibilities and how much you pay each month. You will need to provide evidence of your shared financial responsibilities",
+          "maxLength": 500,
+          "default": ""
+        },
+        "fluentLanguages": {
+          "type": "array",
+          "description": "What languages does your partner speak fluently?",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "default": ["English"]
+        },
+        "communicationLanguages": {
+          "type": "array",
+          "description": "What languages do you and your partner use to communicate with each other?",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "default": ["English"]
+        },
+        "hasValidPassport": {
+          "type": "boolean",
+          "description": "Does [sponsor name] have a valid passport?",
+          "default": true,
+          "x-computed": "exists(passportNumber)"
+        },
+        "passportNumber": {
+          "type": "string",
+          "description": "Passport number",
+          "maxLength": 20,
+          "default": "P1111111"
+        },
+        "passportIssuingAuthority": {
+          "type": "string",
+          "description": "Issuing authority (This could also be referred to as 'Country of issue' or 'Place of issue' on your partner's passport)",
+          "maxLength": 100,
+          "default": "HMPO"
+        },
+        "passportIssueDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "default": "01-01-2020" }
+          ]
+        },
+        "passportExpiryDate": {
+          "allOf": [
+            { "$ref": "../common/Common.json#/definitions/DateField" },
+            { "default": "01-01-2030" }
+          ]
+        },
+        "canProvidePassportCopy": {
+          "type": "boolean",
+          "description": "Confirm you can provide a copy of this passport",
+          "default": true
+        }
+      },
+      "required": [
+        "isPartnerSponsor",
+        "haveMet",
+        "currentlyLiveTogether",
+        "hasChildren",
+        "hasPreviousPartners",
+        "hasSharedFinancialResponsibilities",
+        "hasValidPassport"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "isPartnerSponsor": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "name",
+              "birthDate",
+              "nationality",
+              "travelingWithYou"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "haveMet": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "firstMetDate",
+              "relationshipBeginDate",
+              "meetingFrequency",
+              "lastSeenDate"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "currentlyLiveTogether": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "notLivingTogetherReason",
+              "haveLivedTogether"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "haveLivedTogether": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "previousLivingAddress",
+              "livingTogetherStartDate",
+              "livingTogetherEndDate"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasChildren": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "children"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasPreviousPartners": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "previousPartners"
+            ],
+            "properties": {
+              "previousPartners": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasSharedFinancialResponsibilities": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "sharedFinancialResponsibilitiesDetails"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasValidPassport": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "passportNumber",
+              "passportIssuingAuthority",
+              "passportIssueDate",
+              "passportExpiryDate",
+              "canProvidePassportCopy"
+            ]
+          }
+        }
+      ],
+      "description": "Comprehensive sponsor information including identity, relationship history, previous partners, shared financial responsibilities, living arrangements, and passport details. This is a complex molecule with deep conditional logic (up to level 3 nesting)."
+    }
+  }
+}

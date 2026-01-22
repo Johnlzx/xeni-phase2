@@ -1,0 +1,474 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.cosxai.com/schemas/molecules/convictions_penalties/v1.0.0",
+  "title": "Convictions and Penalties Schema",
+  "description": "Criminal convictions, driving offences, arrests, cautions, court judgments, and civil penalties",
+  "x-llmHint": "Criminal and civil history. Match: police certificates, court judgments, driving licence endorsements, bankruptcy records, civil penalty notices.",
+  "definitions": {
+    "Convictions": {
+      "type": "object",
+      "properties": {
+        "hasConvictionsOrPenalties": {
+          "type": "string",
+          "description": "Only select one answer at a time. If you need to give more than one answer, you can do so on another page. You must tell us about spent as well as unspent convictions. You must tell us about any absolute or conditional discharges you have received for an offence.",
+          "enum": [
+            "A criminal conviction",
+            "A penalty for a driving offence, for example disqualification for speeding or no motor insurance",
+            "An arrest or charge for which you are currently on, or awaiting trial",
+            "A caution, warning, reprimand or other out-of-court penalty",
+            "A civil court judgment against you, for example for non payment of debt, bankruptcy proceedings or anti-social behaviour",
+            "A civil penalty issued under UK immigration law",
+            "No, I have never had any of these"
+          ],
+          "default": "No, I have never had any of these"
+        },
+        "criminalConvictions": {
+          "type": "array",
+          "description": "Criminal convictions",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "crime",
+              "sentenceDetails",
+              "sentenceDate",
+              "country"
+            ],
+            "properties": {
+              "crime": {
+                "type": "string",
+                "description": "What crime were you convicted of?",
+                "maxLength": 200,
+                "default": "XXXXX"
+              },
+              "sentenceDetails": {
+                "type": "string",
+                "description": "Include details about the sentence, for example, how long it was, how much you served, if you went to prison or did community service",
+                "maxLength": 500,
+                "default": "XXXXX"
+              },
+              "sentenceDate": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/DateField" },
+                  { "default": "01-01-2020" }
+                ],
+                "description": "Date you were sentenced"
+              },
+              "country": {
+                "type": "string",
+                "description": "Which country were you convicted in?",
+                "default": "United Kingdom"
+              }
+            }
+          },
+          "default": [
+            {
+              "crime": "XXXXX",
+              "sentenceDetails": "XXXXX",
+              "sentenceDate": "01-01-2020",
+              "country": "United Kingdom"
+            }
+          ]
+        },
+        "drivingOffences": {
+          "type": "array",
+          "description": "Driving offences",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "offenceType",
+              "offenceDetails",
+              "penaltyDate",
+              "country"
+            ],
+            "properties": {
+              "offenceType": {
+                "type": "string",
+                "description": "What was your driving offence?",
+                "enum": [
+                  "Disqualification for speeding",
+                  "No insurance",
+                  "Other"
+                ],
+                "default": "Disqualification for speeding"
+              },
+              "offenceTypeOther": {
+                "type": "string",
+                "description": "Tell us what",
+                "maxLength": 200,
+                "default": ""
+              },
+              "offenceDetails": {
+                "type": "string",
+                "description": "Give more detail, for example, the fine or points on your licence",
+                "maxLength": 500,
+                "default": "XXXXX"
+              },
+              "penaltyDate": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/DateField" },
+                  { "default": "01-01-2020" }
+                ],
+                "description": "Date of the penalty"
+              },
+              "country": {
+                "type": "string",
+                "description": "Which country was the offence in?",
+                "default": "United Kingdom"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "offenceType": {
+                      "const": "Other"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "offenceTypeOther"
+                  ]
+                }
+              }
+            ]
+          },
+          "default": [
+            {
+              "offenceType": "Disqualification for speeding",
+              "offenceDetails": "XXXXX",
+              "penaltyDate": "01-01-2020",
+              "country": "United Kingdom"
+            }
+          ]
+        },
+        "arrestsCharges": {
+          "type": "array",
+          "description": "Arrests and charges",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "arrestReason",
+              "arrestDetails",
+              "country"
+            ],
+            "properties": {
+              "arrestReason": {
+                "type": "string",
+                "description": "Why were you arrested and charged?",
+                "maxLength": 200,
+                "default": "XXXXX"
+              },
+              "arrestDetails": {
+                "type": "string",
+                "description": "Give more detail including arrest date, charge date and any court dates",
+                "maxLength": 500,
+                "default": "XXXXX"
+              },
+              "country": {
+                "type": "string",
+                "description": "Which country were you arrested and charged in?",
+                "default": "United Kingdom"
+              }
+            }
+          },
+          "default": [
+            {
+              "arrestReason": "XXXXX",
+              "arrestDetails": "XXXXX",
+              "country": "United Kingdom"
+            }
+          ]
+        },
+        "outOfCourtPenalties": {
+          "type": "array",
+          "description": "Out-of-court penalties",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "penaltyType",
+              "penaltyDetails",
+              "penaltyDate",
+              "country"
+            ],
+            "properties": {
+              "penaltyType": {
+                "type": "string",
+                "description": "Which out-of-court penalty did you receive?",
+                "enum": [
+                  "A conditional caution",
+                  "A warning or reprimand",
+                  "A fixed penalty notice",
+                  "Other"
+                ],
+                "default": "A conditional caution"
+              },
+              "penaltyTypeOther": {
+                "type": "string",
+                "description": "Tell us what",
+                "maxLength": 200,
+                "default": ""
+              },
+              "penaltyDetails": {
+                "type": "string",
+                "description": "Give more detail and if it was a conditional caution, include the conditions",
+                "maxLength": 500,
+                "default": "XXXXX"
+              },
+              "penaltyDate": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/DateField" },
+                  { "default": "01-01-2020" }
+                ],
+                "description": "Date you got this penalty"
+              },
+              "country": {
+                "type": "string",
+                "description": "Which country was this in?",
+                "default": "United Kingdom"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "penaltyType": {
+                      "const": "Other"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "penaltyTypeOther"
+                  ]
+                }
+              }
+            ]
+          },
+          "default": [
+            {
+              "penaltyType": "A conditional caution",
+              "penaltyDetails": "XXXXX",
+              "penaltyDate": "01-01-2020",
+              "country": "United Kingdom"
+            }
+          ]
+        },
+        "civilCourtJudgments": {
+          "type": "array",
+          "description": "Civil court judgments",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "judgment",
+              "judgmentDetails",
+              "judgmentDate",
+              "country"
+            ],
+            "properties": {
+              "judgment": {
+                "type": "string",
+                "description": "What was the court judgment?",
+                "maxLength": 200,
+                "default": "XXXXX"
+              },
+              "judgmentDetails": {
+                "type": "string",
+                "description": "Give more detail",
+                "maxLength": 500,
+                "default": "XXXXX"
+              },
+              "judgmentDate": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/DateField" },
+                  { "default": "01-01-2020" }
+                ],
+                "description": "Date of judgment"
+              },
+              "country": {
+                "type": "string",
+                "description": "Which country was the judgment in?",
+                "default": "United Kingdom"
+              }
+            }
+          },
+          "default": [
+            {
+              "judgment": "XXXXX",
+              "judgmentDetails": "XXXXX",
+              "judgmentDate": "01-01-2020",
+              "country": "United Kingdom"
+            }
+          ]
+        },
+        "civilImmigrationPenalties": {
+          "type": "array",
+          "description": "Civil penalties under UK immigration law",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "penaltyReason",
+              "penaltyDetails",
+              "penaltyDate"
+            ],
+            "properties": {
+              "penaltyReason": {
+                "type": "string",
+                "description": "Why did you get the civil penalty?",
+                "maxLength": 200,
+                "default": "XXXXX"
+              },
+              "penaltyDetails": {
+                "type": "string",
+                "description": "Give more detail, for example, how much was the penalty",
+                "maxLength": 500,
+                "default": "XXXXX"
+              },
+              "penaltyDate": {
+                "allOf": [
+                  { "$ref": "../common/Common.json#/definitions/DateField" },
+                  { "default": "01-01-2020" }
+                ],
+                "description": "Date of penalty"
+              }
+            }
+          },
+          "default": [
+            {
+              "penaltyReason": "XXXXX",
+              "penaltyDetails": "XXXXX",
+              "penaltyDate": "01-01-2020"
+            }
+          ]
+        }
+      },
+      "required": [
+        "hasConvictionsOrPenalties"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hasConvictionsOrPenalties": {
+                "const": "A criminal conviction"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "criminalConvictions"
+            ],
+            "properties": {
+              "criminalConvictions": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasConvictionsOrPenalties": {
+                "const": "A penalty for a driving offence, for example disqualification for speeding or no motor insurance"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "drivingOffences"
+            ],
+            "properties": {
+              "drivingOffences": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasConvictionsOrPenalties": {
+                "const": "An arrest or charge for which you are currently on, or awaiting trial"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "arrestsCharges"
+            ],
+            "properties": {
+              "arrestsCharges": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasConvictionsOrPenalties": {
+                "const": "A caution, warning, reprimand or other out-of-court penalty"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "outOfCourtPenalties"
+            ],
+            "properties": {
+              "outOfCourtPenalties": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasConvictionsOrPenalties": {
+                "const": "A civil court judgment against you, for example for non payment of debt, bankruptcy proceedings or anti-social behaviour"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "civilCourtJudgments"
+            ],
+            "properties": {
+              "civilCourtJudgments": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hasConvictionsOrPenalties": {
+                "const": "A civil penalty issued under UK immigration law"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "civilImmigrationPenalties"
+            ],
+            "properties": {
+              "civilImmigrationPenalties": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "description": "Criminal convictions, driving offences, arrests, cautions, court judgments, and civil penalties"
+    }
+  }
+}
