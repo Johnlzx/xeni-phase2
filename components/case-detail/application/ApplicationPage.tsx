@@ -323,7 +323,7 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
 
     // Find passport document group
     const passportGroup = documentGroups.find(
-      (group) => group.name?.toLowerCase().includes("passport")
+      (group) => group.title?.toLowerCase().includes("passport")
     );
     if (passportGroup && passportGroup.files.length > 0) {
       docs.push({
@@ -335,7 +335,7 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
 
     // Find case notes document group
     const caseNotesGroup = documentGroups.find(
-      (group) => group.name?.toLowerCase().includes("case note")
+      (group) => group.title?.toLowerCase().includes("case note")
     );
     if (caseNotesGroup && caseNotesGroup.files.length > 0) {
       docs.push({
