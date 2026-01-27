@@ -7,13 +7,22 @@ import {
   CheckCircle2,
   Circle,
   FileText,
-  Sparkles,
   Forward,
   RefreshCw,
   ClipboardCheck,
   Check,
   Edit3,
+  Plus,
 } from "lucide-react";
+import {
+  useCaseDetailStore,
+  useHasNewFilesAfterAnalysis,
+  useNewFilesCount,
+  useEnhancedChecklistItems,
+  useEnhancedQualityIssues,
+  useDocumentGroups,
+} from "@/store/case-detail-store";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -21,14 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  useCaseDetailStore,
-  useHasNewFilesAfterAnalysis,
-  useNewFilesCount,
-  useEnhancedChecklistItems,
-  useEnhancedQualityIssues,
-} from "@/store/case-detail-store";
-import { cn } from "@/lib/utils";
 import { VisaTypeDialog, getVisaConfig } from "../overview/ApplicationCard/VisaTypeDialog";
 import { AnalysisPreviewDialog } from "../overview/ApplicationCard/AnalysisPreviewDialog";
 import { ChecklistSectionType, EnhancedChecklistItem, EnhancedQualityIssue } from "@/types/case-detail";
@@ -88,55 +89,83 @@ function EmptyStateLayout({
   );
 }
 
+// Tab label mapping for breadcrumb
+const TAB_LABELS: Record<string, string> = {
+  overview: "Overview",
+  details: "Details",
+  "supporting-documents": "Supporting Documents",
+};
+
 // Inline header for checklist view (integrated into main content area)
-function ChecklistHeader({ onRequestInfo }: { onRequestInfo: () => void }) {
+function ChecklistHeader({
+  onRequestInfo,
+  sectionTitle,
+  activeTab,
+  onNavigateToOverview,
+}: {
+  onRequestInfo: () => void;
+  sectionTitle?: string;
+  activeTab?: "overview" | "details" | "supporting-documents";
+  onNavigateToOverview?: () => void;
+}) {
   const [showAnalysisPreview, setShowAnalysisPreview] = useState(false);
 
-  const selectedVisaType = useCaseDetailStore((state) => state.selectedVisaType);
   const documentGroups = useCaseDetailStore((state) => state.documentGroups);
   const reAnalyze = useCaseDetailStore((state) => state.reAnalyze);
   const hasNewFilesAfterAnalysis = useHasNewFilesAfterAnalysis();
   const newFilesCount = useNewFilesCount();
   const launchFormPilot = useCaseDetailStore((state) => state.launchFormPilot);
 
-  const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
-
   const handleConfirmAnalysis = () => reAnalyze();
+
+  // Show breadcrumb when not on overview tab
+  const showBreadcrumb = activeTab && activeTab !== "overview" && onNavigateToOverview;
 
   return (
     <div className="shrink-0 px-5 py-3 bg-white border-b border-stone-200">
       <div className="flex items-center justify-between">
-        {/* Left: Visa type + Status */}
+        {/* Left: Section title (or breadcrumb) + Status */}
         <div className="flex items-center gap-4">
-          {visaConfig && (
-            <div className="flex items-center gap-2.5">
-              <div className={cn("size-9 rounded-lg flex items-center justify-center", visaConfig.bgColor)}>
-                <visaConfig.icon size={18} className={visaConfig.color} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-stone-800">{visaConfig.shortName}</h3>
-                {/* Status: All files analyzed vs Update available */}
-                <div className="flex items-center gap-1.5 text-xs">
-                  {hasNewFilesAfterAnalysis ? (
-                    <>
-                      <div className="size-1.5 rounded-full bg-amber-500" />
-                      <span className="text-amber-600">Update available</span>
-                      {newFilesCount > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium tabular-nums">
-                          +{newFilesCount} file{newFilesCount > 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="size-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-emerald-600">All files analyzed</span>
-                    </>
+          <div>
+            {showBreadcrumb ? (
+              /* Breadcrumb Navigation */
+              <nav className="flex items-center gap-1.5 text-sm">
+                <button
+                  onClick={onNavigateToOverview}
+                  className="font-medium text-stone-500 hover:text-stone-700 transition-colors"
+                >
+                  {sectionTitle}
+                </button>
+                <ChevronRight className="size-4 text-stone-400" />
+                <span className="font-semibold text-stone-800">
+                  {TAB_LABELS[activeTab]}
+                </span>
+              </nav>
+            ) : (
+              <h3 className="text-sm font-semibold text-stone-800 text-balance">
+                {sectionTitle || "Select a section"}
+              </h3>
+            )}
+            {/* Status: All files analyzed vs Update available */}
+            <div className="flex items-center gap-1.5 text-xs">
+              {hasNewFilesAfterAnalysis ? (
+                <>
+                  <div className="size-1.5 rounded-full bg-amber-500" />
+                  <span className="text-amber-600">Update available</span>
+                  {newFilesCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium tabular-nums">
+                      +{newFilesCount} file{newFilesCount > 1 ? "s" : ""}
+                    </span>
                   )}
-                </div>
-              </div>
+                </>
+              ) : (
+                <>
+                  <div className="size-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-600">All files analyzed</span>
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right: Action buttons */}
@@ -165,11 +194,9 @@ function ChecklistHeader({ onRequestInfo }: { onRequestInfo: () => void }) {
           {/* Form Pilot button */}
           <button
             onClick={launchFormPilot}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors"
           >
-            <Sparkles className="size-3.5" />
             Form Pilot
-            <ChevronRight className="size-3.5" />
           </button>
         </div>
       </div>
@@ -283,36 +310,45 @@ function ApplicationEmptyState({ onOpenVisaDialog }: { onOpenVisaDialog: () => v
   );
 }
 
-// Source badge component for assessment fields
-function AssessmentSourceBadge({ source, documentName, isEdited }: { source?: "extracted"; documentName?: string; isEdited: boolean }) {
-  if (isEdited) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-violet-600 bg-violet-50 border border-violet-100 rounded">
-        <Edit3 className="size-2.5" />
-        Edited
-      </span>
-    );
-  }
-
-  if (source === "extracted" && documentName) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded">
-        <FileText className="size-2.5" />
-        {documentName}
-      </span>
-    );
-  }
-
-  return null;
-}
-
-// Assessment Detail Panel - shows assessment fields in key-value format
+// Assessment Detail Panel - matches CaseAssessmentForm layout for consistency
 function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaType }) {
   const passport = useCaseDetailStore((state) => state.clientProfile.passport);
   const questionnaireAnswers = useCaseDetailStore((state) => state.questionnaireAnswers);
   const submitQuestionnaireAnswers = useCaseDetailStore((state) => state.submitQuestionnaireAnswers);
+  const documentGroups = useDocumentGroups();
 
-  // Assessment fields - same as in CaseAssessmentForm but displayed in detail format
+  // Reference documents for Case Assessment - only show uploaded passport and case notes
+  const referenceDocuments = useMemo(() => {
+    const docs: { id: string; name: string; fileName: string }[] = [];
+
+    // Find passport document group
+    const passportGroup = documentGroups.find(
+      (group) => group.name?.toLowerCase().includes("passport")
+    );
+    if (passportGroup && passportGroup.files.length > 0) {
+      docs.push({
+        id: "passport",
+        name: "Passport",
+        fileName: passportGroup.files[0].name,
+      });
+    }
+
+    // Find case notes document group
+    const caseNotesGroup = documentGroups.find(
+      (group) => group.name?.toLowerCase().includes("case note")
+    );
+    if (caseNotesGroup && caseNotesGroup.files.length > 0) {
+      docs.push({
+        id: "case-notes",
+        name: "Case Notes",
+        fileName: caseNotesGroup.files[0].name,
+      });
+    }
+
+    return docs;
+  }, [documentGroups]);
+
+  // Assessment fields - same as in CaseAssessmentForm
   const MAJORITY_ENGLISH_COUNTRIES = [
     "British", "United Kingdom", "UK",
     "United States", "USA", "American",
@@ -466,7 +502,6 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
   const editedFieldIds = useMemo(() => {
     const edited = new Set<string>();
     fields.forEach((field) => {
-      // If field has prefilled value and current value differs from prefilled
       if (field.prefilledValue && values[field.id] && values[field.id] !== field.prefilledValue) {
         edited.add(field.id);
       }
@@ -499,6 +534,7 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
 
   // Calculate completion
   const completedCount = visibleFields.filter((f) => values[f.id]).length;
+  const totalCount = visibleFields.length;
 
   const handleFieldChange = (fieldId: string, value: string) => {
     setValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -512,101 +548,191 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
     setValues({ ...originalValues });
   };
 
-  return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Section Header */}
-      <div className="shrink-0 px-6 py-3 border-b border-stone-100">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
-            <h2 className="text-base font-semibold text-stone-900">Case Assessment</h2>
-            <span className="text-xs text-stone-400 tabular-nums">
-              {completedCount}/{visibleFields.length} complete
-            </span>
-          </div>
-          {/* Status */}
-          {visibleFields.length - completedCount > 0 && (
-            <span className="text-xs text-stone-500 tabular-nums">
-              {visibleFields.length - completedCount} field{visibleFields.length - completedCount > 1 ? "s" : ""} needed
-            </span>
+  // Calculate progress
+  const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const isComplete = completedCount === totalCount;
+
+  // Progress Ring Component (matches CaseAssessmentForm)
+  const ProgressRing = ({ percent, isComplete, size = 48 }: { percent: number; isComplete: boolean; size?: number }) => {
+    const strokeWidth = 4;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (percent / 100) * circumference;
+
+    return (
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg className="-rotate-90" width={size} height={size}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            className="text-stone-200"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className={isComplete ? "text-emerald-500" : "text-amber-500"}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          {isComplete ? (
+            <CheckCircle2 className="size-5 text-emerald-500" />
+          ) : (
+            <span className="text-xs font-bold text-stone-700 tabular-nums">{percent}%</span>
           )}
         </div>
       </div>
+    );
+  };
 
-      {/* Fields - Two column grid */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div className="px-6 py-5">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            {visibleFields.map((field) => {
-              const value = values[field.id] || "";
-              const hasValue = !!value;
-              const selectedOption = field.options.find((o) => o.value === value);
-              const isEditedFromExtracted = editedFieldIds.has(field.id);
-              const isExtracted = field.source === "extracted" && value === field.prefilledValue;
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Header - Fixed height with Reference Documents, matches CaseAssessmentForm pattern */}
+      <div className="shrink-0 p-4 border-b border-stone-100">
+        <div className="flex items-center gap-4">
+          {/* Left - Progress Summary */}
+          <div className="shrink-0 flex items-center gap-3">
+            <ProgressRing percent={percent} isComplete={isComplete} size={48} />
+            <div>
+              <h3 className="text-sm font-semibold text-stone-700">Case Assessment</h3>
+              <p className="text-[11px] text-stone-400 tabular-nums">
+                {completedCount} of {totalCount} completed
+              </p>
+            </div>
+          </div>
 
-              // All assessment fields are required
-              const isRequired = true;
+          {/* Divider */}
+          <div className="w-px self-stretch bg-stone-200 shrink-0" />
 
-              return (
-                <div
-                  key={field.id}
-                  className={cn(
-                    "group py-3 px-3 rounded-lg transition-colors",
-                    !hasValue && isRequired && "bg-amber-50/30"
-                  )}
-                >
-                  {/* Label row with status and source badge */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className={cn(
-                        "shrink-0 size-1.5 rounded-full",
-                        hasValue ? "bg-emerald-500" : isRequired ? "bg-amber-400" : "bg-stone-300"
-                      )} />
-                      <label className="text-[11px] font-medium text-stone-600 leading-tight truncate">
-                        {field.label}
-                      </label>
-                    </div>
-                    {hasValue && (
-                      <AssessmentSourceBadge
-                        source={field.source}
-                        documentName={field.sourceDocument}
-                        isEdited={isEditedFromExtracted}
-                      />
-                    )}
-                  </div>
-
-                  {/* Select dropdown - styled to match text input in ChecklistDetailPanel */}
-                  <Select value={value} onValueChange={(v) => handleFieldChange(field.id, v)}>
-                    <SelectTrigger className={cn(
-                      "w-full",
-                      !hasValue && "bg-stone-50"
-                    )}>
-                      <SelectValue placeholder={isRequired ? "Required" : "Optional"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {field.options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-            })}
+          {/* Right - Reference Documents (vertical layout) */}
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
+              </div>
+              <button
+                className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 rounded-md transition-colors"
+              >
+                <Plus className="size-3" />
+                Add
+              </button>
+            </div>
+            {/* Document cards row (horizontal scroll) */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+              {referenceDocuments.length > 0 ? (
+                referenceDocuments.map((doc) => (
+                  <button
+                    key={doc.id}
+                    className="group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
+                  >
+                    <FileText className="size-4 text-blue-500" />
+                    <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover:text-blue-700">
+                      {doc.fileName}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <span className="text-xs text-stone-400">No documents uploaded</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Footer - only show when changes detected */}
+      {/* Scrollable Content */}
+      <div className="flex-1 px-5 py-4 overflow-y-auto">
+        {/* Fields Section Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-medium text-stone-600">Questions</h4>
+            {totalCount - completedCount > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded tabular-nums">
+                {totalCount - completedCount} remaining
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Fields List - matches CaseAssessmentForm AssessmentField component style */}
+        <div className="space-y-1">
+          {visibleFields.map((field) => {
+            const value = values[field.id] || "";
+            const hasValue = !!value;
+            const isRequired = true;
+            const isExtractedValue = field.source === "extracted" && value === field.prefilledValue;
+            const isEditedFromExtracted = editedFieldIds.has(field.id);
+
+            return (
+              <div
+                key={field.id}
+                className="group py-3 px-3 rounded-lg transition-colors hover:bg-stone-50/50"
+              >
+                {/* Label row with status and source badge */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className={cn(
+                      "shrink-0 size-1.5 rounded-full",
+                      hasValue ? "bg-emerald-500" : isRequired ? "bg-amber-400" : "bg-stone-300"
+                    )} />
+                    <label className="text-[11px] font-medium text-stone-600 leading-tight truncate">
+                      {field.label}
+                    </label>
+                  </div>
+                  {/* Source badge */}
+                  {hasValue && isExtractedValue && field.sourceDocument && !isEditedFromExtracted && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded">
+                      <FileText className="size-2.5" />
+                      {field.sourceDocument}
+                    </span>
+                  )}
+                  {isEditedFromExtracted && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-violet-600 bg-violet-50 border border-violet-100 rounded">
+                      <Edit3 className="size-2.5" />
+                      Edited
+                    </span>
+                  )}
+                </div>
+
+                {/* Select dropdown - matches CaseAssessmentForm */}
+                <Select value={value} onValueChange={(v) => handleFieldChange(field.id, v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={isRequired ? "Required" : "Optional"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {field.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Footer - shows when changes detected */}
       {hasChanges && (
-        <div className="shrink-0 px-6 py-3 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
-          <p className="text-xs text-stone-500">
+        <div className="shrink-0 px-4 py-3 border-t border-stone-100 flex items-center justify-between bg-stone-50/50">
+          <p className="text-xs text-stone-500 tabular-nums">
             {changedFieldIds.size} field{changedFieldIds.size !== 1 ? "s" : ""} modified
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 text-sm font-medium text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -703,8 +829,22 @@ export function ApplicationPage() {
   const enhancedItems = useEnhancedChecklistItems();
   const enhancedIssues = useEnhancedQualityIssues();
 
+  const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
+
   const [selectedSectionId, setSelectedSectionId] = useState<ChecklistSectionType | "assessment" | null>(null);
   const [showSendSummaryModal, setShowSendSummaryModal] = useState(false);
+  const [detailActiveTab, setDetailActiveTab] = useState<"overview" | "details" | "supporting-documents">("overview");
+
+  // Reset to overview when section changes
+  const handleSectionSelect = (sectionId: ChecklistSectionType | "assessment") => {
+    setSelectedSectionId(sectionId);
+    setDetailActiveTab("overview");
+  };
+
+  // Navigate back to overview from breadcrumb
+  const handleNavigateToOverview = () => {
+    setDetailActiveTab("overview");
+  };
 
   // Check if questionnaire needs to be shown - show when visa is selected but questionnaire not completed
   const needsQuestionnaire = selectedVisaType && Object.keys(questionnaireAnswers).length === 0;
@@ -726,19 +866,27 @@ export function ApplicationPage() {
       const config = SECTION_CONFIG[sectionType];
       const completedCount = items.filter((i) => i.status === "complete").length;
 
-      // Missing data: items without value
-      const missingDataCount = items.filter((i) => !i.value).length;
+      // Missing data: items without value (check for empty/whitespace strings too)
+      const missingDataCount = items.filter((i) => !i.value?.trim()).length;
 
-      // Missing evidence: count unique evidence items that are not uploaded
-      const evidenceMap = new Map<string, boolean>();
+      // Collect all unique evidence from items
+      const evidenceMap = new Map<string, { isUploaded: boolean; name: string }>();
       items.forEach((item) => {
         item.requiredEvidence?.forEach((ev) => {
           if (!evidenceMap.has(ev.id)) {
-            evidenceMap.set(ev.id, ev.isUploaded);
+            evidenceMap.set(ev.id, { isUploaded: ev.isUploaded, name: ev.name });
           }
         });
       });
-      const missingEvidenceCount = Array.from(evidenceMap.values()).filter((uploaded) => !uploaded).length;
+
+      // Reference docs: passport, CoS, etc. (used for data extraction, not counted as "docs needed")
+      const referenceKeywords = ["passport", "cos", "certificate of sponsorship", "biometric"];
+
+      // Missing evidence: only count supporting documents (not reference docs) that are not uploaded
+      const missingEvidenceCount = Array.from(evidenceMap.values()).filter((ev) => {
+        const isReference = referenceKeywords.some((kw) => ev.name.toLowerCase().includes(kw));
+        return !isReference && !ev.isUploaded;
+      }).length;
 
       return {
         id: sectionType,
@@ -780,7 +928,15 @@ export function ApplicationPage() {
             <div className="w-56 shrink-0 bg-white rounded-xl border border-stone-200 flex flex-col overflow-hidden">
               {/* Checklist header with progress bar */}
               <div className="shrink-0 px-4 py-3 border-b border-stone-100">
-                <h4 className="text-xs font-semibold text-stone-600 uppercase tracking-wide mb-2">Checklist</h4>
+                <h4 className="text-xs font-semibold text-stone-600 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <span>Checklist</span>
+                  {visaConfig && (
+                    <>
+                      <span className="text-stone-300">·</span>
+                      <span className="normal-case tracking-normal">{visaConfig.shortName}</span>
+                    </>
+                  )}
+                </h4>
 
                 {/* Progress bar */}
                 {(() => {
@@ -802,22 +958,8 @@ export function ApplicationPage() {
                       </div>
 
                       {/* Stats */}
-                      <div className="flex items-center justify-between text-[10px]">
+                      <div className="flex items-center text-[10px]">
                         <span className="text-stone-600 font-medium">{Math.round(completePercent)}% Complete</span>
-                        <div className="flex items-center gap-2">
-                          {totalMissingData > 0 && (
-                            <span className="flex items-center gap-1 text-stone-400">
-                              <span className="size-1.5 rounded-full bg-stone-400" />
-                              {totalMissingData}
-                            </span>
-                          )}
-                          {totalMissingEvidence > 0 && (
-                            <span className="flex items-center gap-1 text-amber-600">
-                              <span className="size-1.5 rounded-full bg-amber-500" />
-                              {totalMissingEvidence}
-                            </span>
-                          )}
-                        </div>
                       </div>
                     </>
                   );
@@ -827,7 +969,7 @@ export function ApplicationPage() {
               <div className="flex-1 overflow-y-auto">
                 {/* Case Assessment - permanent item */}
                 <button
-                  onClick={() => setSelectedSectionId("assessment")}
+                  onClick={() => handleSectionSelect("assessment")}
                   className={cn(
                     "w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors border-l-2",
                     selectedSectionId === "assessment"
@@ -869,7 +1011,7 @@ export function ApplicationPage() {
                     key={section.id}
                     section={section}
                     isSelected={selectedSectionId === section.id}
-                    onClick={() => setSelectedSectionId(section.id)}
+                    onClick={() => handleSectionSelect(section.id)}
                   />
                 ))}
               </div>
@@ -877,8 +1019,15 @@ export function ApplicationPage() {
 
             {/* Detail Panel - rounded container with integrated header */}
             <div className="flex-1 flex flex-col bg-white rounded-xl border border-stone-200 overflow-hidden">
-              {/* Integrated header - visa info, progress, actions */}
-              <ChecklistHeader onRequestInfo={() => setShowSendSummaryModal(true)} />
+              {/* Integrated header - only show for checklist sections, not Case Assessment */}
+              {selectedSectionId !== "assessment" && (
+                <ChecklistHeader
+                  onRequestInfo={() => setShowSendSummaryModal(true)}
+                  sectionTitle={selectedSection?.title}
+                  activeTab={selectedSectionId !== "employment" ? detailActiveTab : undefined}
+                  onNavigateToOverview={selectedSectionId !== "employment" ? handleNavigateToOverview : undefined}
+                />
+              )}
 
               {/* Detail content */}
               <div className="flex-1 min-h-0 overflow-hidden">
@@ -890,6 +1039,8 @@ export function ApplicationPage() {
                     sectionId={selectedSection.id}
                     items={selectedSection.items}
                     issues={selectedSectionIssues}
+                    onTabChange={setDetailActiveTab}
+                    externalActiveTab={detailActiveTab}
                   />
                 ) : (
                   <EmptyDetailPanel />

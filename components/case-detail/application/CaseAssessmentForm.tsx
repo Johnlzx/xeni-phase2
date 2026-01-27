@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion } from "motion/react";
 import {
-  ChevronRight,
   Sparkles,
   Share2,
   Copy,
@@ -11,6 +10,7 @@ import {
   ExternalLink,
   ClipboardCheck,
   FileText,
+  Plus,
 } from "lucide-react";
 import {
   Select,
@@ -21,9 +21,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { VisaType, PassportInfo } from "@/types";
-import { useCaseDetailStore } from "@/store/case-detail-store";
+import { useCaseDetailStore, useDocumentGroups } from "@/store/case-detail-store";
 import { LockedChecklistPreview } from "./LockedChecklistPreview";
-import { getVisaConfig } from "./ApplicationLandingPage";
 
 // Majority English-speaking countries for auto-detection
 const MAJORITY_ENGLISH_COUNTRIES = [
@@ -204,6 +203,59 @@ const CHECKLIST_SECTIONS = [
 ];
 
 // ============================================
+// Progress Ring Component
+// ============================================
+function ProgressRing({
+  percent,
+  isComplete,
+  size = 48,
+}: {
+  percent: number;
+  isComplete: boolean;
+  size?: number;
+}) {
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (percent / 100) * circumference;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg className="-rotate-90" width={size} height={size}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-stone-200"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          className={isComplete ? "text-emerald-500" : "text-amber-500"}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {isComplete ? (
+          <CheckCircle2 className="size-5 text-emerald-500" />
+        ) : (
+          <span className="text-xs font-bold text-stone-700 tabular-nums">{percent}%</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Assessment Field Component (Key-Value Style)
 // ============================================
 
@@ -220,10 +272,7 @@ function AssessmentField({ field, value, onChange }: AssessmentFieldProps) {
   const isExtractedValue = field.source === "extracted" && value === field.prefilledValue;
 
   return (
-    <div className={cn(
-      "group py-3 px-3 rounded-lg transition-colors",
-      !hasValue && isRequired && "bg-amber-50/30"
-    )}>
+    <div className="group py-3 px-3 rounded-lg transition-colors hover:bg-stone-50/50">
       {/* Label row with status and source badge */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -244,12 +293,9 @@ function AssessmentField({ field, value, onChange }: AssessmentFieldProps) {
         )}
       </div>
 
-      {/* Select dropdown - styled to match text input in ChecklistDetailPanel */}
+      {/* Select dropdown - clean modern styling */}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className={cn(
-          "w-full",
-          !hasValue && "bg-stone-50"
-        )}>
+        <SelectTrigger className="w-full">
           <SelectValue placeholder={isRequired ? "Required" : "Optional"} />
         </SelectTrigger>
         <SelectContent>
@@ -441,9 +487,40 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
   const passport = useCaseDetailStore((state) => state.clientProfile.passport);
   const caseReference = useCaseDetailStore((state) => state.caseReference);
   const submitQuestionnaireAnswers = useCaseDetailStore((state) => state.submitQuestionnaireAnswers);
+  const documentGroups = useDocumentGroups();
 
-  const visaConfig = getVisaConfig(visaType);
   const fields = useMemo(() => getAssessmentFields(visaType, passport), [visaType, passport]);
+
+  // Reference documents for Case Assessment - only show uploaded passport and case notes
+  const referenceDocuments = useMemo(() => {
+    const docs: { id: string; name: string; fileName: string }[] = [];
+
+    // Find passport document group
+    const passportGroup = documentGroups.find(
+      (group) => group.title?.toLowerCase().includes("passport")
+    );
+    if (passportGroup && passportGroup.files.length > 0) {
+      docs.push({
+        id: "passport",
+        name: "Passport",
+        fileName: passportGroup.files[0].name,
+      });
+    }
+
+    // Find case notes document group
+    const caseNotesGroup = documentGroups.find(
+      (group) => group.title?.toLowerCase().includes("case note")
+    );
+    if (caseNotesGroup && caseNotesGroup.files.length > 0) {
+      docs.push({
+        id: "case-notes",
+        name: "Case Notes",
+        fileName: caseNotesGroup.files[0].name,
+      });
+    }
+
+    return docs;
+  }, [documentGroups]);
 
   // Form state - initialize with pre-filled values
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -458,6 +535,29 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Demo quick-fill shortcut: Cmd+Shift+D (Mac) or Ctrl+Shift+D (Windows)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        // Quick-fill all fields with first option for demo
+        const quickFillValues: Record<string, string> = {};
+        fields.forEach((field) => {
+          // Use prefilled value if available, otherwise use first option
+          if (field.prefilledValue) {
+            quickFillValues[field.id] = field.prefilledValue;
+          } else if (field.options.length > 0) {
+            quickFillValues[field.id] = field.options[0].value;
+          }
+        });
+        setValues(quickFillValues);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fields]);
 
   // Filter visible fields based on conditions
   const visibleFields = useMemo(() => {
@@ -540,108 +640,126 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
         </div>
       </div>
 
-      {/* Right: Assessment Form */}
+      {/* Right: Assessment Form - matches SummaryFieldsCard layout */}
       <div className={cn(
         "flex-1 flex flex-col min-w-0 bg-white overflow-hidden",
         !embedded && "rounded-xl border border-stone-200"
       )}>
-        {/* Header */}
-        <div className="shrink-0 px-5 py-3 bg-white border-b border-stone-200">
-          <div className="flex items-center justify-between">
-            {/* Left: Visa type */}
-            <div className="flex items-center gap-4">
-              {visaConfig && (
-                <div className="flex items-center gap-2.5">
-                  <div className={cn("size-9 rounded-lg flex items-center justify-center", visaConfig.bgColor)}>
-                    <visaConfig.icon size={18} className={visaConfig.color} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-stone-800">{visaConfig.shortName}</h3>
-                    <p className="text-[11px] text-stone-400">Case Assessment</p>
-                  </div>
+        {/* Header - Fixed height with Reference Documents, matches OverviewTab pattern */}
+        <div className="shrink-0 p-4 border-b border-stone-100">
+          <div className="flex items-center gap-4">
+            {/* Left - Progress Summary */}
+            <div className="shrink-0 flex items-center gap-3">
+              <ProgressRing percent={progressPercent} isComplete={progressPercent === 100} size={48} />
+              <div>
+                <h3 className="text-sm font-semibold text-stone-700">Case Assessment</h3>
+                <p className="text-[11px] text-stone-400 tabular-nums">
+                  {completedCount} of {totalCount} completed
+                </p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="w-px self-stretch bg-stone-200 shrink-0" />
+
+            {/* Right - Reference Documents (vertical layout) */}
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
                 </div>
-              )}
+                <button
+                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 rounded-md transition-colors"
+                >
+                  <Plus className="size-3" />
+                  Add
+                </button>
+              </div>
+              {/* Document cards row (horizontal scroll) */}
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+                {referenceDocuments.length > 0 ? (
+                  referenceDocuments.map((doc) => (
+                    <button
+                      key={doc.id}
+                      className="group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
+                    >
+                      <FileText className="size-4 text-blue-500" />
+                      <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover:text-blue-700">
+                        {doc.fileName}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <span className="text-xs text-stone-400">No documents uploaded</span>
+                )}
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Right: Actions */}
+        {/* Scrollable Content */}
+        <div className="flex-1 px-5 py-4 overflow-y-auto">
+          {/* Fields Section Header */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors flex items-center gap-1.5"
-              >
-                <Share2 size={14} />
-                Send to Client
-              </button>
+              <h4 className="text-xs font-medium text-stone-600">Questions</h4>
+              {totalCount - completedCount > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded tabular-nums">
+                  {totalCount - completedCount} remaining
+                </span>
+              )}
             </div>
+          </div>
+
+          {/* Fields List */}
+          <div className="space-y-1">
+            {visibleFields.map((field) => (
+              <AssessmentField
+                key={field.id}
+                field={field}
+                value={values[field.id] || ""}
+                onChange={(v) => handleFieldChange(field.id, v)}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Section Header - matches AssessmentDetailPanel */}
-        <div className="shrink-0 px-6 py-3 border-b border-stone-100">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-baseline gap-3">
-              <h2 className="text-base font-semibold text-stone-900">Case Assessment</h2>
-              <span className="text-xs text-stone-400 tabular-nums">
-                {completedCount}/{totalCount} complete
-              </span>
-            </div>
-            {/* Status */}
+        {/* Footer */}
+        <div className="shrink-0 px-4 py-3 border-t border-stone-100 flex items-center justify-between bg-stone-50/50">
+          <p className="text-xs text-stone-500 tabular-nums">
+            {completedCount}/{totalCount} answered
             {totalCount - completedCount > 0 && (
-              <span className="text-xs text-stone-500 tabular-nums">
-                {totalCount - completedCount} field{totalCount - completedCount > 1 ? "s" : ""} needed
-              </span>
+              <span className="text-amber-600"> · {totalCount - completedCount} remaining</span>
             )}
-          </div>
-        </div>
-
-        {/* Form Content - Scrollable area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="px-6 py-5">
-            {/* Fields Grid - matches ChecklistDetailPanel */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-              {visibleFields.map((field) => (
-                <AssessmentField
-                  key={field.id}
-                  field={field}
-                  value={values[field.id] || ""}
-                  onChange={(v) => handleFieldChange(field.id, v)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Fixed Footer - Submit Button */}
-        <div className="shrink-0 px-6 py-3 bg-white border-t border-stone-200">
-          <div className="flex items-center justify-end">
-            <button
-              onClick={handleSubmit}
-              disabled={!canSubmit || isSubmitting}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
-                canSubmit && !isSubmitting
-                  ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
-                  : "bg-stone-200 text-stone-400 cursor-not-allowed"
-              )}
-            >
-              {isSubmitting ? (
-                <>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Sparkles size={14} />
-                  </motion.div>
-                  Generating...
-                </>
-              ) : (
-                <>
+          </p>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit || isSubmitting}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+              canSubmit && !isSubmitting
+                ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
+                : "bg-stone-200 text-stone-400 cursor-not-allowed"
+            )}
+          >
+            {isSubmitting ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
                   <Sparkles size={14} />
-                  Generate Checklist
-                </>
-              )}
-            </button>
-          </div>
+                </motion.div>
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} />
+                Generate Checklist
+              </>
+            )}
+          </button>
         </div>
       </div>
 

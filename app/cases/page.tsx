@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation";
 import { Globe, MoreVertical, Trash2, Settings, X, Plus } from "lucide-react";
 import { XeniLogo } from "@/components/case-detail/XeniLogo";
 import { CreateCaseModal } from "@/components/case-hub/CreateCaseModal";
+import { CaseListEmptyState } from "@/components/case-hub/CaseListEmptyState";
 import { useCaseDetailStore } from "@/store/case-detail-store";
-import { MOCK_CASES } from "@/data/cases";
 import { VISA_TYPES, CASE_STATUSES, ROUTES } from "@/data/constants";
-import { formatDate, cn } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Case, VisaType, PassportInfo } from "@/types";
 
 export default function CasesPage() {
   const router = useRouter();
-  const [cases, setCases] = useState<Case[]>(MOCK_CASES);
+  const [cases, setCases] = useState<Case[]>([]);
   const [settingsCase, setSettingsCase] = useState<Case | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -113,46 +113,31 @@ export default function CasesPage() {
         </div>
       </header>
 
-      {/* Action Bar */}
-      <div className="sticky top-14 z-10 bg-[#F8FAFC] border-b border-gray-100">
-        <div className="px-8 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left: Title */}
-            <h1 className="text-xl font-semibold text-gray-900">Cases</h1>
+      {/* Action Bar - only show when there are cases */}
+      {cases.length > 0 && (
+        <div className="sticky top-14 z-10 bg-[#F8FAFC] border-b border-gray-100">
+          <div className="px-8 py-4">
+            <div className="flex items-center justify-between">
+              {/* Left: Title */}
+              <h1 className="text-xl font-semibold text-gray-900">Cases</h1>
 
-            {/* Right: New Case Button */}
-            <button
-              onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              New Case
-            </button>
+              {/* Right: New Case Button */}
+              <button
+                onClick={handleOpenCreateModal}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                New Case
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <main className="p-8">
         {cases.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4">
-              <Globe className="w-8 h-8 text-stone-400" />
-            </div>
-            <h3 className="text-lg font-medium text-stone-800 mb-2">
-              No cases yet
-            </h3>
-            <p className="text-sm text-stone-500 mb-6 max-w-sm">
-              Create your first case to get started with visa applications.
-            </p>
-            <button
-              onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#0E4369] hover:bg-[#0B3654] text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create First Case
-            </button>
-          </div>
+          <CaseListEmptyState onCreateCase={handleOpenCreateModal} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {cases.map((caseItem) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   FileText,
   Edit3,
@@ -42,6 +42,8 @@ interface ChecklistDetailPanelProps {
   sectionId: string;
   items: EnhancedChecklistItem[];
   issues: EnhancedQualityIssue[];
+  onTabChange?: (tab: "overview" | "details" | "supporting-documents") => void;
+  externalActiveTab?: "overview" | "details" | "supporting-documents";
 }
 
 // Clickable Source badge component - opens document preview on click
@@ -1058,21 +1060,36 @@ function DocumentPanel({
   );
 }
 
-// Main Detail Panel - Left: Field cards, Right: Evidence sidebar
+// Import new tab components
+import { ItemDetailTabs } from "./detail-panel";
+
+// Main Detail Panel - Uses new tabbed interface
 export function ChecklistDetailPanel({
   sectionTitle,
   sectionId,
   items,
   issues,
+  onTabChange: onTabChangeExternal,
+  externalActiveTab,
 }: ChecklistDetailPanelProps) {
   const documentGroups = useDocumentGroups();
   const updateField = useCaseDetailStore((state) => state.updateEnhancedChecklistField);
 
-  // Multi-select filter state
-  const [activeFilters, setActiveFilters] = useState<Set<FieldFilterKey>>(new Set());
+  // Track active tab to conditionally show footer
+  const [activeTab, setActiveTab] = useState<"overview" | "details" | "supporting-documents">(externalActiveTab || "overview");
 
-  // Document panel mode state
-  const [docPanelMode, setDocPanelMode] = useState<DocumentPanelMode>("default");
+  // Sync with external active tab when it changes (e.g., from header breadcrumb)
+  useEffect(() => {
+    if (externalActiveTab !== undefined && externalActiveTab !== activeTab) {
+      setActiveTab(externalActiveTab);
+    }
+  }, [externalActiveTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wrapper to also notify parent of tab changes
+  const handleTabChange = useCallback((tab: "overview" | "details" | "supporting-documents") => {
+    setActiveTab(tab);
+    onTabChangeExternal?.(tab);
+  }, [onTabChangeExternal]);
 
   // Local form state - initialize from items
   const [formValues, setFormValues] = useState<Record<string, string>>(() => {
@@ -1126,144 +1143,36 @@ export function ChecklistDetailPanel({
     setFormValues(originalValues);
   };
 
-  // Count missing mandatory evidence
-  const missingMandatory = useMemo(() => {
-    const evidenceMap = new Map<string, RequiredEvidence>();
-    items.forEach((item) => {
-      item.requiredEvidence?.forEach((ev) => {
-        if (ev.isMandatory && !ev.isUploaded && !evidenceMap.has(ev.id)) {
-          evidenceMap.set(ev.id, ev);
-        }
-      });
-    });
-    return Array.from(evidenceMap.values());
-  }, [items]);
-
-  // Completed fields count (based on current form values)
-  const completedFields = items.filter((i) => !!formValues[i.id]).length;
-
-  // Filter items based on active filters (multi-select with OR logic)
-  const filteredItems = useMemo(() => {
-    if (activeFilters.size === 0) return items;
-
-    return items.filter((item) => {
-      // Check each active filter - item matches if ANY filter matches (OR logic)
-      for (const filterKey of activeFilters) {
-        switch (filterKey) {
-          case "missing":
-            if (item.isRequired && !item.value) return true;
-            break;
-          case "extracted":
-            if (item.source === "extracted") return true;
-            break;
-          case "manual":
-            if (item.source === "manual") return true;
-            break;
-          case "questionnaire":
-            if (item.source === "questionnaire") return true;
-            break;
-          case "low_confidence":
-            if (item.source === "extracted" && item.confidenceScore !== undefined && item.confidenceScore < 80) return true;
-            break;
-        }
-      }
-      return false;
-    });
-  }, [items, activeFilters]);
+  const handleReanalyze = () => {
+    // Trigger document analysis to extract field data
+    // This would call an API or store method to analyze documents
+    console.log("Analyzing reference documents for section:", sectionId);
+    // TODO: Implement actual analysis logic
+    // For now, this triggers the UI state change in OverviewTab
+  };
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Section Header */}
-      <div className="shrink-0 px-6 py-3 border-b border-stone-100">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
-            <h2 className="text-base font-semibold text-stone-900">{sectionTitle}</h2>
-            <span className="text-xs text-stone-400 tabular-nums">
-              {completedFields}/{items.length} complete
-            </span>
-          </div>
-          {/* Status indicators - match sidebar display */}
-          <div className="flex items-center gap-2 text-xs text-stone-500">
-            {items.length - completedFields > 0 && (
-              <span className="tabular-nums">
-                {items.length - completedFields} field{items.length - completedFields > 1 ? "s" : ""}
-              </span>
-            )}
-            {items.length - completedFields > 0 && missingMandatory.length > 0 && (
-              <span>,</span>
-            )}
-            {missingMandatory.length > 0 && (
-              <span className="text-amber-600 tabular-nums">
-                {missingMandatory.length} doc{missingMandatory.length > 1 ? "s" : ""}
-              </span>
-            )}
-            {(items.length - completedFields > 0 || missingMandatory.length > 0) && (
-              <span>needed</span>
-            )}
-          </div>
-        </div>
+      {/* New Tabbed Interface */}
+      <div className="flex-1 min-h-0">
+        <ItemDetailTabs
+          itemType="checklist"
+          itemId={sectionId}
+          itemTitle={sectionTitle}
+          items={items}
+          issues={issues}
+          documentGroups={documentGroups}
+          formValues={formValues}
+          editedFieldIds={editedFieldIds}
+          onFieldChange={handleFieldChange}
+          onReanalyze={handleReanalyze}
+          onTabChange={handleTabChange}
+          externalActiveTab={externalActiveTab}
+        />
       </div>
 
-      {/* Main content: Left fields + Right evidence sidebar */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Left: Field Cards - Scrollable list */}
-        <div className="flex-1 min-w-0 overflow-auto">
-          <div className="px-6 py-5">
-            {/* Filter Dropdown - Multi-select filter to locate fields */}
-            <FieldFilterDropdown
-              items={items}
-              activeFilters={activeFilters}
-              onFilterChange={setActiveFilters}
-            />
-
-            {/* Field Cards */}
-            <div className="space-y-3">
-              {filteredItems.length > 0 ? (
-                filteredItems.map((item) => (
-                  <FieldCard
-                    key={item.id}
-                    item={item}
-                    editValue={formValues[item.id] || ""}
-                    onValueChange={(value) => handleFieldChange(item.id, value)}
-                    isEdited={editedFieldIds.has(item.id)}
-                    documentGroups={documentGroups}
-                  />
-                ))
-              ) : activeFilters.size > 0 ? (
-                <div className="py-8 text-center">
-                  <p className="text-sm text-stone-500">No fields match the filter</p>
-                  <button
-                    onClick={() => setActiveFilters(new Set())}
-                    className="mt-2 text-xs text-[#0E4268] hover:underline"
-                  >
-                    Show all fields
-                  </button>
-                </div>
-              ) : (
-                <p className="text-sm text-stone-400 py-8 text-center">
-                  No fields in this section
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Document Panel - Dynamic width based on mode */}
-        <div className={cn(
-          "shrink-0 border-l border-stone-100",
-          docPanelMode === "default" ? "w-52" : "w-[420px]"
-        )}>
-          <DocumentPanel
-            items={items}
-            documentGroups={documentGroups}
-            mode={docPanelMode}
-            onModeChange={setDocPanelMode}
-          />
-        </div>
-      </div>
-
-      {/* Save/Cancel Footer - fixed at bottom, only show when changes detected */}
-      {hasChanges && (
+      {/* Save/Cancel Footer - only show on Details tab when changes detected */}
+      {hasChanges && activeTab === "details" && (
         <div className="shrink-0 px-6 py-3 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
           <p className="text-xs text-stone-500">
             {editedFieldIds.size} field{editedFieldIds.size !== 1 ? "s" : ""} modified
@@ -1288,3 +1197,4 @@ export function ChecklistDetailPanel({
     </div>
   );
 }
+

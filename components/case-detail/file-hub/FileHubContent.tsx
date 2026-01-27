@@ -19,7 +19,56 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Cloud,
 } from "lucide-react";
+
+// ============================================================================
+// CLOUD PROVIDER ICONS - Monochrome gray, colorful on hover
+// ============================================================================
+const GoogleDriveIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M7.71 3.5L1.15 15l3.43 5.97L11.14 9.5 7.71 3.5zm1.14 0l6.86 12H22.3l-3.43-6-9.72-6H8.85zM8 14.5l-3.43 6h13.72l3.43-6H8z" />
+  </svg>
+);
+
+const DropboxIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75L6 17 0 13.25zm18-3.75l6 3.75L18 17l-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z" />
+  </svg>
+);
+
+const OneDriveIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M19.35 10.04A7.49 7.49 0 0012 4a7.48 7.48 0 00-6.64 4.05A5.998 5.998 0 006 20h13a5 5 0 00.35-9.96z" />
+  </svg>
+);
+
+// Cloud provider configurations
+const CLOUD_PROVIDERS = [
+  {
+    id: "google-drive",
+    name: "Google Drive",
+    Icon: GoogleDriveIcon,
+    hoverColor: "hover:text-[#4285F4]",
+    activeColor: "text-[#4285F4]",
+  },
+  {
+    id: "dropbox",
+    name: "Dropbox",
+    Icon: DropboxIcon,
+    hoverColor: "hover:text-[#0061FF]",
+    activeColor: "text-[#0061FF]",
+  },
+  {
+    id: "onedrive",
+    name: "OneDrive",
+    Icon: OneDriveIcon,
+    hoverColor: "hover:text-[#0078D4]",
+    activeColor: "text-[#0078D4]",
+  },
+] as const;
+
+type CloudProviderId = (typeof CLOUD_PROVIDERS)[number]["id"];
 import { cn } from "@/lib/utils";
 import {
   useCaseDetailStore,
@@ -124,6 +173,31 @@ const PROCESSING_STAGES = [
   { key: "classifying", label: "Classifying...", duration: 900 },
 ] as const;
 
+// Cloud import processing stages - distinguishes download vs upload
+const CLOUD_IMPORT_STAGES = {
+  "google-drive": [
+    { key: "connecting", label: "Connecting to Google Drive...", duration: 400 },
+    { key: "downloading", label: "Importing from Drive...", duration: 1200 },
+    { key: "uploading", label: "Uploading to server...", duration: 800 },
+    { key: "splitting", label: "Splitting...", duration: 600 },
+    { key: "classifying", label: "Classifying...", duration: 700 },
+  ],
+  dropbox: [
+    { key: "connecting", label: "Connecting to Dropbox...", duration: 400 },
+    { key: "downloading", label: "Importing from Dropbox...", duration: 1200 },
+    { key: "uploading", label: "Uploading to server...", duration: 800 },
+    { key: "splitting", label: "Splitting...", duration: 600 },
+    { key: "classifying", label: "Classifying...", duration: 700 },
+  ],
+  onedrive: [
+    { key: "connecting", label: "Connecting to OneDrive...", duration: 400 },
+    { key: "downloading", label: "Importing from OneDrive...", duration: 1200 },
+    { key: "uploading", label: "Uploading to server...", duration: 800 },
+    { key: "splitting", label: "Splitting...", duration: 600 },
+    { key: "classifying", label: "Classifying...", duration: 700 },
+  ],
+} as const;
+
 // ============================================================================
 // SIDEBAR - macOS-style collapsible sidebar for unclassified pages
 // ============================================================================
@@ -142,11 +216,13 @@ const Sidebar = ({
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [processingStage, setProcessingStage] = useState<number | null>(null);
+  const [cloudImportProvider, setCloudImportProvider] = useState<CloudProviderId | null>(null);
+  const [cloudProcessingLabel, setCloudProcessingLabel] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const uploadAndAutoClassify = useCaseDetailStore((state) => state.uploadAndAutoClassify);
 
-  const isProcessing = processingStage !== null;
+  const isProcessing = processingStage !== null || cloudImportProvider !== null;
 
   // Run processing workflow with auto-classification
   const runProcessingWorkflow = async () => {
@@ -160,6 +236,35 @@ const Sidebar = ({
     // Auto-classify uploaded documents into categories
     const pageCount = Math.floor(Math.random() * 4) + 6; // 6-9 pages
     uploadAndAutoClassify(pageCount);
+  };
+
+  // Run cloud import workflow - simulates OAuth popup + file picker + import
+  const runCloudImportWorkflow = async (providerId: CloudProviderId) => {
+    setCloudImportProvider(providerId);
+
+    // Simulate OAuth popup - in real implementation this would open a popup window
+    // and wait for the OAuth callback
+    const stages = CLOUD_IMPORT_STAGES[providerId];
+
+    for (let i = 0; i < stages.length; i++) {
+      setCloudProcessingLabel(stages[i].label);
+      await new Promise((resolve) => setTimeout(resolve, stages[i].duration));
+    }
+
+    setCloudImportProvider(null);
+    setCloudProcessingLabel(null);
+
+    // Auto-classify imported documents
+    const pageCount = Math.floor(Math.random() * 5) + 4; // 4-8 pages from cloud
+    uploadAndAutoClassify(pageCount);
+  };
+
+  // Handle cloud provider click - prevent event bubbling
+  const handleCloudProviderClick = (e: React.MouseEvent, providerId: CloudProviderId) => {
+    e.stopPropagation();
+    if (!isProcessing) {
+      runCloudImportWorkflow(providerId);
+    }
   };
 
   // Drop target for internal page drags
@@ -211,6 +316,9 @@ const Sidebar = ({
   const isAnyDragOver = isDragOver || isInternalDragOver;
   const currentStage =
     processingStage !== null ? PROCESSING_STAGES[processingStage] : null;
+
+  // Get current processing label - either from local upload or cloud import
+  const currentProcessingLabel = cloudProcessingLabel || currentStage?.label;
 
   const setRefs = (el: HTMLDivElement | null) => {
     containerRef.current = el;
@@ -334,48 +442,91 @@ const Sidebar = ({
         )}
       </div>
 
-      {/* Upload Zone - Fixed at bottom, more prominent */}
+      {/* Upload Zone - Fixed at bottom with cloud import */}
       <div className="shrink-0 p-3 border-t border-stone-100">
-        <button
-          onClick={() => !isProcessing && runProcessingWorkflow()}
-          disabled={isProcessing}
+        <div
           className={cn(
-            "w-full px-4 py-3 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all",
+            "w-full rounded-xl border-2 border-dashed overflow-hidden transition-all",
             isProcessing
-              ? "border-[#0E4268]/40 bg-[#0E4268]/5 cursor-default"
+              ? "border-[#0E4268]/40 bg-[#0E4268]/5"
               : isAnyDragOver
                 ? "border-[#0E4268] bg-[#0E4268]/10 scale-[1.02]"
-                : "border-stone-300 hover:border-[#0E4268] hover:bg-stone-50",
+                : "border-stone-300 hover:border-stone-400",
           )}
         >
-          {isProcessing ? (
-            <>
-              <Loader2 size={20} className="text-[#0E4268] animate-spin" />
-              <span className="text-xs font-medium text-[#0E4268]">
-                {currentStage?.label}
-              </span>
-            </>
-          ) : (
-            <>
-              <FilePlus
-                size={20}
-                className={cn(
-                  "transition-colors",
-                  isAnyDragOver ? "text-[#0E4268]" : "text-stone-400",
-                )}
-              />
-              <span
-                className={cn(
-                  "text-xs font-medium transition-colors",
-                  isAnyDragOver ? "text-[#0E4268]" : "text-stone-500",
-                )}
-              >
-                {isAnyDragOver ? "Drop here" : "Upload Files"}
-              </span>
-              <span className="text-[10px] text-stone-400">Drop or click</span>
-            </>
+          {/* Main upload area - clickable for local files */}
+          <button
+            onClick={() => !isProcessing && runProcessingWorkflow()}
+            disabled={isProcessing}
+            className={cn(
+              "w-full px-4 py-3 flex flex-col items-center justify-center gap-1.5 transition-colors",
+              !isProcessing && "hover:bg-stone-50/80",
+            )}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 size={20} className="text-[#0E4268] animate-spin" />
+                <span className="text-xs font-medium text-[#0E4268]">
+                  {currentProcessingLabel}
+                </span>
+              </>
+            ) : (
+              <>
+                <FilePlus
+                  size={20}
+                  className={cn(
+                    "transition-colors",
+                    isAnyDragOver ? "text-[#0E4268]" : "text-stone-400",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-xs font-medium transition-colors",
+                    isAnyDragOver ? "text-[#0E4268]" : "text-stone-500",
+                  )}
+                >
+                  {isAnyDragOver ? "Drop here" : "Upload Files"}
+                </span>
+                <span className="text-[10px] text-stone-400">Drop or click</span>
+              </>
+            )}
+          </button>
+
+          {/* Cloud import section - only show when not processing */}
+          {!isProcessing && (
+            <div className="px-3 pb-3">
+              {/* Divider with text */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex-1 h-px bg-stone-200" />
+                <span className="text-[9px] text-stone-400 uppercase tracking-wider font-medium">
+                  or import from
+                </span>
+                <div className="flex-1 h-px bg-stone-200" />
+              </div>
+
+              {/* Cloud provider icons */}
+              <div className="flex items-center justify-center gap-3">
+                {CLOUD_PROVIDERS.map((provider) => (
+                  <button
+                    key={provider.id}
+                    onClick={(e) => handleCloudProviderClick(e, provider.id)}
+                    className={cn(
+                      "group p-2 rounded-lg transition-all",
+                      "text-stone-400",
+                      provider.hoverColor,
+                      "hover:bg-stone-100 hover:scale-110",
+                      "active:scale-95",
+                    )}
+                    title={provider.name}
+                    aria-label={`Import from ${provider.name}`}
+                  >
+                    <provider.Icon className="size-5 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );

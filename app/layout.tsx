@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { FloatingButtonProvider } from "@/components/ui/floating-button-provider";
+import { AgentationProvider } from "@/components/dev/AgentationProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,7 +28,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${poppins.variable} font-sans antialiased`}>
-        <FloatingButtonProvider>{children}</FloatingButtonProvider>
+        <FloatingButtonProvider>
+          {children}
+          <AgentationProvider />
+        </FloatingButtonProvider>
       </body>
     </html>
   );
