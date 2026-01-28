@@ -11,6 +11,7 @@ import {
   EnhancedQualityIssue,
   RequiredEvidence,
   DocumentGroup,
+  ChecklistSectionType,
 } from "@/types/case-detail";
 
 export type DetailTabId = "overview" | "details" | "supporting-documents";
@@ -153,6 +154,7 @@ export function ItemDetailTabs(props: ItemDetailTabsProps) {
                 itemType="checklist"
                 items={(props as ChecklistItemDetailProps).items}
                 documentGroups={documentGroups}
+                sectionId={(props as ChecklistItemDetailProps).items[0]?.section as ChecklistSectionType}
               />
             </div>
           )}
@@ -224,6 +226,7 @@ export function ItemDetailTabs(props: ItemDetailTabsProps) {
                   itemType="checklist"
                   items={props.items}
                   documentGroups={documentGroups}
+                  sectionId={props.items[0]?.section as ChecklistSectionType}
                 />
               ) : (
                 <SupportingDocumentsTab

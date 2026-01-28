@@ -12,6 +12,7 @@ import {
   ChecklistItem,
   DocumentGroup,
   DocumentFile,
+  DocumentBundle,
   ApplicationPhase,
   FormSchemaStatus,
   FormPilotStatus,
@@ -755,6 +756,7 @@ const initialState: CaseDetailState = {
   maxPreviewFiles: 6,
   documentGroups: [],
   isLoadingDocuments: false,
+  documentBundles: [],
   demoStage: 0,
   isAnalyzingDocuments: false,
   analysisProgress: 0,
@@ -1549,6 +1551,169 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           },
           false,
           "uploadAndAutoClassify",
+        );
+      },
+
+      // Duplicate a file to another group (one-to-many linking)
+      // The file remains in its original location AND appears in the target group
+      duplicateFileToGroup: (fileId: string, targetGroupId: string) => {
+        set(
+          (state) => {
+            // Find the source file across all groups
+            let sourceFile: DocumentFile | null = null;
+            let sourceGroupId: string | null = null;
+
+            for (const group of state.documentGroups) {
+              const file = group.files.find((f) => f.id === fileId);
+              if (file) {
+                sourceFile = file;
+                sourceGroupId = group.id;
+                break;
+              }
+            }
+
+            if (!sourceFile || !sourceGroupId || sourceGroupId === targetGroupId) {
+              return state;
+            }
+
+            const timestamp = Date.now();
+
+            // Create a copy of the file for the target group
+            const duplicatedFile: DocumentFile = {
+              ...sourceFile,
+              id: `${sourceFile.id}_dup_${timestamp}`,
+              isNew: true,
+              linkedToGroups: [
+                ...(sourceFile.linkedToGroups || []),
+                sourceGroupId,
+                targetGroupId,
+              ],
+            };
+
+            // Update the source file to track linking
+            const newGroups = state.documentGroups.map((group) => {
+              if (group.id === sourceGroupId) {
+                return {
+                  ...group,
+                  files: group.files.map((f) =>
+                    f.id === fileId
+                      ? {
+                          ...f,
+                          linkedToGroups: [
+                            ...(f.linkedToGroups || []),
+                            sourceGroupId!,
+                            targetGroupId,
+                          ],
+                        }
+                      : f
+                  ),
+                };
+              }
+              if (group.id === targetGroupId) {
+                return {
+                  ...group,
+                  files: [...group.files, duplicatedFile],
+                  status: "pending" as const,
+                  hasChanges: true,
+                };
+              }
+              return group;
+            });
+
+            const previews = syncFilePreviewsFromGroups(newGroups);
+            return {
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "duplicateFileToGroup",
+        );
+      },
+
+      // Create a new document bundle
+      createDocumentBundle: (name: string, linkedGroupIds: string[]) => {
+        set(
+          (state) => {
+            const newBundle: DocumentBundle = {
+              id: `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name,
+              linkedGroupIds,
+              createdAt: new Date().toISOString(),
+            };
+            return {
+              documentBundles: [...state.documentBundles, newBundle],
+            };
+          },
+          false,
+          "createDocumentBundle",
+        );
+      },
+
+      // Delete a document bundle (does not delete linked groups)
+      deleteDocumentBundle: (bundleId: string) => {
+        set(
+          (state) => ({
+            documentBundles: state.documentBundles.filter((b) => b.id !== bundleId),
+          }),
+          false,
+          "deleteDocumentBundle",
+        );
+      },
+
+      // Rename a document bundle
+      renameDocumentBundle: (bundleId: string, newName: string) => {
+        set(
+          (state) => ({
+            documentBundles: state.documentBundles.map((b) =>
+              b.id === bundleId ? { ...b, name: newName } : b
+            ),
+          }),
+          false,
+          "renameDocumentBundle",
+        );
+      },
+
+      // Link a group to an existing bundle
+      linkGroupToBundle: (groupId: string, bundleId: string) => {
+        set(
+          (state) => ({
+            documentBundles: state.documentBundles.map((b) =>
+              b.id === bundleId && !b.linkedGroupIds.includes(groupId)
+                ? { ...b, linkedGroupIds: [...b.linkedGroupIds, groupId] }
+                : b
+            ),
+          }),
+          false,
+          "linkGroupToBundle",
+        );
+      },
+
+      // Unlink a group from a bundle
+      unlinkGroupFromBundle: (groupId: string, bundleId: string) => {
+        set(
+          (state) => ({
+            documentBundles: state.documentBundles.map((b) =>
+              b.id === bundleId
+                ? { ...b, linkedGroupIds: b.linkedGroupIds.filter((id) => id !== groupId) }
+                : b
+            ),
+          }),
+          false,
+          "unlinkGroupFromBundle",
+        );
+      },
+
+      // Reorder linked documents in a bundle
+      reorderLinkedDocumentsInBundle: (bundleId: string, newOrder: string[]) => {
+        set(
+          (state) => ({
+            documentBundles: state.documentBundles.map((b) =>
+              b.id === bundleId ? { ...b, linkedGroupIds: newOrder } : b
+            ),
+          }),
+          false,
+          "reorderLinkedDocumentsInBundle",
         );
       },
 
@@ -3423,11 +3588,11 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               validityPeriod: "Must be dated within 31 days of application",
             },
             {
-              id: "ev_bank_letter",
-              name: "Bank Confirmation Letter",
-              description: "Official letter from bank confirming account details and balance",
+              id: "ev_payslip",
+              name: "Payslip",
+              description: "Recent payslips showing salary payments (last 3 months recommended)",
               isUploaded: false,
-              isMandatory: false,
+              isMandatory: true,
               acceptedFormats: ["PDF"],
             },
           ],
@@ -3709,8 +3874,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         set(
           {
-            // Navigation - land on application page to start case assessment
-            activeNav: "application",
+            // Navigation - land on overview page
+            activeNav: "overview",
             selectedVisaType: data.visaType,
             clientProfile: profileWithPassport,
             caseReference: data.referenceNumber || "REF-2024-001",
@@ -3768,6 +3933,8 @@ export const useDocumentGroups = () =>
   useCaseDetailStore((state) => state.documentGroups);
 export const useIsLoadingDocuments = () =>
   useCaseDetailStore((state) => state.isLoadingDocuments);
+export const useDocumentBundles = () =>
+  useCaseDetailStore((state) => state.documentBundles);
 export const useUploadedFilePreviews = () =>
   useCaseDetailStore((state) => state.uploadedFilePreviews);
 export const useApplicationPhase = () =>

@@ -105,6 +105,8 @@ export interface DocumentFile {
   // Analysis tracking
   isAnalyzed?: boolean;
   analyzedAt?: string;
+  // One-to-many linking: a page can be linked to multiple groups
+  linkedToGroups?: string[]; // Array of group IDs this page is linked to
 }
 
 // Document Group
@@ -117,6 +119,17 @@ export interface DocumentGroup {
   hasChanges?: boolean;
   files: DocumentFile[];
   isSpecial?: boolean; // Special documents like Case Notes - auto-confirmed, no review needed
+}
+
+// Document Bundle - Container for grouping multiple logical files (DocumentGroups)
+// Represents a custom collection without business definition (not "Passport", "Bank Statement", etc.)
+export interface DocumentBundle {
+  id: string;
+  name: string; // User-defined name: "Financial Package", "Supporting Evidence", etc.
+  description?: string;
+  linkedGroupIds: string[]; // Array of DocumentGroup IDs linked to this bundle (LINK, not move)
+  createdAt: string;
+  color?: "violet" | "indigo" | "teal" | "amber" | "rose"; // Accent color for visual distinction
 }
 
 // Application Phase (4-stage state machine)
@@ -361,6 +374,9 @@ export interface CaseDetailState {
   documentGroups: DocumentGroup[];
   isLoadingDocuments: boolean;
 
+  // Document Bundles (containers for grouping multiple logical files)
+  documentBundles: DocumentBundle[];
+
   // Demo Controls
   demoStage: number;
 
@@ -469,6 +485,17 @@ export interface CaseDetailActions {
   uploadDocuments: () => Promise<void>;
   uploadToGroup: (groupId: string, fileCount?: number) => void;
   uploadAndAutoClassify: (totalPages?: number) => void;
+
+  // Page Linking (one-to-many: a page can be linked to multiple groups)
+  duplicateFileToGroup: (fileId: string, targetGroupId: string) => void;
+
+  // Document Bundles (containers for grouping logical files)
+  createDocumentBundle: (name: string, linkedGroupIds: string[]) => void;
+  deleteDocumentBundle: (bundleId: string) => void;
+  renameDocumentBundle: (bundleId: string, newName: string) => void;
+  linkGroupToBundle: (groupId: string, bundleId: string) => void;
+  unlinkGroupFromBundle: (groupId: string, bundleId: string) => void;
+  reorderLinkedDocumentsInBundle: (bundleId: string, newOrder: string[]) => void;
 
   // Demo Controls
   advanceDemoStage: () => void;

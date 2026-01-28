@@ -6,13 +6,9 @@ import {
   ChevronRight,
   Loader2,
   FileSearch,
-  Play,
   CheckCircle2,
   Circle,
   FileText,
-  Sparkles,
-  Forward,
-  RefreshCw,
   ClipboardCheck,
 } from "lucide-react";
 import {
@@ -23,17 +19,9 @@ import {
   useEnhancedQualityIssues,
 } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { getVisaConfig } from "./VisaTypeDialog";
-import { AnalysisPreviewDialog } from "./AnalysisPreviewDialog";
 import { ChecklistSectionType, EnhancedChecklistItem } from "@/types/case-detail";
 import { ChecklistDetailPanel } from "../../application/checklist/ChecklistDetailPanel";
-import { SendChecklistSummaryModal } from "../../application/checklist/SendChecklistSummaryModal";
 
 // Section configuration
 const SECTION_CONFIG: Record<
@@ -64,64 +52,26 @@ interface ApplicationCardProps {
   onOpenVisaDialog: () => void;
 }
 
-// Header component - synced with ApplicationPage
-function ApplicationHeader({
-  onOpenVisaDialog,
-  onRequestInfo,
-}: {
-  onOpenVisaDialog: () => void;
-  onRequestInfo: () => void;
-}) {
-  const [showAnalysisPreview, setShowAnalysisPreview] = useState(false);
-
+// Header component - shows status only (no action buttons)
+function ApplicationHeader() {
   const selectedVisaType = useCaseDetailStore((state) => state.selectedVisaType);
   const isAnalyzingDocuments = useCaseDetailStore((state) => state.isAnalyzingDocuments);
   const isLoadingDocuments = useCaseDetailStore((state) => state.isLoadingDocuments);
-  const documentGroups = useCaseDetailStore((state) => state.documentGroups);
   const lastAnalysisAt = useCaseDetailStore((state) => state.lastAnalysisAt);
   const analysisProgress = useCaseDetailStore((state) => state.analysisProgress);
-  const startAnalysis = useCaseDetailStore((state) => state.startAnalysis);
-  const reAnalyze = useCaseDetailStore((state) => state.reAnalyze);
   const hasNewFilesAfterAnalysis = useHasNewFilesAfterAnalysis();
   const newFilesCount = useNewFilesCount();
-  const launchFormPilot = useCaseDetailStore((state) => state.launchFormPilot);
 
   const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
-
-  // Check if there are confirmed documents
-  const hasConfirmedDocs = documentGroups.some(
-    (g) => g.id !== "unclassified" && g.status === "reviewed" && g.files.some((f) => !f.isRemoved)
-  );
-
-  // Button should be disabled when processing or no confirmed docs
-  const isRunAnalysisDisabled = isLoadingDocuments || !hasConfirmedDocs;
-
-  // Tooltip message for disabled button
-  const getDisabledReason = () => {
-    if (isLoadingDocuments) return "Please wait while documents are being processed";
-    if (!hasConfirmedDocs) return "Review and confirm documents first";
-    return "";
-  };
-
-  const handleOpenAnalysisPreview = () => setShowAnalysisPreview(true);
-  const handleConfirmAnalysis = () => startAnalysis();
-  const handleReAnalyze = () => reAnalyze();
 
   // No visa type selected
   if (!selectedVisaType) {
     return (
-      <div className="shrink-0 h-12 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
+      <div className="shrink-0 h-12 px-4 flex items-center bg-stone-50 border-b border-stone-200">
         <div>
           <h3 className="text-sm font-semibold text-stone-800">Application</h3>
           <p className="text-xs text-stone-400">Select visa type to begin</p>
         </div>
-        <button
-          onClick={onOpenVisaDialog}
-          className="px-3 py-1.5 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-1.5"
-        >
-          Select Visa Type
-          <ChevronRight className="size-4" />
-        </button>
       </div>
     );
   }
@@ -150,10 +100,10 @@ function ApplicationHeader({
     );
   }
 
-  // Analysis completed - show status and action buttons
+  // Analysis completed - show status
   if (lastAnalysisAt) {
     return (
-      <div className="shrink-0 h-12 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
+      <div className="shrink-0 h-12 px-4 flex items-center bg-stone-50 border-b border-stone-200">
         {/* Left: Visa type + Status */}
         <div className="flex items-center gap-2">
           {visaConfig && (
@@ -186,55 +136,13 @@ function ApplicationHeader({
             </>
           )}
         </div>
-
-        {/* Right: Action buttons */}
-        <div className="flex items-center gap-2">
-          {/* Re-analyze button */}
-          {hasNewFilesAfterAnalysis && (
-            <button
-              onClick={handleReAnalyze}
-              className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors flex items-center gap-1.5"
-            >
-              <RefreshCw className="size-3.5" />
-              Re-analyze
-            </button>
-          )}
-
-          {/* Request Info button */}
-          <button
-            onClick={onRequestInfo}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors flex items-center gap-1.5"
-            aria-label="Request missing information from client"
-          >
-            <Forward className="size-3.5" />
-            Request Info
-          </button>
-
-          {/* Form Pilot button */}
-          <button
-            onClick={launchFormPilot}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-1.5"
-          >
-            <Sparkles className="size-3.5" />
-            Form Pilot
-            <ChevronRight className="size-3.5" />
-          </button>
-        </div>
-
-        {/* Analysis Preview Dialog for re-analysis */}
-        <AnalysisPreviewDialog
-          open={showAnalysisPreview}
-          onOpenChange={setShowAnalysisPreview}
-          documentGroups={documentGroups}
-          onConfirm={handleConfirmAnalysis}
-        />
       </div>
     );
   }
 
-  // Visa selected but not analyzed - show Run Gap Analysis
+  // Visa selected but not analyzed - show status
   return (
-    <div className="shrink-0 h-12 px-4 flex items-center justify-between bg-stone-50 border-b border-stone-200">
+    <div className="shrink-0 h-12 px-4 flex items-center bg-stone-50 border-b border-stone-200">
       <div className="flex items-center gap-2">
         {visaConfig && (
           <>
@@ -258,40 +166,6 @@ function ApplicationHeader({
           </>
         )}
       </div>
-
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <button
-                onClick={handleOpenAnalysisPreview}
-                disabled={isRunAnalysisDisabled}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5",
-                  isRunAnalysisDisabled
-                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
-                    : "bg-[#0E4268] text-white hover:bg-[#0a3555]"
-                )}
-              >
-                <Play className="size-4" />
-                Run Gap Analysis
-              </button>
-            </span>
-          </TooltipTrigger>
-          {isRunAnalysisDisabled && (
-            <TooltipContent side="bottom">
-              <p className="text-sm">{getDisabledReason()}</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </TooltipProvider>
-
-      <AnalysisPreviewDialog
-        open={showAnalysisPreview}
-        onOpenChange={setShowAnalysisPreview}
-        documentGroups={documentGroups}
-        onConfirm={handleConfirmAnalysis}
-      />
     </div>
   );
 }
@@ -493,7 +367,6 @@ export function ApplicationCard({ className, onOpenVisaDialog }: ApplicationCard
   const enhancedIssues = useEnhancedQualityIssues();
 
   const [selectedSectionId, setSelectedSectionId] = useState<ChecklistSectionType | null>(null);
-  const [showSendSummaryModal, setShowSendSummaryModal] = useState(false);
 
   // Check if questionnaire needs to be shown
   const needsQuestionnaire = selectedVisaType && Object.keys(questionnaireAnswers).length === 0;
@@ -565,10 +438,7 @@ export function ApplicationCard({ className, onOpenVisaDialog }: ApplicationCard
     <div className={cn("flex flex-col border border-stone-200 bg-white rounded-xl overflow-hidden", className)}>
       {/* Header - always show */}
       <div className="shrink-0 sticky top-0 z-10 bg-white">
-        <ApplicationHeader
-          onOpenVisaDialog={onOpenVisaDialog}
-          onRequestInfo={() => setShowSendSummaryModal(true)}
-        />
+        <ApplicationHeader />
       </div>
 
       {/* Content */}
@@ -681,14 +551,6 @@ export function ApplicationCard({ className, onOpenVisaDialog }: ApplicationCard
         <ApplicationEmptyState onOpenVisaDialog={onOpenVisaDialog} />
       )}
 
-      {/* Send Summary to Client Modal */}
-      {showSendSummaryModal && (
-        <SendChecklistSummaryModal
-          items={enhancedItems}
-          issues={enhancedIssues}
-          onClose={() => setShowSendSummaryModal(false)}
-        />
-      )}
     </div>
   );
 }

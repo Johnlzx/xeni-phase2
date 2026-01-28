@@ -15,10 +15,59 @@ import {
   EnhancedChecklistItem,
   RequiredEvidence,
   DocumentGroup,
+  ChecklistSectionType,
 } from "@/types/case-detail";
 import { useCaseDetailStore } from "@/store/case-detail-store";
 import { CategoryReviewModal } from "../../../shared";
 import { DocumentUploadModal } from "./DocumentUploadModal";
+import { CombinedEvidenceCard, CombinedEvidenceConfig } from "./CombinedEvidenceCard";
+
+// Configuration for combined evidence groups by section
+// Maps evidence IDs to combined groups
+const COMBINED_EVIDENCE_CONFIG: Record<string, {
+  groupId: string;
+  title: string;
+  description: string;
+  relationship: "all" | "any";
+  evidenceIds: string[];
+}[]> = {
+  financial: [
+    {
+      groupId: "financial-proof",
+      title: "Financial Evidence",
+      description: "Bank statements and/or bank letter to prove financial stability",
+      relationship: "any",
+      evidenceIds: ["ev_bank_statements", "ev_bank_letter"],
+    },
+  ],
+  employment: [
+    {
+      groupId: "employment-proof",
+      title: "Employment Documentation",
+      description: "Certificate of Sponsorship and employment contract together confirm your job offer",
+      relationship: "all",
+      evidenceIds: ["ev_cos", "ev_employment_contract"],
+    },
+  ],
+  personal: [
+    {
+      groupId: "identity-proof",
+      title: "Identity Documents",
+      description: "Valid passport and photo required for application",
+      relationship: "all",
+      evidenceIds: ["ev_passport", "ev_photo"],
+    },
+  ],
+  education: [
+    {
+      groupId: "qualification-proof",
+      title: "Academic Qualifications",
+      description: "English certificate required, degree certificate optional",
+      relationship: "all",
+      evidenceIds: ["ev_english_cert", "ev_degree_cert"],
+    },
+  ],
+};
 
 // Document Preview Content - Simulates scanned document appearance
 const DocumentPreviewContent = ({ size = "sm" }: { size?: "sm" | "md" }) => {
@@ -235,6 +284,7 @@ interface ChecklistSupportingDocsProps {
   itemType: "checklist";
   items: EnhancedChecklistItem[];
   documentGroups: DocumentGroup[];
+  sectionId?: ChecklistSectionType;
 }
 
 // Props for assessment items
@@ -242,6 +292,7 @@ interface AssessmentSupportingDocsProps {
   itemType: "assessment";
   requiredEvidence: RequiredEvidence[];
   documentGroups: DocumentGroup[];
+  sectionId?: ChecklistSectionType;
 }
 
 export type SupportingDocumentsTabProps =
@@ -249,7 +300,7 @@ export type SupportingDocumentsTabProps =
   | AssessmentSupportingDocsProps;
 
 export function SupportingDocumentsTab(props: SupportingDocumentsTabProps) {
-  const { itemType, documentGroups } = props;
+  const { itemType, documentGroups, sectionId } = props;
 
   // Collect all required evidence
   const allEvidence = useMemo(() => {
@@ -274,13 +325,52 @@ export function SupportingDocumentsTab(props: SupportingDocumentsTabProps) {
     return documentGroups.find((g) => g.id === evidence.linkedFileId);
   };
 
-  // Split into mandatory and optional
-  const mandatoryEvidence = allEvidence.filter((ev) => ev.isMandatory);
-  const optionalEvidence = allEvidence.filter((ev) => !ev.isMandatory);
+  // Build combined evidence groups based on section config
+  const { combinedGroups, standaloneEvidence } = useMemo(() => {
+    const sectionConfig = sectionId ? COMBINED_EVIDENCE_CONFIG[sectionId] : undefined;
 
-  // Count stats
-  const uploadedMandatory = mandatoryEvidence.filter((ev) => ev.isUploaded).length;
-  const uploadedOptional = optionalEvidence.filter((ev) => ev.isUploaded).length;
+    if (!sectionConfig || sectionConfig.length === 0) {
+      // No combined config for this section, all evidence is standalone
+      return { combinedGroups: [], standaloneEvidence: allEvidence };
+    }
+
+    const usedEvidenceIds = new Set<string>();
+    const groups: CombinedEvidenceConfig[] = [];
+
+    sectionConfig.forEach((config) => {
+      // Find matching evidence items for this combined group
+      const matchingEvidence = allEvidence.filter((ev) =>
+        config.evidenceIds.includes(ev.id)
+      );
+
+      if (matchingEvidence.length > 0) {
+        groups.push({
+          id: config.groupId,
+          title: config.title,
+          description: config.description,
+          relationship: config.relationship,
+          evidenceItems: matchingEvidence,
+        });
+
+        matchingEvidence.forEach((ev) => usedEvidenceIds.add(ev.id));
+      }
+    });
+
+    // Remaining evidence that's not in any combined group
+    const standalone = allEvidence.filter((ev) => !usedEvidenceIds.has(ev.id));
+
+    return { combinedGroups: groups, standaloneEvidence: standalone };
+  }, [allEvidence, sectionId]);
+
+  // Split standalone into mandatory and optional
+  const mandatoryEvidence = standaloneEvidence.filter((ev) => ev.isMandatory);
+  const optionalEvidence = standaloneEvidence.filter((ev) => !ev.isMandatory);
+
+  // Count stats (including combined groups)
+  const totalMandatory = allEvidence.filter((ev) => ev.isMandatory).length;
+  const uploadedMandatory = allEvidence.filter((ev) => ev.isMandatory && ev.isUploaded).length;
+  const totalOptional = allEvidence.filter((ev) => !ev.isMandatory).length;
+  const uploadedOptional = allEvidence.filter((ev) => !ev.isMandatory && ev.isUploaded).length;
 
   if (allEvidence.length === 0) {
     return (
@@ -299,24 +389,37 @@ export function SupportingDocumentsTab(props: SupportingDocumentsTabProps) {
         <h3 className="text-sm font-semibold text-stone-700">Supporting Documents</h3>
         <div className="flex items-center gap-3 text-xs text-stone-500">
           <span className="tabular-nums">
-            <span className={uploadedMandatory === mandatoryEvidence.length ? "text-emerald-600" : ""}>
-              {uploadedMandatory}/{mandatoryEvidence.length}
+            <span className={uploadedMandatory === totalMandatory ? "text-emerald-600" : ""}>
+              {uploadedMandatory}/{totalMandatory}
             </span>{" "}
             required
           </span>
-          {optionalEvidence.length > 0 && (
+          {totalOptional > 0 && (
             <span className="tabular-nums">
-              {uploadedOptional}/{optionalEvidence.length} optional
+              {uploadedOptional}/{totalOptional} optional
             </span>
           )}
         </div>
       </div>
 
-      {/* Required Evidence */}
+      {/* Combined Evidence Groups */}
+      {combinedGroups.length > 0 && (
+        <div className="space-y-3">
+          {combinedGroups.map((group) => (
+            <CombinedEvidenceCard
+              key={group.id}
+              config={group}
+              documentGroups={documentGroups}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Standalone Required Evidence */}
       {mandatoryEvidence.length > 0 && (
         <div>
           <p className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-3">
-            Required Evidence
+            {combinedGroups.length > 0 ? "Other Required Evidence" : "Required Evidence"}
           </p>
           <div className="grid grid-cols-2 gap-3">
             {mandatoryEvidence.map((ev) => (

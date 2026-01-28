@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { DndProvider, useDrag, useDrop } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
+import { useDrag, useDrop } from "react-dnd";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -527,7 +526,6 @@ export function CategoryReviewModal({
     .join(" ");
 
   return (
-    <DndProvider backend={HTML5Backend}>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -959,6 +957,5 @@ export function CategoryReviewModal({
         </AnimatePresence>
         </motion.div>
       </div>
-    </DndProvider>
   );
 }

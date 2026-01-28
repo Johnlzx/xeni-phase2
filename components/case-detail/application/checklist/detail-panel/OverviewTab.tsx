@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, Fragment } from "react";
 import {
   CheckCircle2,
   FileText,
@@ -703,6 +703,139 @@ function MissingInformationCard({
 }
 
 // ============================================================================
+// Combined Evidence Slot - Shows grouped document requirements
+// ============================================================================
+function CombinedEvidenceSlotInline({
+  title,
+  relationship,
+  documents,
+  onAddClick,
+}: {
+  title: string;
+  relationship: "all" | "any";
+  documents: RequiredEvidence[];
+  onAddClick: (evidence: RequiredEvidence) => void;
+}) {
+  const uploadedCount = documents.filter(d => d.isUploaded).length;
+  const totalCount = documents.length;
+  const isComplete = relationship === "all"
+    ? uploadedCount === totalCount
+    : uploadedCount >= 1;
+
+  return (
+    <div className={cn(
+      "rounded-xl border-2 overflow-hidden transition-all",
+      isComplete
+        ? "border-emerald-300 bg-gradient-to-b from-emerald-50 to-white shadow-sm"
+        : "border-stone-200 bg-white"
+    )}>
+      {/* Header */}
+      <div className={cn(
+        "px-3 py-2.5 border-b",
+        isComplete ? "border-emerald-200 bg-emerald-50" : "border-stone-100 bg-stone-50"
+      )}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isComplete && (
+              <CheckCircle2 className="size-4 text-emerald-500" />
+            )}
+            <span className={cn(
+              "text-xs font-semibold",
+              isComplete ? "text-emerald-700" : "text-stone-700"
+            )}>
+              {title}
+            </span>
+            {/* Relationship badge */}
+            <span className={cn(
+              "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded",
+              isComplete
+                ? "bg-emerald-200 text-emerald-700"
+                : relationship === "all"
+                  ? "bg-stone-200 text-stone-600"
+                  : "bg-blue-100 text-blue-600"
+            )}>
+              {isComplete ? "Complete" : relationship === "all" ? "All required" : "Any one"}
+            </span>
+          </div>
+          <span className={cn(
+            "text-[10px] font-semibold tabular-nums",
+            isComplete ? "text-emerald-600" : "text-stone-500"
+          )}>
+            {uploadedCount}/{totalCount}
+          </span>
+        </div>
+      </div>
+
+      {/* Document slots - horizontal flex layout */}
+      <div className="p-3">
+        <div className="flex items-center gap-2">
+          {documents.map((doc, idx) => (
+            <Fragment key={doc.id}>
+              {/* Slot - flex-1 for equal width, fixed height */}
+              <button
+                onClick={() => onAddClick(doc)}
+                className={cn(
+                  "flex-1 min-w-0 h-24 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-2 px-2",
+                  doc.isUploaded
+                    ? "border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:shadow-sm"
+                    : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100"
+                )}
+              >
+                {doc.isUploaded ? (
+                  <>
+                    {/* Uploaded state - document preview style */}
+                    <div className="relative">
+                      <div className="w-10 h-12 rounded bg-white border border-emerald-200 shadow-sm flex flex-col p-1.5 gap-0.5">
+                        <div className="h-0.5 bg-emerald-300 rounded w-2/3" />
+                        <div className="h-0.5 bg-emerald-200 rounded w-full" />
+                        <div className="h-0.5 bg-emerald-200 rounded w-full" />
+                        <div className="h-0.5 bg-emerald-200 rounded w-4/5" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 size-4 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <Check className="size-2.5 text-white" strokeWidth={3} />
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-medium text-emerald-700 text-center line-clamp-1 max-w-full">
+                      {doc.linkedFileName || doc.name}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {/* Empty state */}
+                    <div className="size-10 rounded-lg bg-white border-2 border-dashed border-stone-300 flex items-center justify-center">
+                      <Upload className="size-4 text-stone-400" />
+                    </div>
+                    <span className="text-[10px] font-medium text-stone-500 text-center line-clamp-1 max-w-full">
+                      {doc.name}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              {/* Connector between slots */}
+              {idx < documents.length - 1 && (
+                <div className="shrink-0 flex items-center justify-center">
+                  <span className={cn(
+                    "px-2 py-1 text-[9px] font-bold rounded-full",
+                    isComplete
+                      ? "bg-emerald-100 text-emerald-600"
+                      : relationship === "all"
+                        ? "bg-stone-100 text-stone-500"
+                        : "bg-blue-50 text-blue-500"
+                  )}>
+                    {relationship === "all" ? "+" : "or"}
+                  </span>
+                </div>
+              )}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Supporting Documents Card - Shows all document slots as cards
 // ============================================================================
 function SupportingDocumentsCard({
@@ -714,8 +847,60 @@ function SupportingDocumentsCard({
   onAddClick: (evidence: RequiredEvidence) => void;
   onViewMore?: () => void;
 }) {
-  const uploadedDocs = documents.filter(d => d.isUploaded);
-  const pendingDocs = documents.filter(d => !d.isUploaded);
+  // Group documents by type for combined evidence slots
+  const groupedDocs = useMemo(() => {
+    // Check if we have bank statements and payslip - combine them as Financial Evidence
+    const bankStatements = documents.find(d =>
+      d.name.toLowerCase().includes("bank statement")
+    );
+    const payslip = documents.find(d =>
+      d.name.toLowerCase().includes("payslip")
+    );
+
+    // If we have both bank statements and payslip, group them
+    if (bankStatements && payslip) {
+      const financialGroup = {
+        title: "Financial Evidence",
+        relationship: "all" as const, // Both bank statements AND payslip required
+        documents: [bankStatements, payslip],
+      };
+
+      // Get remaining standalone documents
+      const groupedIds = new Set([bankStatements.id, payslip.id]);
+      const standalone = documents.filter(d => !groupedIds.has(d.id));
+
+      return { groups: [financialGroup], standalone };
+    }
+
+    // No grouping needed
+    return { groups: [], standalone: documents };
+  }, [documents]);
+
+  // Calculate counts treating combined groups as single items
+  const counts = useMemo(() => {
+    // Total = number of groups + number of standalone docs
+    const totalCount = groupedDocs.groups.length + groupedDocs.standalone.length;
+
+    // Uploaded count for groups (based on relationship)
+    const uploadedGroups = groupedDocs.groups.filter(group => {
+      const uploadedInGroup = group.documents.filter(d => d.isUploaded).length;
+      if (group.relationship === "all") {
+        return uploadedInGroup === group.documents.length;
+      } else {
+        return uploadedInGroup >= 1;
+      }
+    }).length;
+
+    // Uploaded count for standalone docs
+    const uploadedStandalone = groupedDocs.standalone.filter(d => d.isUploaded).length;
+
+    const uploadedCount = uploadedGroups + uploadedStandalone;
+
+    return { totalCount, uploadedCount };
+  }, [groupedDocs]);
+
+  const percent = counts.totalCount > 0 ? Math.round((counts.uploadedCount / counts.totalCount) * 100) : 0;
+  const isComplete = counts.uploadedCount === counts.totalCount && counts.totalCount > 0;
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white overflow-hidden h-full flex flex-col">
@@ -723,14 +908,14 @@ function SupportingDocumentsCard({
       <div className="shrink-0 p-4 border-b border-stone-100">
         <div className="flex items-center gap-3">
           <ProgressRing
-            percent={documents.length > 0 ? Math.round((uploadedDocs.length / documents.length) * 100) : 0}
-            isComplete={uploadedDocs.length === documents.length && documents.length > 0}
+            percent={percent}
+            isComplete={isComplete}
             size={48}
           />
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-stone-700 text-balance">Supporting Documents</h3>
             <p className="text-[11px] text-stone-400 tabular-nums">
-              {uploadedDocs.length} of {documents.length} uploaded
+              {counts.uploadedCount} of {counts.totalCount} uploaded
             </p>
           </div>
           {onViewMore && (
@@ -754,74 +939,70 @@ function SupportingDocumentsCard({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Uploaded Documents */}
-            {uploadedDocs.length > 0 && (
+            {/* Combined Evidence Groups */}
+            {groupedDocs.groups.map((group, idx) => (
+              <CombinedEvidenceSlotInline
+                key={`group-${idx}`}
+                title={group.title}
+                relationship={group.relationship}
+                documents={group.documents}
+                onAddClick={onAddClick}
+              />
+            ))}
+
+            {/* Standalone Documents */}
+            {groupedDocs.standalone.length > 0 && (
               <div className="space-y-2">
-                {uploadedDocs.map((doc) => (
-                  <div
+                {groupedDocs.standalone.map((doc) => (
+                  <button
                     key={doc.id}
-                    className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/50"
+                    onClick={() => onAddClick(doc)}
+                    className={cn(
+                      "w-full p-3 rounded-lg border-2 transition-colors text-left",
+                      doc.isUploaded
+                        ? "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300"
+                        : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100/50"
+                    )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="size-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                        <FileText className="size-4 text-emerald-600" />
+                      <div className={cn(
+                        "size-9 rounded-lg flex items-center justify-center shrink-0",
+                        doc.isUploaded
+                          ? "bg-emerald-100"
+                          : "bg-stone-100 border border-dashed border-stone-300"
+                      )}>
+                        {doc.isUploaded ? (
+                          <FileText className="size-4 text-emerald-600" />
+                        ) : (
+                          <Upload className="size-4 text-stone-400" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-stone-700 truncate">
+                          <span className={cn(
+                            "text-xs font-medium truncate",
+                            doc.isUploaded ? "text-stone-700" : "text-stone-600"
+                          )}>
                             {doc.name}
                           </span>
-                          <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                          {doc.isUploaded && (
+                            <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                          )}
                         </div>
-                        {doc.linkedFileName && (
+                        {doc.isUploaded && doc.linkedFileName && (
                           <p className="text-[11px] text-emerald-600 mt-0.5 truncate">
                             {doc.linkedFileName}
                           </p>
                         )}
-                      </div>
-                      <button
-                        onClick={() => onAddClick(doc)}
-                        className="shrink-0 text-xs font-medium text-stone-500 hover:text-stone-700 transition-colors"
-                      >
-                        Replace
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Pending Documents */}
-            {pendingDocs.length > 0 && (
-              <div className="space-y-2">
-                {pendingDocs.map((doc) => (
-                  <button
-                    key={doc.id}
-                    onClick={() => onAddClick(doc)}
-                    className="w-full p-3 rounded-lg border border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100/50 transition-colors text-left"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="size-9 rounded-lg bg-stone-100 flex items-center justify-center shrink-0 border border-dashed border-stone-300">
-                        <Upload className="size-4 text-stone-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-stone-600 truncate">
-                            {doc.name}
-                          </span>
-                          {!doc.isMandatory && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-medium text-stone-500 bg-stone-200 rounded shrink-0">
-                              Optional
-                            </span>
-                          )}
-                        </div>
-                        {doc.description && (
+                        {!doc.isUploaded && doc.description && (
                           <p className="text-[10px] text-stone-400 mt-0.5 line-clamp-1 text-pretty">
                             {doc.description}
                           </p>
                         )}
                       </div>
-                      <Plus className="size-4 text-stone-400 shrink-0" />
+                      {!doc.isUploaded && (
+                        <Plus className="size-4 text-stone-400 shrink-0" />
+                      )}
                     </div>
                   </button>
                 ))}
