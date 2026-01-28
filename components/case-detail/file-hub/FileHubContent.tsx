@@ -26,6 +26,7 @@ import {
   Package,
   ChevronUp,
   GripVertical,
+  Unlink,
 } from "lucide-react";
 
 // ============================================================================
@@ -1369,7 +1370,7 @@ const DraggableLinkedDocumentItem = ({
         className="p-1 text-stone-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
         title="Unlink"
       >
-        <X size={12} />
+        <Unlink size={12} />
       </button>
     </div>
   );
