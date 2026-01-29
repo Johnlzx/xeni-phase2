@@ -1,0 +1,117 @@
+Story Category
+Part of an Epic (link to parent Epic below)
+
+Parent Epic
+No response
+
+User Story
+User Story
+As a Home Office caseworker reviewing applications for the government, I want documents to follow a clear, consistent naming convention so that I can immediately understand what a document is and who it relates to just by looking at the file name.
+
+Priority
+Medium
+
+Size Estimate
+M (1 day)
+
+Story Points / Hours
+No response
+
+Target Iteration/Sprint
+No response
+
+Target Completion Date
+No response
+
+Detailed Description
+User Need (Problem)
+Immigration applications often contain many documents that look similar at a glance (e.g., multiple bank statements, payslips, letters). File names received directly from clients or third parties are inconsistent and often unhelpful.
+
+Clear, standardised file names allow reviewers to quickly recognise documents without opening them, particularly when:
+
+Reviewing applications
+Downloading files or ZIP bundles
+Preparing or checking submissions
+Suggested Solution (Step-by-Step Behaviour)
+1. Apply a Consistent Naming Convention
+Xeni generates clear, structured document names using the standard pattern:
+
+who_documentType_mostRecentDate
+
+2. Clearly Identify Who the Document Relates To
+The file name includes a short identifier indicating who the document relates to, such as:
+
+applicant
+sponsor
+adviser
+dependant (if applicable)
+3. Clearly Identify the Document Type
+The file name includes a recognisable document type, for example:
+
+payslip
+bankStatement
+passport
+letterOfConsent
+employmentContract
+proofOfCohabitation
+proofOfAccommodation
+4. Include a Date Only When Relevant
+Time-based documents (e.g., bank statements, payslips):
+
+Include the most recent relevant date in MMYY format
+Example: 0126 for January 2026
+Non time-based documents (e.g., passports, consent letters):
+
+Omit the date portion entirely
+5. Use the Same Convention Everywhere
+The generated file name is used consistently across:
+
+Document lists
+Individual file downloads
+ZIP exports
+Acceptance Criteria
+Acceptance Criteria – File Naming Convention
+Naming Format
+
+Given a document is uploaded or processed
+When Xeni assigns a file name
+Then the name follows the format who_documentType_mostRecentDate (where applicable)
+Person Identification
+
+Given a document relates to a specific person
+When the file name is generated
+Then the name clearly identifies who the document relates to (e.g., applicant, sponsor)
+Document Type
+
+Given a document has a recognisable type
+When the file name is generated
+Then the document type is clearly reflected in the name
+Time-Based Documents
+
+Given a document is time-based
+When the file name is generated
+Then the most recent relevant date is included in MMYY format
+Non Time-Based Documents
+
+Given a document is not time-based
+When the file name is generated
+Then no date is included in the file name
+Download Consistency
+
+Given documents are downloaded individually or as a ZIP
+When the files are saved locally
+Then the same naming convention is preserved
+Test Cases
+No response
+
+Technical Tasks
+No response
+
+Dependencies
+No response
+
+Design Resources
+No response
+
+Additional Notes
+No response

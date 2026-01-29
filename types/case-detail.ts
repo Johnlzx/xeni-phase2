@@ -92,7 +92,14 @@ export interface UploadedFilePreview {
   groupId?: string;
 }
 
+// Entity type for document ownership attribution
+export type DocumentEntityType = 'applicant' | 'sponsor' | 'dependant' | 'shared' | 'unknown';
+
+// Source of how a file was added to a container
+export type FileAssociationSource = 'upload' | 'assign' | 'reuse';
+
 // Document File (for Documents page)
+// Files are stored centrally in allFiles, containers only hold references
 export interface DocumentFile {
   id: string;
   name: string;
@@ -101,15 +108,21 @@ export interface DocumentFile {
   date?: string;
   type: "pdf" | "doc";
   isNew?: boolean;
-  isRemoved?: boolean;
+  isRemoved?: boolean; // Soft delete for the entire file
   // Analysis tracking
   isAnalyzed?: boolean;
   analyzedAt?: string;
-  // One-to-many linking: a page can be linked to multiple groups
-  linkedToGroups?: string[]; // Array of group IDs this page is linked to
+  // One-to-Many: Array of container IDs this file is associated with
+  // Empty array = Unclassified (not in any container)
+  containerIds: string[];
+  // Folder upload metadata (for entity attribution)
+  relativePath?: string; // Original path from folder upload (e.g., "Case_2024/Applicant_John/Identity/")
+  entityType?: DocumentEntityType; // Detected entity type from path
 }
 
-// Document Group
+// Document Group (Container)
+// Containers hold references to files via fileIds, not the files themselves
+// The `files` property is resolved by selectors for backward compatibility with UI components
 export interface DocumentGroup {
   id: string;
   title: string;
@@ -117,19 +130,15 @@ export interface DocumentGroup {
   mergedFileName?: string;
   status: "pending" | "reviewed";
   hasChanges?: boolean;
+  // Reference-based: array of file IDs in this container (source of truth)
+  fileIds: string[];
+  // Resolved files - populated by useDocumentGroups selector for backward compatibility
+  // In the store, this may be an empty array. Selectors resolve it from allFiles + fileIds.
   files: DocumentFile[];
   isSpecial?: boolean; // Special documents like Case Notes - auto-confirmed, no review needed
-}
-
-// Document Bundle - Container for grouping multiple logical files (DocumentGroups)
-// Represents a custom collection without business definition (not "Passport", "Bank Statement", etc.)
-export interface DocumentBundle {
-  id: string;
-  name: string; // User-defined name: "Financial Package", "Supporting Evidence", etc.
-  description?: string;
-  linkedGroupIds: string[]; // Array of DocumentGroup IDs linked to this bundle (LINK, not move)
-  createdAt: string;
-  color?: "violet" | "indigo" | "teal" | "amber" | "rose"; // Accent color for visual distinction
+  // Folder upload metadata
+  entityType?: DocumentEntityType; // Entity this document belongs to (from folder path)
+  generatedName?: string; // Auto-generated name following convention: who_documentType_date
 }
 
 // Application Phase (4-stage state machine)
@@ -370,12 +379,13 @@ export interface CaseDetailState {
   uploadedFilePreviews: UploadedFilePreview[];
   maxPreviewFiles: number;
 
-  // Document Groups (shared between Overview and Documents)
+  // Document Files (centralized storage - 1:N model)
+  // Files are stored here, DocumentGroups only hold references via fileIds
+  allFiles: Record<string, DocumentFile>;
+
+  // Document Groups/Containers (shared between Overview and Documents)
   documentGroups: DocumentGroup[];
   isLoadingDocuments: boolean;
-
-  // Document Bundles (containers for grouping multiple logical files)
-  documentBundles: DocumentBundle[];
 
   // Demo Controls
   demoStage: number;
@@ -486,16 +496,36 @@ export interface CaseDetailActions {
   uploadToGroup: (groupId: string, fileCount?: number) => void;
   uploadAndAutoClassify: (totalPages?: number) => void;
 
-  // Page Linking (one-to-many: a page can be linked to multiple groups)
+  // ============================================
+  // One-to-Many File-Container Actions
+  // ============================================
+
+  // Add file to container (creates reference, file appears in container)
+  addFileToContainer: (fileId: string, containerId: string) => void;
+
+  // Remove file from container (removes reference only, file may remain in other containers)
+  removeFileFromContainer: (fileId: string, containerId: string) => void;
+
+  // Reuse file in another container (adds reference, file appears in both containers)
+  reuseFileInContainer: (fileId: string, targetContainerId: string) => void;
+
+  // Move file between containers (remove from source, add to target)
+  moveFileBetweenContainers: (fileId: string, fromContainerId: string, toContainerId: string) => void;
+
+  // Add multiple files to a container (moves files from their current containers)
+  addFilesToGroup: (groupId: string, orderedFileIds: string[]) => void;
+
+  // Legacy compatibility (redirects to new actions)
   duplicateFileToGroup: (fileId: string, targetGroupId: string) => void;
 
-  // Document Bundles (containers for grouping logical files)
-  createDocumentBundle: (name: string, linkedGroupIds: string[]) => void;
-  deleteDocumentBundle: (bundleId: string) => void;
-  renameDocumentBundle: (bundleId: string, newName: string) => void;
-  linkGroupToBundle: (groupId: string, bundleId: string) => void;
-  unlinkGroupFromBundle: (groupId: string, bundleId: string) => void;
-  reorderLinkedDocumentsInBundle: (bundleId: string, newOrder: string[]) => void;
+  // Combine Documents (merge individual files into a new "Other Documents" container)
+  mergeDocumentsIntoGroup: (
+    name: string,
+    orderedFileIds: string[]
+  ) => void;
+
+  // Folder Upload (recursive folder upload with path parsing)
+  uploadFolder: (files: Array<{ file: File; relativePath: string }>) => void;
 
   // Demo Controls
   advanceDemoStage: () => void;

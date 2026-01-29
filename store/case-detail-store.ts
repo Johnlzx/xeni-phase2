@@ -12,7 +12,6 @@ import {
   ChecklistItem,
   DocumentGroup,
   DocumentFile,
-  DocumentBundle,
   ApplicationPhase,
   FormSchemaStatus,
   FormPilotStatus,
@@ -33,9 +32,25 @@ import {
   RequiredEvidence,
 } from "@/types/case-detail";
 import { PassportInfo, VisaType } from "@/types";
+import { parseDocumentPath } from "@/lib/document-path-parser";
+
+// Old-style document group type (with files embedded) - for legacy data
+interface LegacyDocumentGroup {
+  id: string;
+  title: string;
+  tag: string;
+  mergedFileName?: string;
+  status: "pending" | "reviewed";
+  hasChanges?: boolean;
+  files: Array<Omit<DocumentFile, 'containerIds'> & { containerIds?: string[] }>;
+  isSpecial?: boolean;
+  entityType?: DocumentFile['entityType'];
+  generatedName?: string;
+}
 
 // Initial document groups data - Rich mock data with many pages per category
-const INITIAL_DOCUMENT_GROUPS: DocumentGroup[] = [
+// Uses legacy format (files embedded) - converted to new model when used
+const INITIAL_DOCUMENT_GROUPS_LEGACY: LegacyDocumentGroup[] = [
   {
     id: "passport",
     title: "Passport",
@@ -754,9 +769,9 @@ const initialState: CaseDetailState = {
   },
   uploadedFilePreviews: [],
   maxPreviewFiles: 6,
+  allFiles: {},
   documentGroups: [],
   isLoadingDocuments: false,
-  documentBundles: [],
   demoStage: 0,
   isAnalyzingDocuments: false,
   analysisProgress: 0,
@@ -793,13 +808,61 @@ const initialState: CaseDetailState = {
   forwardModalIssueId: null,
 };
 
-// Helper to sync file previews from document groups
-const syncFilePreviewsFromGroups = (
+// ============================================================================
+// Helper Functions for 1:N File-Container Model
+// ============================================================================
+
+// Helper to sync file previews from allFiles and documentGroups
+const syncFilePreviewsFromState = (
+  allFiles: Record<string, DocumentFile>,
   groups: DocumentGroup[],
 ): UploadedFilePreview[] => {
   const previews: UploadedFilePreview[] = [];
   for (const group of groups) {
-    for (const file of group.files) {
+    for (const fileId of group.fileIds) {
+      const file = allFiles[fileId];
+      if (file && !file.isRemoved) {
+        previews.push({
+          id: file.id,
+          name: file.name,
+          type: file.type === "pdf" ? "application/pdf" : "application/msword",
+          groupId: group.id,
+        });
+      }
+    }
+  }
+  return previews;
+};
+
+// Helper to get files for a specific container
+const getContainerFiles = (
+  allFiles: Record<string, DocumentFile>,
+  group: DocumentGroup,
+): DocumentFile[] => {
+  return group.fileIds
+    .map(id => allFiles[id])
+    .filter((f): f is DocumentFile => f !== undefined && !f.isRemoved);
+};
+
+// Helper to get unclassified files (files with no container associations)
+const getUnclassifiedFiles = (
+  allFiles: Record<string, DocumentFile>,
+): DocumentFile[] => {
+  return Object.values(allFiles).filter(
+    f => !f.isRemoved && f.containerIds.length === 0
+  );
+};
+
+// Legacy compatibility: Helper to sync file previews from old-style groups (with files array)
+// Used during migration and for backwards compatibility
+const syncFilePreviewsFromGroups = (
+  groups: Array<DocumentGroup & { files?: DocumentFile[] }>,
+): UploadedFilePreview[] => {
+  const previews: UploadedFilePreview[] = [];
+  for (const group of groups) {
+    // Support both new model (fileIds) and old model (files)
+    const files = (group as { files?: DocumentFile[] }).files || [];
+    for (const file of files) {
       previews.push({
         id: file.id,
         name: file.name,
@@ -809,6 +872,47 @@ const syncFilePreviewsFromGroups = (
     }
   }
   return previews;
+};
+
+// Convert old-style groups (files embedded) to new model (files separate, groups have fileIds)
+const convertLegacyGroupsToNewModel = (
+  legacyGroups: LegacyDocumentGroup[]
+): { allFiles: Record<string, DocumentFile>; documentGroups: DocumentGroup[] } => {
+  const allFiles: Record<string, DocumentFile> = {};
+  const documentGroups: DocumentGroup[] = [];
+
+  for (const group of legacyGroups) {
+    const fileIds: string[] = [];
+
+    for (const file of group.files) {
+      // Determine containerIds: empty if unclassified group, otherwise [group.id]
+      const containerIds = group.id === 'unclassified' ? [] : [group.id];
+
+      // Store file in allFiles with containerIds
+      allFiles[file.id] = {
+        ...file,
+        containerIds: file.containerIds || containerIds,
+      };
+      fileIds.push(file.id);
+    }
+
+    // Create new-style group with fileIds instead of files
+    documentGroups.push({
+      id: group.id,
+      title: group.title,
+      tag: group.tag,
+      mergedFileName: group.mergedFileName,
+      status: group.status,
+      hasChanges: group.hasChanges,
+      fileIds,
+      files: [],
+      isSpecial: group.isSpecial,
+      entityType: group.entityType,
+      generatedName: group.generatedName,
+    });
+  }
+
+  return { allFiles, documentGroups };
 };
 
 // Calculate profile completeness
@@ -1132,6 +1236,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               tag: templateName,
               mergedFileName: `${templateName}.pdf`,
               status: "pending",
+              fileIds: [],
               files: [],
             };
             // Append new category to the end of the array
@@ -1165,7 +1270,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         set(
           (state) => ({
             documentGroups: state.documentGroups.map((g) =>
-              g.id === groupId ? { ...g, mergedFileName: newTitle } : g,
+              g.id === groupId ? { ...g, title: newTitle } : g,
             ),
           }),
           false,
@@ -1173,59 +1278,173 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      // ============================================
+      // One-to-Many File-Container Actions
+      // ============================================
+
+      // Add file to container (creates reference)
+      addFileToContainer: (fileId: string, containerId: string) => {
+        set(
+          (state) => {
+            const file = state.allFiles[fileId];
+            const group = state.documentGroups.find(g => g.id === containerId);
+
+            if (!file || !group) return state;
+
+            // Idempotency: if already in container, do nothing
+            if (file.containerIds.includes(containerId)) return state;
+
+            // Update file's containerIds
+            const updatedFile = {
+              ...file,
+              containerIds: [...file.containerIds, containerId],
+              isNew: true,
+            };
+
+            // Update container's fileIds
+            const updatedGroups = state.documentGroups.map(g => {
+              if (g.id === containerId) {
+                return {
+                  ...g,
+                  fileIds: [fileId, ...g.fileIds], // Add to beginning
+                  status: "pending" as const,
+                  hasChanges: true,
+                };
+              }
+              return g;
+            });
+
+            const newAllFiles = { ...state.allFiles, [fileId]: updatedFile };
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "addFileToContainer",
+        );
+      },
+
+      // Remove file from container (removes reference only)
+      removeFileFromContainer: (fileId: string, containerId: string) => {
+        set(
+          (state) => {
+            const file = state.allFiles[fileId];
+            const group = state.documentGroups.find(g => g.id === containerId);
+
+            if (!file || !group) return state;
+
+            // Update file's containerIds
+            const updatedFile = {
+              ...file,
+              containerIds: file.containerIds.filter(id => id !== containerId),
+            };
+
+            // Update container's fileIds
+            const updatedGroups = state.documentGroups.map(g => {
+              if (g.id === containerId) {
+                return {
+                  ...g,
+                  fileIds: g.fileIds.filter(id => id !== fileId),
+                  status: "pending" as const,
+                  hasChanges: true,
+                };
+              }
+              return g;
+            });
+
+            const newAllFiles = { ...state.allFiles, [fileId]: updatedFile };
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "removeFileFromContainer",
+        );
+      },
+
+      // Reuse file in another container (adds reference, keeps original)
+      reuseFileInContainer: (fileId: string, targetContainerId: string) => {
+        // Just call addFileToContainer - file will be in both containers
+        get().addFileToContainer(fileId, targetContainerId);
+      },
+
+      // Move file between containers (remove from source, add to target)
+      moveFileBetweenContainers: (fileId: string, fromContainerId: string, toContainerId: string) => {
+        get().removeFileFromContainer(fileId, fromContainerId);
+        get().addFileToContainer(fileId, toContainerId);
+      },
+
+      // Legacy moveFileToGroup - for Unclassified to Container moves
+      // When moving from Unclassified (containerIds=[]), just add to target container
+      // When moving between containers, use moveFileBetweenContainers
       moveFileToGroup: (fileId: string, targetGroupId: string) => {
         set(
           (state) => {
-            let file: DocumentFile | undefined;
-            let sourceGroupId: string | undefined;
+            const file = state.allFiles[fileId];
+            if (!file || file.isRemoved) return state;
 
-            for (const g of state.documentGroups) {
-              // Find the file (excluding already removed ones for the source check)
-              const found = g.files.find(
-                (f) => f.id === fileId && !f.isRemoved,
-              );
-              if (found) {
-                file = found;
-                sourceGroupId = g.id;
-                break;
+            // Find source container (first container in list, or empty for unclassified)
+            const sourceContainerId = file.containerIds.length > 0 ? file.containerIds[0] : null;
+
+            // If moving to same container, do nothing
+            if (sourceContainerId === targetGroupId) return state;
+
+            // Update file's containerIds
+            let newContainerIds: string[];
+            if (sourceContainerId) {
+              // Replace source with target
+              newContainerIds = file.containerIds.filter(id => id !== sourceContainerId);
+              if (!newContainerIds.includes(targetGroupId)) {
+                newContainerIds = [targetGroupId, ...newContainerIds];
               }
+            } else {
+              // Unclassified: just add target
+              newContainerIds = [targetGroupId];
             }
 
-            if (!file || !sourceGroupId || sourceGroupId === targetGroupId) {
-              return state;
-            }
+            const updatedFile = {
+              ...file,
+              containerIds: newContainerIds,
+              isNew: true,
+            };
 
-            const newGroups = state.documentGroups.map((group) => {
-              if (group.id === sourceGroupId) {
+            // Update groups
+            const updatedGroups = state.documentGroups.map(g => {
+              if (sourceContainerId && g.id === sourceContainerId) {
+                // Remove from source
                 return {
-                  ...group,
-                  // Mark file as removed instead of deleting it (for diff view)
-                  files: group.files.map((f) =>
-                    f.id === fileId
-                      ? { ...f, isRemoved: true, isNew: false }
-                      : f,
-                  ),
+                  ...g,
+                  fileIds: g.fileIds.filter(id => id !== fileId),
                   status: "pending" as const,
                   hasChanges: true,
                 };
               }
-              if (group.id === targetGroupId) {
+              if (g.id === targetGroupId && !g.fileIds.includes(fileId)) {
+                // Add to target
                 return {
-                  ...group,
+                  ...g,
+                  fileIds: [fileId, ...g.fileIds],
                   status: "pending" as const,
                   hasChanges: true,
-                  files: [
-                    { ...file!, isNew: true, isRemoved: false },
-                    ...group.files,
-                  ],
                 };
               }
-              return group;
+              return g;
             });
 
-            const previews = syncFilePreviewsFromGroups(newGroups);
+            const newAllFiles = { ...state.allFiles, [fileId]: updatedFile };
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
             return {
-              documentGroups: newGroups,
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
               uploadedFilePreviews: previews,
             };
           },
@@ -1244,13 +1463,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             const newGroups = state.documentGroups.map((group) => {
               if (group.id !== groupId) return group;
 
-              const newFiles = [...group.files];
-              const [removed] = newFiles.splice(fromIndex, 1);
-              newFiles.splice(toIndex, 0, removed);
+              const newFileIds = [...group.fileIds];
+              const [removed] = newFileIds.splice(fromIndex, 1);
+              newFileIds.splice(toIndex, 0, removed);
 
               return {
                 ...group,
-                files: newFiles,
+                fileIds: newFileIds,
                 status: "pending" as const,
                 hasChanges: true,
               };
@@ -1266,21 +1485,26 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       markFileForDeletion: (fileId: string, groupId: string) => {
         set(
           (state) => {
+            const file = state.allFiles[fileId];
+            if (!file) return state;
+
+            // Mark file as removed
+            const updatedFile = { ...file, isRemoved: true, isNew: false };
+            const newAllFiles = { ...state.allFiles, [fileId]: updatedFile };
+
+            // Update group status
             const newGroups = state.documentGroups.map((group) => {
               if (group.id !== groupId) return group;
-
               return {
                 ...group,
                 status: "pending" as const,
                 hasChanges: true,
-                files: group.files.map((f) =>
-                  f.id === fileId ? { ...f, isRemoved: true, isNew: false } : f,
-                ),
               };
             });
 
-            const previews = syncFilePreviewsFromGroups(newGroups);
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
             return {
+              allFiles: newAllFiles,
               documentGroups: newGroups,
               uploadedFilePreviews: previews,
             };
@@ -1292,14 +1516,17 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
       clearFileNewStatus: (fileId: string) => {
         set(
-          (state) => ({
-            documentGroups: state.documentGroups.map((group) => ({
-              ...group,
-              files: group.files.map((f) =>
-                f.id === fileId ? { ...f, isNew: false } : f,
-              ),
-            })),
-          }),
+          (state) => {
+            const file = state.allFiles[fileId];
+            if (!file) return state;
+
+            return {
+              allFiles: {
+                ...state.allFiles,
+                [fileId]: { ...file, isNew: false },
+              },
+            };
+          },
           false,
           "clearFileNewStatus",
         );
@@ -1319,21 +1546,40 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
       confirmGroupReview: (groupId: string) => {
         set(
-          (state) => ({
-            documentGroups: state.documentGroups.map((g) =>
-              g.id === groupId
-                ? {
-                    ...g,
-                    status: "reviewed" as const,
-                    hasChanges: false,
-                    // Remove files marked as isRemoved, clear isNew flag for remaining
-                    files: g.files
-                      .filter((f) => !f.isRemoved)
-                      .map((f) => ({ ...f, isNew: false })),
-                  }
-                : g,
-            ),
-          }),
+          (state) => {
+            const group = state.documentGroups.find((g) => g.id === groupId);
+            if (!group) return {};
+
+            // Update allFiles: remove isRemoved files, clear isNew flag for remaining
+            const newAllFiles = { ...state.allFiles };
+            const activeFileIds: string[] = [];
+            for (const fileId of group.fileIds) {
+              const file = newAllFiles[fileId];
+              if (!file) continue;
+              if (file.isRemoved) {
+                // Remove the file from allFiles entirely
+                delete newAllFiles[fileId];
+              } else {
+                // Clear isNew flag
+                newAllFiles[fileId] = { ...file, isNew: false };
+                activeFileIds.push(fileId);
+              }
+            }
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: state.documentGroups.map((g) =>
+                g.id === groupId
+                  ? {
+                      ...g,
+                      status: "reviewed" as const,
+                      hasChanges: false,
+                      fileIds: activeFileIds,
+                    }
+                  : g,
+              ),
+            };
+          },
           false,
           "confirmGroupReview",
         );
@@ -1343,10 +1589,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         set({ isLoadingDocuments: true }, false, "uploadDocuments:start");
         // Simulate AI processing
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        const previews = syncFilePreviewsFromGroups(INITIAL_DOCUMENT_GROUPS);
+        // Convert legacy groups to new model
+        const { allFiles, documentGroups } = convertLegacyGroupsToNewModel(INITIAL_DOCUMENT_GROUPS_LEGACY);
+        const previews = syncFilePreviewsFromState(allFiles, documentGroups);
         set(
           {
-            documentGroups: INITIAL_DOCUMENT_GROUPS,
+            allFiles,
+            documentGroups,
             uploadedFilePreviews: previews,
             isLoadingDocuments: false,
           },
@@ -1359,32 +1608,43 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       uploadToGroup: (groupId: string, fileCount: number = 1) => {
         set(
           (state) => {
-            const newGroups = state.documentGroups.map((g) => {
+            const group = state.documentGroups.find(g => g.id === groupId);
+            if (!group) return state;
+
+            const timestamp = Date.now();
+            const newAllFiles = { ...state.allFiles };
+            const newFileIds: string[] = [];
+
+            for (let i = 0; i < fileCount; i++) {
+              const fileId = `file_${timestamp}_${i}`;
+              newAllFiles[fileId] = {
+                id: fileId,
+                name: `Uploaded_Page_${group.fileIds.length + i + 1}.pdf`,
+                size: "0.5 MB",
+                pages: 1,
+                date: "Just now",
+                type: "pdf",
+                isNew: true,
+                containerIds: [groupId],
+              };
+              newFileIds.push(fileId);
+            }
+
+            const newGroups = state.documentGroups.map(g => {
               if (g.id === groupId) {
-                const newFiles: DocumentFile[] = [];
-                for (let i = 0; i < fileCount; i++) {
-                  const fileId = `file_${Date.now()}_${i}`;
-                  newFiles.push({
-                    id: fileId,
-                    name: `Uploaded_Page_${g.files.length + i + 1}.pdf`,
-                    size: "0.5 MB",
-                    pages: 1,
-                    date: "Just now",
-                    type: "pdf",
-                    isNew: true,
-                  });
-                }
                 return {
                   ...g,
-                  files: [...g.files, ...newFiles],
+                  fileIds: [...g.fileIds, ...newFileIds],
                   status: "pending" as const,
                   hasChanges: true,
                 };
               }
               return g;
             });
-            const previews = syncFilePreviewsFromGroups(newGroups);
+
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
             return {
+              allFiles: newAllFiles,
               documentGroups: newGroups,
               uploadedFilePreviews: previews,
             };
@@ -1399,13 +1659,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         set(
           (state) => {
             const timestamp = Date.now();
+            const newAllFiles = { ...state.allFiles };
 
             // Helper to normalize names for comparison (remove spaces, hyphens, lowercase)
             const normalize = (str: string) =>
               str.toLowerCase().replace(/[\s\-_]/g, "");
 
             // Categories to potentially create (simulating AI classification results)
-            // Always create at least one NEW category that doesn't exist yet
             const allPossibleCategories = [
               { category: "Passport", pages: 2 },
               { category: "Bank Statement", pages: 3 },
@@ -1461,50 +1721,58 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
             // Create NEW category groups with files
             selectedNewCategories.forEach((result, catIndex) => {
-              const newFiles: DocumentFile[] = [];
+              const groupId = `group_${timestamp}_${catIndex}`;
+              const fileIds: string[] = [];
+
               for (let i = 0; i < result.pages; i++) {
-                newFiles.push({
-                  id: `classified_${timestamp}_${catIndex}_${i}`,
+                const fileId = `classified_${timestamp}_${catIndex}_${i}`;
+                newAllFiles[fileId] = {
+                  id: fileId,
                   name: `${result.category.replace(/\s+/g, "_")}_Page_${i + 1}.pdf`,
                   size: "0.5 MB",
                   pages: 1,
                   date: "Just now",
                   type: "pdf",
                   isNew: true,
-                });
+                  containerIds: [groupId],
+                };
+                fileIds.push(fileId);
               }
 
-              const newGroup: DocumentGroup = {
-                id: `group_${timestamp}_${catIndex}`,
+              newGroups.push({
+                id: groupId,
                 title: result.category,
                 tag: result.category,
                 mergedFileName: `${result.category.replace(/\s+/g, "_")}.pdf`,
                 status: "pending",
                 hasChanges: true,
-                files: newFiles,
-              };
-              newGroups.push(newGroup);
+                fileIds,
+                files: [],
+              });
             });
 
             // Add files to an existing group (if selected)
             if (selectedExistingGroup) {
-              const newFiles: DocumentFile[] = [];
+              const existingFileIds: string[] = [];
               for (let i = 0; i < existingGroupPages; i++) {
-                newFiles.push({
-                  id: `existing_${timestamp}_${i}`,
+                const fileId = `existing_${timestamp}_${i}`;
+                newAllFiles[fileId] = {
+                  id: fileId,
                   name: `${selectedExistingGroup.title.replace(/\s+/g, "_")}_New_${i + 1}.pdf`,
                   size: "0.5 MB",
                   pages: 1,
                   date: "Just now",
                   type: "pdf",
                   isNew: true,
-                });
+                  containerIds: [selectedExistingGroup.id],
+                };
+                existingFileIds.push(fileId);
               }
               newGroups = newGroups.map((g) =>
                 g.id === selectedExistingGroup.id
                   ? {
                       ...g,
-                      files: [...g.files, ...newFiles],
+                      fileIds: [...g.fileIds, ...existingFileIds],
                       status: "pending" as const,
                       hasChanges: true,
                     }
@@ -1512,39 +1780,27 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               );
             }
 
-            // Add remaining pages to unclassified
-            const unclassifiedGroup = newGroups.find(
-              (g) => g.id === "unclassified"
-            );
-            if (unclassifiedGroup && unclassifiedPages > 0) {
-              const existingUnclassifiedCount = unclassifiedGroup.files.filter(
-                (f) => !f.isRemoved
-              ).length;
-              const unclassifiedFiles: DocumentFile[] = [];
+            // Add remaining pages as unclassified (containerIds = [])
+            if (unclassifiedPages > 0) {
+              const existingUnclassifiedCount = getUnclassifiedFiles(state.allFiles).length;
               for (let i = 0; i < unclassifiedPages; i++) {
-                unclassifiedFiles.push({
-                  id: `unclassified_${timestamp}_${i}`,
+                const fileId = `unclassified_${timestamp}_${i}`;
+                newAllFiles[fileId] = {
+                  id: fileId,
                   name: `Scan_Page_${String(existingUnclassifiedCount + i + 1).padStart(3, "0")}.pdf`,
                   size: "0.5 MB",
                   pages: 1,
                   date: "Just now",
                   type: "pdf",
                   isNew: true,
-                });
+                  containerIds: [], // Empty = unclassified
+                };
               }
-              newGroups = newGroups.map((g) =>
-                g.id === "unclassified"
-                  ? {
-                      ...g,
-                      files: [...g.files, ...unclassifiedFiles],
-                      hasChanges: true,
-                    }
-                  : g
-              );
             }
 
-            const previews = syncFilePreviewsFromGroups(newGroups);
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
             return {
+              allFiles: newAllFiles,
               documentGroups: newGroups,
               uploadedFilePreviews: previews,
             };
@@ -1554,166 +1810,259 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
-      // Duplicate a file to another group (one-to-many linking)
-      // The file remains in its original location AND appears in the target group
+      // Duplicate/Reuse a file to another group (one-to-many linking)
+      // Now uses reference model - no physical duplication needed
       duplicateFileToGroup: (fileId: string, targetGroupId: string) => {
+        // In the new 1:N model, this is the same as reuseFileInContainer
+        get().addFileToContainer(fileId, targetGroupId);
+      },
+
+      // Add multiple files to an existing container (moves files from their current containers)
+      // Copy files into a target group - source files remain unchanged
+      addFilesToGroup: (groupId: string, orderedFileIds: string[]) => {
         set(
           (state) => {
-            // Find the source file across all groups
-            let sourceFile: DocumentFile | null = null;
-            let sourceGroupId: string | null = null;
-
-            for (const group of state.documentGroups) {
-              const file = group.files.find((f) => f.id === fileId);
-              if (file) {
-                sourceFile = file;
-                sourceGroupId = group.id;
-                break;
-              }
-            }
-
-            if (!sourceFile || !sourceGroupId || sourceGroupId === targetGroupId) {
-              return state;
-            }
+            const targetGroup = state.documentGroups.find((g) => g.id === groupId);
+            if (!targetGroup) return state;
 
             const timestamp = Date.now();
+            const newAllFiles = { ...state.allFiles };
+            const copiedFileIds: string[] = [];
 
-            // Create a copy of the file for the target group
-            const duplicatedFile: DocumentFile = {
-              ...sourceFile,
-              id: `${sourceFile.id}_dup_${timestamp}`,
-              isNew: true,
-              linkedToGroups: [
-                ...(sourceFile.linkedToGroups || []),
-                sourceGroupId,
-                targetGroupId,
-              ],
-            };
-
-            // Update the source file to track linking
-            const newGroups = state.documentGroups.map((group) => {
-              if (group.id === sourceGroupId) {
-                return {
-                  ...group,
-                  files: group.files.map((f) =>
-                    f.id === fileId
-                      ? {
-                          ...f,
-                          linkedToGroups: [
-                            ...(f.linkedToGroups || []),
-                            sourceGroupId!,
-                            targetGroupId,
-                          ],
-                        }
-                      : f
-                  ),
+            // Create COPIES of each file for the target group
+            // Original files remain unchanged in their source containers
+            for (let i = 0; i < orderedFileIds.length; i++) {
+              const originalFileId = orderedFileIds[i];
+              const originalFile = newAllFiles[originalFileId];
+              if (originalFile) {
+                const newFileId = `${originalFileId}_copy_${timestamp}_${i}`;
+                newAllFiles[newFileId] = {
+                  ...originalFile,
+                  id: newFileId,
+                  containerIds: [groupId],
+                  isNew: true,
                 };
+                copiedFileIds.push(newFileId);
               }
-              if (group.id === targetGroupId) {
+            }
+
+            // Only update the target group - source groups remain unchanged
+            const updatedGroups = state.documentGroups.map((group) => {
+              if (group.id === groupId) {
                 return {
                   ...group,
-                  files: [...group.files, duplicatedFile],
-                  status: "pending" as const,
+                  fileIds: [...group.fileIds, ...copiedFileIds],
                   hasChanges: true,
                 };
               }
               return group;
             });
 
-            const previews = syncFilePreviewsFromGroups(newGroups);
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
             return {
-              documentGroups: newGroups,
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
               uploadedFilePreviews: previews,
             };
           },
           false,
-          "duplicateFileToGroup",
+          "addFilesToGroup"
         );
       },
 
-      // Create a new document bundle
-      createDocumentBundle: (name: string, linkedGroupIds: string[]) => {
+      // Merge (copy) multiple files into a new combined document group
+      // Source files remain unchanged - this creates copies for the merged document
+      mergeDocumentsIntoGroup: (
+        name: string,
+        orderedFileIds: string[]
+      ) => {
         set(
           (state) => {
-            const newBundle: DocumentBundle = {
-              id: `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              name,
-              linkedGroupIds,
-              createdAt: new Date().toISOString(),
+            const timestamp = Date.now();
+            const newGroupId = `merged_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+            const newAllFiles = { ...state.allFiles };
+
+            // Create COPIES of selected files for the merged document
+            // Original files remain unchanged in their source containers
+            const copiedFileIds: string[] = [];
+
+            for (let i = 0; i < orderedFileIds.length; i++) {
+              const originalFileId = orderedFileIds[i];
+              const originalFile = newAllFiles[originalFileId];
+              if (originalFile) {
+                // Create a new file ID for the copy
+                const newFileId = `${originalFileId}_copy_${timestamp}_${i}`;
+
+                // Create a copy of the file for the new merged group
+                newAllFiles[newFileId] = {
+                  ...originalFile,
+                  id: newFileId,
+                  containerIds: [newGroupId],
+                  isNew: true,
+                };
+                copiedFileIds.push(newFileId);
+              }
+            }
+
+            // Source groups remain unchanged - no files are removed
+
+            // Create new merged group with copied files
+            const newGroup: DocumentGroup = {
+              id: newGroupId,
+              title: name,
+              tag: "Other Documents",
+              mergedFileName: `${name.replace(/\s+/g, "_")}_Merged.pdf`,
+              status: "pending",
+              fileIds: copiedFileIds,
+              files: [],
+              hasChanges: true,
             };
+
+            const updatedGroups = [...state.documentGroups, newGroup];
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
             return {
-              documentBundles: [...state.documentBundles, newBundle],
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
             };
           },
           false,
-          "createDocumentBundle",
+          "mergeDocumentsIntoGroup",
         );
       },
 
-      // Delete a document bundle (does not delete linked groups)
-      deleteDocumentBundle: (bundleId: string) => {
+      // Upload folder with recursive path parsing
+      uploadFolder: (files: Array<{ file: File; relativePath: string }>) => {
         set(
-          (state) => ({
-            documentBundles: state.documentBundles.filter((b) => b.id !== bundleId),
-          }),
-          false,
-          "deleteDocumentBundle",
-        );
-      },
+          (state) => {
+            const timestamp = Date.now();
+            const newAllFiles = { ...state.allFiles };
 
-      // Rename a document bundle
-      renameDocumentBundle: (bundleId: string, newName: string) => {
-        set(
-          (state) => ({
-            documentBundles: state.documentBundles.map((b) =>
-              b.id === bundleId ? { ...b, name: newName } : b
-            ),
-          }),
-          false,
-          "renameDocumentBundle",
-        );
-      },
+            // Separate files into recognized (known entity) and unrecognized (unknown entity)
+            const recognizedFiles: Array<{ file: File; relativePath: string; parsed: ReturnType<typeof parseDocumentPath> }> = [];
+            const unrecognizedFiles: Array<{ file: File; relativePath: string; parsed: ReturnType<typeof parseDocumentPath> }> = [];
 
-      // Link a group to an existing bundle
-      linkGroupToBundle: (groupId: string, bundleId: string) => {
-        set(
-          (state) => ({
-            documentBundles: state.documentBundles.map((b) =>
-              b.id === bundleId && !b.linkedGroupIds.includes(groupId)
-                ? { ...b, linkedGroupIds: [...b.linkedGroupIds, groupId] }
-                : b
-            ),
-          }),
-          false,
-          "linkGroupToBundle",
-        );
-      },
+            for (const fileData of files) {
+              const parsed = parseDocumentPath(fileData.relativePath, fileData.file.name);
+              if (parsed.who === 'unknown') {
+                unrecognizedFiles.push({ ...fileData, parsed });
+              } else {
+                recognizedFiles.push({ ...fileData, parsed });
+              }
+            }
 
-      // Unlink a group from a bundle
-      unlinkGroupFromBundle: (groupId: string, bundleId: string) => {
-        set(
-          (state) => ({
-            documentBundles: state.documentBundles.map((b) =>
-              b.id === bundleId
-                ? { ...b, linkedGroupIds: b.linkedGroupIds.filter((id) => id !== groupId) }
-                : b
-            ),
-          }),
-          false,
-          "unlinkGroupFromBundle",
-        );
-      },
+            // Group recognized files by their generated document name
+            const groupedByName = new Map<string, {
+              parsedDoc: ReturnType<typeof parseDocumentPath>;
+              files: Array<{ file: File; relativePath: string }>;
+            }>();
 
-      // Reorder linked documents in a bundle
-      reorderLinkedDocumentsInBundle: (bundleId: string, newOrder: string[]) => {
-        set(
-          (state) => ({
-            documentBundles: state.documentBundles.map((b) =>
-              b.id === bundleId ? { ...b, linkedGroupIds: newOrder } : b
-            ),
-          }),
+            for (const fileData of recognizedFiles) {
+              if (!groupedByName.has(fileData.parsed.generatedName)) {
+                groupedByName.set(fileData.parsed.generatedName, {
+                  parsedDoc: fileData.parsed,
+                  files: [],
+                });
+              }
+              groupedByName.get(fileData.parsed.generatedName)!.files.push(fileData);
+            }
+
+            // Create DocumentGroups for each unique generated name
+            const newGroups: DocumentGroup[] = [];
+            let fileIndex = 0;
+
+            // Determine tag from document type
+            const tagMap: Record<string, string> = {
+              passport: "Identity",
+              nationalId: "Identity",
+              birthCertificate: "Identity",
+              bankStatement: "Financial",
+              payslip: "Financial",
+              taxReturn: "Financial",
+              employmentLetter: "Employment",
+              employmentContract: "Employment",
+              educationCertificate: "Education",
+              transcript: "Education",
+              schoolEnrollment: "Education",
+              marriageCertificate: "Relationship",
+              proofOfCohabitation: "Relationship",
+              propertyTitle: "Accommodation",
+              proofOfAccommodation: "Accommodation",
+              utilityBill: "Utility",
+              visa: "Travel",
+              insurance: "Insurance",
+              letterOfConsent: "Other",
+              document: "Other Documents",
+            };
+
+            for (const [generatedName, data] of groupedByName) {
+              const groupId = `group_folder_${timestamp}_${newGroups.length}`;
+              const fileIds: string[] = [];
+
+              for (const fileData of data.files) {
+                const fileId = `folder_${timestamp}_${fileIndex++}`;
+                newAllFiles[fileId] = {
+                  id: fileId,
+                  name: fileData.file.name,
+                  size: `${(fileData.file.size / 1024).toFixed(1)} KB`,
+                  pages: 1,
+                  date: "Just now",
+                  type: "pdf" as const,
+                  isNew: true,
+                  containerIds: [groupId],
+                  relativePath: fileData.relativePath,
+                  entityType: data.parsedDoc.who,
+                };
+                fileIds.push(fileId);
+              }
+
+              const tag = tagMap[data.parsedDoc.documentType] || "Other Documents";
+
+              newGroups.push({
+                id: groupId,
+                title: generatedName,
+                tag,
+                mergedFileName: `${generatedName}.pdf`,
+                status: "pending",
+                fileIds,
+                files: [],
+                hasChanges: true,
+                entityType: data.parsedDoc.who,
+                generatedName,
+              });
+            }
+
+            // Add unrecognized files as unclassified (containerIds = [])
+            for (const fileData of unrecognizedFiles) {
+              const fileId = `folder_${timestamp}_${fileIndex++}`;
+              newAllFiles[fileId] = {
+                id: fileId,
+                name: fileData.file.name,
+                size: `${(fileData.file.size / 1024).toFixed(1)} KB`,
+                pages: 1,
+                date: "Just now",
+                type: "pdf" as const,
+                isNew: true,
+                containerIds: [], // Empty = unclassified
+                relativePath: fileData.relativePath,
+                entityType: "unknown" as const,
+              };
+            }
+
+            // Add new classified groups
+            const updatedGroups = [...state.documentGroups, ...newGroups];
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
           false,
-          "reorderLinkedDocumentsInBundle",
+          "uploadFolder",
         );
       },
 
@@ -1723,6 +2072,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           (state) => {
             const timestamp = Date.now();
             const normalizedName = evidenceName.toLowerCase().replace(/[\s\-_]/g, "");
+            const newAllFiles = { ...state.allFiles };
 
             // Find existing group that matches the evidence name
             let targetGroupId: string | undefined;
@@ -1734,25 +2084,33 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               }
             }
 
-            const newFile: DocumentFile = {
-              id: `evidence_${timestamp}`,
+            // If no matching group exists, create one
+            if (!targetGroupId) {
+              targetGroupId = `group_${timestamp}`;
+            }
+
+            const fileId = `evidence_${timestamp}`;
+            newAllFiles[fileId] = {
+              id: fileId,
               name: `${evidenceName.replace(/\s+/g, "_")}.pdf`,
               size: "0.5 MB",
               pages: 1,
               date: "Just now",
               type: "pdf",
               isNew: true,
+              containerIds: [targetGroupId],
             };
 
             let newGroups = [...state.documentGroups];
 
-            if (targetGroupId) {
+            const existingGroup = newGroups.find(g => g.id === targetGroupId);
+            if (existingGroup) {
               // Add file to existing group
               newGroups = newGroups.map((g) =>
                 g.id === targetGroupId
                   ? {
                       ...g,
-                      files: [...g.files, newFile],
+                      fileIds: [...g.fileIds, fileId],
                       status: "pending" as const,
                       hasChanges: true,
                     }
@@ -1760,17 +2118,16 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               );
             } else {
               // Create new group for this evidence
-              const newGroup: DocumentGroup = {
-                id: `group_${timestamp}`,
+              newGroups.push({
+                id: targetGroupId,
                 title: evidenceName,
                 tag: evidenceName,
                 mergedFileName: `${evidenceName}.pdf`,
                 status: "pending",
-                files: [newFile],
+                fileIds: [fileId],
+                files: [],
                 hasChanges: true,
-              };
-              newGroups.push(newGroup);
-              targetGroupId = newGroup.id;
+              });
             }
 
             // Update enhanced checklist items (requiredEvidence is only on EnhancedChecklistItem)
@@ -1781,8 +2138,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
                   ? {
                       ...ev,
                       isUploaded: true,
-                      linkedFileId: newFile.id,
-                      linkedFileName: newFile.name,
+                      linkedFileId: fileId,
+                      linkedFileName: newAllFiles[fileId].name,
                     }
                   : ev
               ),
@@ -1801,9 +2158,10 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
                 : issue
             );
 
-            const previews = syncFilePreviewsFromGroups(newGroups);
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
 
             return {
+              allFiles: newAllFiles,
               documentGroups: newGroups,
               uploadedFilePreviews: previews,
               enhancedChecklistItems: updatedEnhancedItems,
@@ -1894,17 +2252,33 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         // Step 1: Mark all document groups as reviewed
         set(
-          {
-            isAnalyzingDocuments: true,
-            analysisProgress: 0,
-            documentGroups: state.documentGroups.map((g) => ({
-              ...g,
-              status: "reviewed" as const,
-              hasChanges: false,
-              files: g.files
-                .filter((f) => !f.isRemoved)
-                .map((f) => ({ ...f, isNew: false })),
-            })),
+          (prev) => {
+            const newAllFiles = { ...prev.allFiles };
+            const newDocumentGroups = prev.documentGroups.map((g) => {
+              const activeFileIds: string[] = [];
+              for (const fileId of g.fileIds) {
+                const file = newAllFiles[fileId];
+                if (!file) continue;
+                if (file.isRemoved) {
+                  delete newAllFiles[fileId];
+                } else {
+                  newAllFiles[fileId] = { ...file, isNew: false };
+                  activeFileIds.push(fileId);
+                }
+              }
+              return {
+                ...g,
+                status: "reviewed" as const,
+                hasChanges: false,
+                fileIds: activeFileIds,
+              };
+            });
+            return {
+              isAnalyzingDocuments: true,
+              analysisProgress: 0,
+              allFiles: newAllFiles,
+              documentGroups: newDocumentGroups,
+            };
           },
           false,
           "reviewAllDocuments",
@@ -1944,7 +2318,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         const currentState = get();
         const analyzedFileIds = currentState.documentGroups
           .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
-          .flatMap((g) => g.files.filter((f) => !f.isRemoved).map((f) => f.id));
+          .flatMap((g) => getContainerFiles(currentState.allFiles, g).map((f) => f.id));
 
         set(
           (state) => {
@@ -1954,25 +2328,24 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               contactInfo: mockContactInfo,
             };
             newProfile.completeness = calculateCompleteness(newProfile);
+
+            // Mark all analyzed files in allFiles
+            const newAllFiles = { ...state.allFiles };
+            const now = new Date().toISOString();
+            for (const fileId of analyzedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                newAllFiles[fileId] = { ...file, isAnalyzed: true, analyzedAt: now };
+              }
+            }
+
             return {
               clientProfile: newProfile,
               isAnalyzingDocuments: false,
               analysisProgress: 100,
-              lastAnalysisAt: new Date().toISOString(),
+              lastAnalysisAt: now,
               analyzedFileIds,
-              // Mark all analyzed files
-              documentGroups: state.documentGroups.map((g) => ({
-                ...g,
-                files: g.files.map((f) =>
-                  analyzedFileIds.includes(f.id)
-                    ? {
-                        ...f,
-                        isAnalyzed: true,
-                        analyzedAt: new Date().toISOString(),
-                      }
-                    : f,
-                ),
-              })),
+              allFiles: newAllFiles,
             };
           },
           false,
@@ -1990,7 +2363,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         // Get all ready files (from reviewed groups, excluding unclassified and removed)
         const readyFiles = state.documentGroups
           .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
-          .flatMap((g) => g.files.filter((f) => !f.isRemoved));
+          .flatMap((g) => getContainerFiles(state.allFiles, g));
 
         if (readyFiles.length === 0) {
           return; // Nothing to analyze
@@ -2016,24 +2389,24 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         const analyzedFileIds = readyFiles.map((f) => f.id);
 
         set(
-          (state) => ({
-            isAnalyzingDocuments: false,
-            analysisProgress: 100,
-            lastAnalysisAt: new Date().toISOString(),
-            analyzedFileIds,
-            documentGroups: state.documentGroups.map((g) => ({
-              ...g,
-              files: g.files.map((f) =>
-                analyzedFileIds.includes(f.id)
-                  ? {
-                      ...f,
-                      isAnalyzed: true,
-                      analyzedAt: new Date().toISOString(),
-                    }
-                  : f,
-              ),
-            })),
-          }),
+          (state) => {
+            // Mark analyzed files in allFiles
+            const newAllFiles = { ...state.allFiles };
+            const now = new Date().toISOString();
+            for (const fileId of analyzedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                newAllFiles[fileId] = { ...file, isAnalyzed: true, analyzedAt: now };
+              }
+            }
+            return {
+              isAnalyzingDocuments: false,
+              analysisProgress: 100,
+              lastAnalysisAt: now,
+              analyzedFileIds,
+              allFiles: newAllFiles,
+            };
+          },
           false,
           "analysisComplete",
         );
@@ -2125,7 +2498,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           (g) => g.id !== "unclassified" && g.status === "reviewed"
         );
         const readyFiles = reviewedGroups.flatMap((g) =>
-          g.files.filter((f) => !f.isRemoved)
+          getContainerFiles(state.allFiles, g)
         );
 
         if (readyFiles.length === 0) {
@@ -2156,15 +2529,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         // Generate analyzed files summary
         const analyzedFiles: AnalyzedFileSummary[] = reviewedGroups.flatMap((g) =>
-          g.files
-            .filter((f) => !f.isRemoved)
-            .map((f) => ({
-              id: f.id,
-              name: f.name,
-              groupTitle: g.title,
-              pages: f.pages || 1,
-              analyzedAt: new Date().toISOString(),
-            }))
+          getContainerFiles(state.allFiles, g).map((f) => ({
+            id: f.id,
+            name: f.name,
+            groupTitle: g.title,
+            pages: f.pages || 1,
+            analyzedAt: new Date().toISOString(),
+          }))
         );
 
         const analyzedFileIds = readyFiles.map((f) => f.id);
@@ -2224,18 +2595,18 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               clientProfile: newProfile,
               // Reset questionnaire answers to trigger questionnaire flow
               questionnaireAnswers: {},
-              documentGroups: state.documentGroups.map((g) => ({
-                ...g,
-                files: g.files.map((f) =>
-                  analyzedFileIds.includes(f.id)
-                    ? {
-                        ...f,
-                        isAnalyzed: true,
-                        analyzedAt: new Date().toISOString(),
-                      }
-                    : f
-                ),
-              })),
+              // Mark analyzed files in allFiles
+              allFiles: (() => {
+                const newAllFiles = { ...state.allFiles };
+                const now = new Date().toISOString();
+                for (const fileId of analyzedFileIds) {
+                  const file = newAllFiles[fileId];
+                  if (file) {
+                    newAllFiles[fileId] = { ...file, isAnalyzed: true, analyzedAt: now };
+                  }
+                }
+                return newAllFiles;
+              })(),
             };
           },
           false,
@@ -2256,7 +2627,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           (g) => g.id !== "unclassified" && g.status === "reviewed"
         );
         const allReadyFileIds = reviewedGroups.flatMap((g) =>
-          g.files.filter((f) => !f.isRemoved).map((f) => f.id)
+          getContainerFiles(state.allFiles, g).map((f) => f.id)
         );
 
         // Find new files that haven't been analyzed
@@ -2284,25 +2655,24 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         const updatedAnalyzedFileIds = [...state.analyzedFileIds, ...newFileIds];
 
         set(
-          (currentState) => ({
-            isAnalyzingDocuments: false,
-            analysisProgress: 100,
-            lastAnalysisAt: new Date().toISOString(),
-            analyzedFileIds: updatedAnalyzedFileIds,
-            // Mark new files as analyzed in document groups
-            documentGroups: currentState.documentGroups.map((g) => ({
-              ...g,
-              files: g.files.map((f) =>
-                newFileIds.includes(f.id)
-                  ? {
-                      ...f,
-                      isAnalyzed: true,
-                      analyzedAt: new Date().toISOString(),
-                    }
-                  : f
-              ),
-            })),
-          }),
+          (currentState) => {
+            // Mark new files as analyzed in allFiles
+            const newAllFiles = { ...currentState.allFiles };
+            const now = new Date().toISOString();
+            for (const fileId of newFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                newAllFiles[fileId] = { ...file, isAnalyzed: true, analyzedAt: now };
+              }
+            }
+            return {
+              isAnalyzingDocuments: false,
+              analysisProgress: 100,
+              lastAnalysisAt: now,
+              analyzedFileIds: updatedAnalyzedFileIds,
+              allFiles: newAllFiles,
+            };
+          },
           false,
           "reAnalyze:complete"
         );
@@ -2361,7 +2731,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           (g) => g.id !== "unclassified" && g.status === "reviewed"
         );
         const readyFiles = reviewedGroups.flatMap((g) =>
-          g.files.filter((f) => !f.isRemoved)
+          getContainerFiles(state.allFiles, g)
         );
 
         if (readyFiles.length === 0) {
@@ -2392,15 +2762,13 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         // Generate analyzed files summary
         const analyzedFiles: AnalyzedFileSummary[] = reviewedGroups.flatMap((g) =>
-          g.files
-            .filter((f) => !f.isRemoved)
-            .map((f) => ({
-              id: f.id,
-              name: f.name,
-              groupTitle: g.title,
-              pages: f.pages || 1,
-              analyzedAt: new Date().toISOString(),
-            }))
+          getContainerFiles(state.allFiles, g).map((f) => ({
+            id: f.id,
+            name: f.name,
+            groupTitle: g.title,
+            pages: f.pages || 1,
+            analyzedAt: new Date().toISOString(),
+          }))
         );
 
         const analyzedFileIds = readyFiles.map((f) => f.id);
@@ -2441,18 +2809,18 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               analyzedFileIds,
               analyzedFiles,
               clientProfile: newProfile,
-              documentGroups: state.documentGroups.map((g) => ({
-                ...g,
-                files: g.files.map((f) =>
-                  analyzedFileIds.includes(f.id)
-                    ? {
-                        ...f,
-                        isAnalyzed: true,
-                        analyzedAt: new Date().toISOString(),
-                      }
-                    : f
-                ),
-              })),
+              // Mark analyzed files in allFiles
+              allFiles: (() => {
+                const newAllFiles = { ...state.allFiles };
+                const now = new Date().toISOString();
+                for (const fileId of analyzedFileIds) {
+                  const file = newAllFiles[fileId];
+                  if (file) {
+                    newAllFiles[fileId] = { ...file, isAnalyzed: true, analyzedAt: now };
+                  }
+                }
+                return newAllFiles;
+              })(),
             };
           },
           false,
@@ -2467,7 +2835,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         // Get all currently reviewed file IDs to mark as analyzed
         const analyzedFileIds = state.documentGroups
           .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
-          .flatMap((g) => g.files.filter((f) => !f.isRemoved).map((f) => f.id));
+          .flatMap((g) => getContainerFiles(state.allFiles, g).map((f) => f.id));
 
         set(
           {
@@ -2494,7 +2862,9 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         // Get passport file ID from document groups
         const passportGroup = state.documentGroups.find(g => g.id === "passport");
-        const passportFileId = passportGroup?.files[0]?.id || "pp_1";
+        const passportFileId = passportGroup?.fileIds[0]
+          ? (state.allFiles[passportGroup.fileIds[0]]?.id || "pp_1")
+          : "pp_1";
 
         // Mock checklist items based on UK Skilled Worker Visa requirements
         const mockChecklistItems: ApplicationChecklistItem[] = [
@@ -3502,24 +3872,45 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
         // Create linked documents from analyzed files
         const createLinkedDocument = (fileId: string): LinkedDocument | null => {
-          for (const group of state.documentGroups) {
-            const file = group.files.find((f) => f.id === fileId && !f.isRemoved);
-            if (file) {
-              return {
-                fileId: file.id,
-                fileName: file.name,
-                groupTitle: group.title,
-                pageNumbers: [1], // Mock page number
-                extractedText: `Extracted from ${file.name}`,
-              };
-            }
-          }
-          return null;
+          const file = state.allFiles[fileId];
+          if (!file || file.isRemoved) return null;
+          // Find the group this file belongs to
+          const group = state.documentGroups.find((g) =>
+            g.fileIds.includes(fileId)
+          );
+          return {
+            fileId: file.id,
+            fileName: file.name,
+            groupTitle: group?.title || "Unknown",
+            pageNumbers: [1], // Mock page number
+            extractedText: `Extracted from ${file.name}`,
+          };
         };
 
-        // Get passport file info
-        const passportGroup = state.documentGroups.find(g => g.id === "passport");
-        const passportFile = passportGroup?.files[0];
+        // Evidence ID → Document Group ID mapping for auto-linking
+        const EVIDENCE_GROUP_MAP: Record<string, string> = {
+          ev_passport: "passport",
+          ev_bank_statements: "bank_statement",
+          ev_payslip: "bank_statement", // payslip may be in same group
+          ev_employment_contract: "employment_letter",
+          ev_travel_history: "travel_history",
+          ev_english_cert: "education",
+          ev_degree_cert: "education",
+        };
+
+        // Auto-link evidence to existing document groups
+        const autoLinkEvidence = (ev: RequiredEvidence): RequiredEvidence => {
+          const groupId = EVIDENCE_GROUP_MAP[ev.id];
+          if (!groupId) return ev;
+          const group = state.documentGroups.find(g => g.id === groupId);
+          if (!group || group.fileIds.length === 0) return ev;
+          return {
+            ...ev,
+            isUploaded: true,
+            linkedFileId: group.id,
+            linkedFileName: group.title,
+          };
+        };
 
         // Required evidence configuration per section (UK Skilled Worker Visa)
         const SECTION_REQUIRED_EVIDENCE: Record<ChecklistSectionType, RequiredEvidence[]> = {
@@ -3528,9 +3919,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               id: "ev_passport",
               name: "Valid Passport",
               description: "Current passport with at least 1 blank page for visa vignette",
-              isUploaded: !!passportFile,
-              linkedFileId: passportFile?.id,
-              linkedFileName: passportFile?.name,
+              isUploaded: false,
               isMandatory: true,
               acceptedFormats: ["PDF", "JPEG", "PNG"],
               validityPeriod: "Must be valid for duration of stay",
@@ -3662,9 +4051,9 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           other: [],
         };
 
-        // Get required evidence for a section
+        // Get required evidence for a section (with auto-linking applied)
         const getRequiredEvidence = (section: ChecklistSectionType): RequiredEvidence[] => {
-          return SECTION_REQUIRED_EVIDENCE[section] || [];
+          return (SECTION_REQUIRED_EVIDENCE[section] || []).map(autoLinkEvidence);
         };
 
         // Convert existing checklist items to enhanced format
@@ -3811,6 +4200,33 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           extractedAt: new Date().toISOString(),
         };
 
+        // Create files for allFiles store
+        const caseNotesFileId = `cn_${Date.now()}`;
+        const passportFileId = `pp_${Date.now()}`;
+
+        const newAllFiles: Record<string, DocumentFile> = {
+          [caseNotesFileId]: {
+            id: caseNotesFileId,
+            name: data.caseNotesFileName,
+            size: "1.2 MB",
+            pages: 5,
+            date: "Just now",
+            type: "pdf",
+            isNew: false, // Not marked as new since it's auto-confirmed
+            containerIds: ["case_notes"],
+          },
+          [passportFileId]: {
+            id: passportFileId,
+            name: data.passportFileName,
+            size: "0.8 MB",
+            pages: 1,
+            date: "Just now",
+            type: "pdf",
+            isNew: true,
+            containerIds: ["passport"],
+          },
+        };
+
         // Create document groups - case notes is special (auto-confirmed), passport requires review
         const caseNotesGroup: DocumentGroup = {
           id: "case_notes",
@@ -3819,17 +4235,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           mergedFileName: data.caseNotesFileName,
           status: "reviewed", // Auto-confirmed, no review needed
           isSpecial: true, // Special document - doesn't require manual review
-          files: [
-            {
-              id: `cn_${Date.now()}`,
-              name: data.caseNotesFileName,
-              size: "1.2 MB",
-              pages: 5,
-              date: "Just now",
-              type: "pdf",
-              isNew: false, // Not marked as new since it's auto-confirmed
-            },
-          ],
+          fileIds: [caseNotesFileId],
+          files: [],
         };
 
         // Passport document requires confirm review (not isSpecial)
@@ -3839,17 +4246,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           tag: "Passport",
           mergedFileName: data.passportFileName,
           status: "pending", // Requires confirm review
-          files: [
-            {
-              id: `pp_${Date.now()}`,
-              name: data.passportFileName,
-              size: "0.8 MB",
-              pages: 1,
-              date: "Just now",
-              type: "pdf",
-              isNew: true,
-            },
-          ],
+          fileIds: [passportFileId],
+          files: [],
         };
 
         // Create empty unclassified group for future uploads
@@ -3858,6 +4256,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           title: "Unclassified",
           tag: "unclassified",
           status: "pending",
+          fileIds: [],
           files: [],
         };
 
@@ -3870,7 +4269,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         profileWithPassport.completeness = calculateCompleteness(profileWithPassport);
 
         const documentGroups = [unclassifiedGroup, caseNotesGroup, passportGroup];
-        const previews = syncFilePreviewsFromGroups(documentGroups);
+        const previews = syncFilePreviewsFromState(newAllFiles, documentGroups);
 
         set(
           {
@@ -3880,6 +4279,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             clientProfile: profileWithPassport,
             caseReference: data.referenceNumber || "REF-2024-001",
             caseNotesSummary: mockCaseNotesSummary,
+            allFiles: newAllFiles,
             documentGroups,
             uploadedFilePreviews: previews,
             // Reset analysis state
@@ -3929,12 +4329,25 @@ export const useChecklist = () =>
   useCaseDetailStore((state) => state.checklist);
 export const useChecklistStage = () =>
   useCaseDetailStore((state) => state.checklist.stage);
-export const useDocumentGroups = () =>
-  useCaseDetailStore((state) => state.documentGroups);
+// Returns document groups with files resolved from allFiles (backward compatible)
+// UI components can access group.files directly
+// Uses separate subscriptions + useMemo to avoid infinite re-render loops
+export const useDocumentGroups = () => {
+  const groups = useCaseDetailStore((state) => state.documentGroups);
+  const allFiles = useCaseDetailStore((state) => state.allFiles);
+  return useMemo(
+    () =>
+      groups.map((group) => ({
+        ...group,
+        files: group.fileIds
+          .map((id) => allFiles[id])
+          .filter((f): f is DocumentFile => f !== undefined),
+      })),
+    [groups, allFiles]
+  );
+};
 export const useIsLoadingDocuments = () =>
   useCaseDetailStore((state) => state.isLoadingDocuments);
-export const useDocumentBundles = () =>
-  useCaseDetailStore((state) => state.documentBundles);
 export const useUploadedFilePreviews = () =>
   useCaseDetailStore((state) => state.uploadedFilePreviews);
 export const useApplicationPhase = () =>
@@ -4023,7 +4436,7 @@ export const useHasNewFilesAfterAnalysis = () =>
     // Get all file IDs from reviewed groups (excluding unclassified and removed)
     const currentReviewedFileIds = state.documentGroups
       .filter((g) => g.id !== "unclassified" && g.status === "reviewed")
-      .flatMap((g) => g.files.filter((f) => !f.isRemoved).map((f) => f.id));
+      .flatMap((g) => getContainerFiles(state.allFiles, g).map((f) => f.id));
 
     const analyzedFileIds = state.analyzedFileIds;
 
@@ -4048,9 +4461,56 @@ export const useNewFilesCount = () =>
       if (g.id === "unclassified" || g.status !== "reviewed") return false;
 
       // Check if this group has any files that weren't analyzed
-      const activeFiles = g.files.filter((f) => !f.isRemoved);
+      const activeFiles = getContainerFiles(state.allFiles, g);
       return activeFiles.some((f) => !analyzedFileIds.includes(f.id));
     });
 
     return groupsWithNewFiles.length;
+  });
+
+// ============================================================================
+// One-to-Many Model Selectors
+// ============================================================================
+
+// Get all files from the central store
+export const useAllFiles = () =>
+  useCaseDetailStore((state) => state.allFiles);
+
+// Get unclassified files (files with no container associations)
+export const useUnclassifiedFiles = () => {
+  const allFiles = useCaseDetailStore((state) => state.allFiles);
+  return useMemo(
+    () =>
+      Object.values(allFiles).filter(
+        (f) => !f.isRemoved && f.containerIds.length === 0
+      ),
+    [allFiles]
+  );
+};
+
+// Get files for a specific container/group
+export const useContainerFiles = (containerId: string) => {
+  const groups = useCaseDetailStore((state) => state.documentGroups);
+  const allFiles = useCaseDetailStore((state) => state.allFiles);
+  return useMemo(() => {
+    const group = groups.find((g) => g.id === containerId);
+    if (!group) return [];
+    return group.fileIds
+      .map((id) => allFiles[id])
+      .filter((f): f is DocumentFile => f !== undefined && !f.isRemoved);
+  }, [groups, allFiles, containerId]);
+};
+
+// Get the number of containers a file is in (for showing linked badge)
+export const useFileContainerCount = (fileId: string) =>
+  useCaseDetailStore((state) => {
+    const file = state.allFiles[fileId];
+    return file?.containerIds.length ?? 0;
+  });
+
+// Check if a file is in multiple containers (shared/reused)
+export const useIsFileShared = (fileId: string) =>
+  useCaseDetailStore((state) => {
+    const file = state.allFiles[fileId];
+    return (file?.containerIds.length ?? 0) > 1;
   });

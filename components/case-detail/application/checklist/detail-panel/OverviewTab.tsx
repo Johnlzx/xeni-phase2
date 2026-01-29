@@ -306,21 +306,35 @@ function SummaryFieldsCard({
             </div>
             {/* Document cards row (horizontal scroll) - fixed min-height to prevent layout shift */}
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-h-[30px]">
-              {referenceEvidence.filter((e) => e.isUploaded).length > 0 ? (
-                referenceEvidence.filter((e) => e.isUploaded).map((ev) => (
+              {referenceEvidence.length > 0 ? (
+                referenceEvidence.map((ev) => (
                   <button
                     key={ev.id}
-                    onClick={() => onReferenceDocClick(ev)}
-                    className="group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
+                    onClick={() => ev.isUploaded ? onReferenceDocClick(ev) : onUploadClick()}
+                    className={cn(
+                      "group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all",
+                      ev.isUploaded
+                        ? "border-stone-200 bg-white hover:border-blue-300"
+                        : "border-dashed border-stone-300 bg-stone-50 hover:border-stone-400"
+                    )}
                   >
-                    <FileText className="size-4 text-blue-500" />
-                    <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover:text-blue-700">
-                      {ev.linkedFileName || ev.name}
+                    {ev.isUploaded ? (
+                      <FileText className="size-4 text-blue-500" />
+                    ) : (
+                      <Upload className="size-3.5 text-stone-400" />
+                    )}
+                    <span className={cn(
+                      "text-xs font-medium truncate max-w-[120px]",
+                      ev.isUploaded
+                        ? "text-stone-700 group-hover:text-blue-700"
+                        : "text-stone-400"
+                    )}>
+                      {ev.isUploaded ? (ev.linkedFileName || ev.name) : ev.name}
                     </span>
                   </button>
                 ))
               ) : (
-                <span className="text-xs text-stone-400 leading-[30px]">No documents uploaded</span>
+                <span className="text-xs text-stone-400 leading-[30px]">No documents required</span>
               )}
             </div>
           </div>
@@ -551,28 +565,47 @@ function SummarySection({
           </div>
 
           {/* Document List */}
-          {referenceEvidence.filter((e) => e.isUploaded).length > 0 ? (
+          {referenceEvidence.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {referenceEvidence.filter((e) => e.isUploaded).map((ev) => (
+              {referenceEvidence.map((ev) => (
                 <button
                   key={ev.id}
-                  onClick={() => onReferenceDocClick(ev)}
-                  className="group inline-flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-lg border border-stone-200 bg-white hover:border-blue-300 hover:shadow-sm transition-all"
+                  onClick={() => ev.isUploaded ? onReferenceDocClick(ev) : onUploadClick()}
+                  className={cn(
+                    "group inline-flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-lg border transition-all",
+                    ev.isUploaded
+                      ? "border-stone-200 bg-white hover:border-blue-300 hover:shadow-sm"
+                      : "border-dashed border-stone-300 bg-stone-50 hover:border-stone-400"
+                  )}
                 >
-                  <div className="size-8 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
-                    <FileText className="size-4 text-blue-600" />
+                  <div className={cn(
+                    "size-8 rounded-md flex items-center justify-center shrink-0",
+                    ev.isUploaded ? "bg-blue-100" : "bg-stone-100"
+                  )}>
+                    {ev.isUploaded ? (
+                      <FileText className="size-4 text-blue-600" />
+                    ) : (
+                      <Upload className="size-4 text-stone-400" />
+                    )}
                   </div>
                   <div className="text-left min-w-0">
-                    <p className="text-xs font-medium text-stone-700 truncate max-w-[140px] group-hover:text-blue-700 transition-colors">
-                      {ev.linkedFileName || ev.name}
+                    <p className={cn(
+                      "text-xs font-medium truncate max-w-[140px] transition-colors",
+                      ev.isUploaded
+                        ? "text-stone-700 group-hover:text-blue-700"
+                        : "text-stone-400"
+                    )}>
+                      {ev.isUploaded ? (ev.linkedFileName || ev.name) : ev.name}
                     </p>
-                    <p className="text-[10px] text-stone-400">{ev.name}</p>
+                    {ev.isUploaded && (
+                      <p className="text-[10px] text-stone-400">{ev.name}</p>
+                    )}
                   </div>
                 </button>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-stone-400 text-pretty">No documents uploaded yet</p>
+            <p className="text-xs text-stone-400 text-pretty">No documents required</p>
           )}
         </div>
       </div>
@@ -918,14 +951,6 @@ function SupportingDocumentsCard({
               {counts.uploadedCount} of {counts.totalCount} uploaded
             </p>
           </div>
-          {onViewMore && (
-            <button
-              onClick={onViewMore}
-              className="text-xs font-medium text-[#0E4268] hover:underline"
-            >
-              View all
-            </button>
-          )}
         </div>
       </div>
 

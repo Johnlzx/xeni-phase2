@@ -19,70 +19,21 @@ import {
   Pencil,
   Trash2,
   Loader2,
-  Cloud,
   Copy,
   Link2,
   Layers,
-  Package,
-  ChevronUp,
   GripVertical,
-  Unlink,
+  Upload,
+  FileStack,
 } from "lucide-react";
 
-// ============================================================================
-// CLOUD PROVIDER ICONS - Monochrome gray, colorful on hover
-// ============================================================================
-const GoogleDriveIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-    <path d="M7.71 3.5L1.15 15l3.43 5.97L11.14 9.5 7.71 3.5zm1.14 0l6.86 12H22.3l-3.43-6-9.72-6H8.85zM8 14.5l-3.43 6h13.72l3.43-6H8z" />
-  </svg>
-);
-
-const DropboxIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75L6 17 0 13.25zm18-3.75l6 3.75L18 17l-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z" />
-  </svg>
-);
-
-const OneDriveIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-    <path d="M19.35 10.04A7.49 7.49 0 0012 4a7.48 7.48 0 00-6.64 4.05A5.998 5.998 0 006 20h13a5 5 0 00.35-9.96z" />
-  </svg>
-);
-
-// Cloud provider configurations
-const CLOUD_PROVIDERS = [
-  {
-    id: "google-drive",
-    name: "Google Drive",
-    Icon: GoogleDriveIcon,
-    hoverColor: "hover:text-[#4285F4]",
-    activeColor: "text-[#4285F4]",
-  },
-  {
-    id: "dropbox",
-    name: "Dropbox",
-    Icon: DropboxIcon,
-    hoverColor: "hover:text-[#0061FF]",
-    activeColor: "text-[#0061FF]",
-  },
-  {
-    id: "onedrive",
-    name: "OneDrive",
-    Icon: OneDriveIcon,
-    hoverColor: "hover:text-[#0078D4]",
-    activeColor: "text-[#0078D4]",
-  },
-] as const;
-
-type CloudProviderId = (typeof CLOUD_PROVIDERS)[number]["id"];
 import { cn } from "@/lib/utils";
 import {
   useCaseDetailStore,
   useDocumentGroups,
   useIsLoadingDocuments,
   useHighlightedGroupId,
-  useDocumentBundles,
+  useUnclassifiedFiles,
 } from "@/store/case-detail-store";
 import {
   DropdownMenu,
@@ -91,6 +42,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   ContextMenu,
@@ -140,7 +94,7 @@ const DocumentPreviewContent = ({
     </div>
   );
 };
-import type { DocumentGroup, DocumentFile, DocumentBundle } from "@/types/case-detail";
+import type { DocumentGroup, DocumentFile } from "@/types/case-detail";
 
 const ItemTypes = {
   PAGE: "page",
@@ -181,30 +135,6 @@ const PROCESSING_STAGES = [
   { key: "classifying", label: "Classifying...", duration: 900 },
 ] as const;
 
-// Cloud import processing stages - distinguishes download vs upload
-const CLOUD_IMPORT_STAGES = {
-  "google-drive": [
-    { key: "connecting", label: "Connecting to Google Drive...", duration: 400 },
-    { key: "downloading", label: "Importing from Drive...", duration: 1200 },
-    { key: "uploading", label: "Uploading to server...", duration: 800 },
-    { key: "splitting", label: "Splitting...", duration: 600 },
-    { key: "classifying", label: "Classifying...", duration: 700 },
-  ],
-  dropbox: [
-    { key: "connecting", label: "Connecting to Dropbox...", duration: 400 },
-    { key: "downloading", label: "Importing from Dropbox...", duration: 1200 },
-    { key: "uploading", label: "Uploading to server...", duration: 800 },
-    { key: "splitting", label: "Splitting...", duration: 600 },
-    { key: "classifying", label: "Classifying...", duration: 700 },
-  ],
-  onedrive: [
-    { key: "connecting", label: "Connecting to OneDrive...", duration: 400 },
-    { key: "downloading", label: "Importing from OneDrive...", duration: 1200 },
-    { key: "uploading", label: "Uploading to server...", duration: 800 },
-    { key: "splitting", label: "Splitting...", duration: 600 },
-    { key: "classifying", label: "Classifying...", duration: 700 },
-  ],
-} as const;
 
 // ============================================================================
 // SIDEBAR - macOS-style collapsible sidebar for unclassified pages
@@ -224,13 +154,14 @@ const Sidebar = ({
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [processingStage, setProcessingStage] = useState<number | null>(null);
-  const [cloudImportProvider, setCloudImportProvider] = useState<CloudProviderId | null>(null);
-  const [cloudProcessingLabel, setCloudProcessingLabel] = useState<string | null>(null);
+  const [processingLabel, setProcessingLabel] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const uploadAndAutoClassify = useCaseDetailStore((state) => state.uploadAndAutoClassify);
+  const uploadFolder = useCaseDetailStore((state) => state.uploadFolder);
 
-  const isProcessing = processingStage !== null || cloudImportProvider !== null;
+  const isProcessing = processingStage !== null;
 
   // Run processing workflow with auto-classification
   const runProcessingWorkflow = async () => {
@@ -246,32 +177,55 @@ const Sidebar = ({
     uploadAndAutoClassify(pageCount);
   };
 
-  // Run cloud import workflow - simulates OAuth popup + file picker + import
-  const runCloudImportWorkflow = async (providerId: CloudProviderId) => {
-    setCloudImportProvider(providerId);
+  // Handle folder input change
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
-    // Simulate OAuth popup - in real implementation this would open a popup window
-    // and wait for the OAuth callback
-    const stages = CLOUD_IMPORT_STAGES[providerId];
+    // Run folder processing workflow
+    setProcessingStage(0);
+    setProcessingLabel("Scanning folder structure...");
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    for (let i = 0; i < stages.length; i++) {
-      setCloudProcessingLabel(stages[i].label);
-      await new Promise((resolve) => setTimeout(resolve, stages[i].duration));
+    setProcessingLabel("Parsing paths...");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // Collect files with their relative paths
+    const filesWithPaths: Array<{ file: File; relativePath: string }> = [];
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      // webkitRelativePath contains the full path from the selected folder root
+      const relativePath = (file as File & { webkitRelativePath: string }).webkitRelativePath;
+      if (relativePath) {
+        // Get directory path (without filename)
+        const dirPath = relativePath.substring(0, relativePath.lastIndexOf('/') + 1);
+        filesWithPaths.push({ file, relativePath: dirPath });
+      }
     }
 
-    setCloudImportProvider(null);
-    setCloudProcessingLabel(null);
+    setProcessingLabel("Classifying documents...");
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-    // Auto-classify imported documents
-    const pageCount = Math.floor(Math.random() * 5) + 4; // 4-8 pages from cloud
-    uploadAndAutoClassify(pageCount);
+    setProcessingLabel("Creating document groups...");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // Upload folder with parsed paths
+    if (filesWithPaths.length > 0) {
+      uploadFolder(filesWithPaths);
+    }
+
+    setProcessingStage(null);
+    setProcessingLabel(null);
+
+    // Reset input so the same folder can be selected again
+    e.target.value = '';
   };
 
-  // Handle cloud provider click - prevent event bubbling
-  const handleCloudProviderClick = (e: React.MouseEvent, providerId: CloudProviderId) => {
+  // Trigger folder input click
+  const handleFolderUploadClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isProcessing) {
-      runCloudImportWorkflow(providerId);
+    if (!isProcessing && folderInputRef.current) {
+      folderInputRef.current.click();
     }
   };
 
@@ -325,8 +279,8 @@ const Sidebar = ({
   const currentStage =
     processingStage !== null ? PROCESSING_STAGES[processingStage] : null;
 
-  // Get current processing label - either from local upload or cloud import
-  const currentProcessingLabel = cloudProcessingLabel || currentStage?.label;
+  // Get current processing label - either from folder upload or file upload
+  const currentProcessingLabel = processingLabel || currentStage?.label;
 
   const setRefs = (el: HTMLDivElement | null) => {
     containerRef.current = el;
@@ -450,88 +404,59 @@ const Sidebar = ({
         )}
       </div>
 
-      {/* Upload Zone - Fixed at bottom with cloud import */}
+      {/* Hidden folder input */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFolderSelect}
+        {...{ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>}
+        multiple
+      />
+
+      {/* Upload Zone - Simple unified upload area */}
       <div className="shrink-0 p-3 border-t border-stone-100">
         <div
+          onClick={() => !isProcessing && folderInputRef.current?.click()}
           className={cn(
-            "w-full rounded-xl border-2 border-dashed overflow-hidden transition-all",
+            "w-full rounded-xl border-2 border-dashed cursor-pointer transition-all",
             isProcessing
-              ? "border-[#0E4268]/40 bg-[#0E4268]/5"
+              ? "border-[#0E4268]/40 bg-[#0E4268]/5 cursor-default"
               : isAnyDragOver
                 ? "border-[#0E4268] bg-[#0E4268]/10 scale-[1.02]"
-                : "border-stone-300 hover:border-stone-400",
+                : "border-stone-300 hover:border-stone-400 hover:bg-stone-50/50",
           )}
         >
-          {/* Main upload area - clickable for local files */}
-          <button
-            onClick={() => !isProcessing && runProcessingWorkflow()}
-            disabled={isProcessing}
-            className={cn(
-              "w-full px-4 py-3 flex flex-col items-center justify-center gap-1.5 transition-colors",
-              !isProcessing && "hover:bg-stone-50/80",
-            )}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 size={20} className="text-[#0E4268] animate-spin" />
-                <span className="text-xs font-medium text-[#0E4268]">
-                  {currentProcessingLabel}
-                </span>
-              </>
-            ) : (
-              <>
+          {isProcessing ? (
+            <div className="w-full px-4 py-4 flex flex-col items-center justify-center gap-1.5">
+              <Loader2 size={20} className="text-[#0E4268] animate-spin" />
+              <span className="text-xs font-medium text-[#0E4268]">
+                {currentProcessingLabel}
+              </span>
+            </div>
+          ) : (
+            <div className="w-full px-4 py-4 flex flex-col items-center justify-center gap-1.5">
+              <div className={cn(
+                "size-8 rounded-lg flex items-center justify-center transition-colors",
+                isAnyDragOver ? "bg-[#0E4268]/10" : "bg-stone-100"
+              )}>
                 <FilePlus
-                  size={20}
+                  size={16}
                   className={cn(
                     "transition-colors",
                     isAnyDragOver ? "text-[#0E4268]" : "text-stone-400",
                   )}
                 />
-                <span
-                  className={cn(
-                    "text-xs font-medium transition-colors",
-                    isAnyDragOver ? "text-[#0E4268]" : "text-stone-500",
-                  )}
-                >
-                  {isAnyDragOver ? "Drop here" : "Upload Files"}
-                </span>
-                <span className="text-[10px] text-stone-400">Drop or click</span>
-              </>
-            )}
-          </button>
-
-          {/* Cloud import section - only show when not processing */}
-          {!isProcessing && (
-            <div className="px-3 pb-3">
-              {/* Divider with text */}
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex-1 h-px bg-stone-200" />
-                <span className="text-[9px] text-stone-400 uppercase tracking-wider font-medium">
-                  or import from
-                </span>
-                <div className="flex-1 h-px bg-stone-200" />
               </div>
-
-              {/* Cloud provider icons */}
-              <div className="flex items-center justify-center gap-3">
-                {CLOUD_PROVIDERS.map((provider) => (
-                  <button
-                    key={provider.id}
-                    onClick={(e) => handleCloudProviderClick(e, provider.id)}
-                    className={cn(
-                      "group p-2 rounded-lg transition-all",
-                      "text-stone-400",
-                      provider.hoverColor,
-                      "hover:bg-stone-100 hover:scale-110",
-                      "active:scale-95",
-                    )}
-                    title={provider.name}
-                    aria-label={`Import from ${provider.name}`}
-                  >
-                    <provider.Icon className="size-5 transition-colors" />
-                  </button>
-                ))}
-              </div>
+              <span className={cn(
+                "text-xs font-medium transition-colors",
+                isAnyDragOver ? "text-[#0E4268]" : "text-stone-500"
+              )}>
+                {isAnyDragOver ? "Drop here" : "Upload"}
+              </span>
+              <span className="text-[10px] text-stone-400">
+                Files or folder
+              </span>
             </div>
           )}
         </div>
@@ -567,7 +492,7 @@ const SidebarPageItem = ({
 
   drag(ref);
 
-  const linkCount = file.linkedToGroups?.length || 0;
+  const linkCount = file.containerIds?.length || 0;
 
   return (
     <ContextMenu>
@@ -929,15 +854,23 @@ const DraggableUnclassifiedPage = ({
 const CategoryCard = ({
   group,
   allGroups,
+  unclassifiedFiles,
   onReview,
   isHighlighted,
   onHighlightComplete,
+  isSelected,
+  onToggleSelect,
+  isSelectMode,
 }: {
   group: DocumentGroup;
   allGroups: DocumentGroup[];
+  unclassifiedFiles: DocumentFile[];
   onReview: () => void;
   isHighlighted?: boolean;
   onHighlightComplete?: () => void;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  isSelectMode?: boolean;
 }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -945,6 +878,7 @@ const CategoryCard = ({
   const [editedTitle, setEditedTitle] = useState(group.title);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
   const [showHighlight, setShowHighlight] = useState(false);
+  const [hoveredFileId, setHoveredFileId] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   // Handle highlight animation and scroll into view
@@ -971,6 +905,7 @@ const CategoryCard = ({
   const renameDocumentGroup = useCaseDetailStore(
     (state) => state.renameDocumentGroup,
   );
+  const addFilesToGroup = useCaseDetailStore((state) => state.addFilesToGroup);
 
   // Handle native file drag and drop (only for files from OS, not react-dnd)
   const handleNativeDragOver = (e: React.DragEvent) => {
@@ -1095,12 +1030,14 @@ const CategoryCard = ({
     <div
       ref={setRefs}
       className={cn(
-        "bg-white rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer",
+        "bg-white rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer relative",
         isOver || isFileDragOver
           ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 scale-[1.02]"
-          : showHighlight
-            ? "border-[#0E4268] ring-2 ring-[#0E4268]/30 shadow-lg shadow-[#0E4268]/10"
-            : "border-stone-200 hover:border-stone-300 hover:shadow-md",
+          : isSelected
+            ? "border-[#0E4268] ring-2 ring-[#0E4268]/20"
+            : showHighlight
+              ? "border-[#0E4268] ring-2 ring-[#0E4268]/30 shadow-lg shadow-[#0E4268]/10"
+              : "border-stone-200 hover:border-stone-300 hover:shadow-md",
       )}
       onClick={onReview}
       onMouseEnter={() => setIsHovered(true)}
@@ -1109,10 +1046,33 @@ const CategoryCard = ({
       onDragLeave={handleNativeDragLeave}
       onDrop={handleNativeDrop}
     >
-      {/* Card Header - no icon */}
+      {/* Card Header - Title + Checkbox row 1, Type + Status row 2 */}
       <div className="px-3 py-2 border-b border-stone-100 shrink-0">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* Row 1: Checkbox + Title sharing full width */}
+        <div className="flex items-center gap-2 mb-1">
+          {/* Selection checkbox */}
+          {(isSelectMode || isHovered) && onToggleSelect && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect();
+              }}
+              className="shrink-0"
+            >
+              <div
+                className={cn(
+                  "size-4 rounded flex items-center justify-center transition-colors cursor-pointer",
+                  isSelected
+                    ? "bg-[#0E4268] text-white"
+                    : "bg-white border border-stone-300 hover:border-stone-400 text-transparent hover:text-stone-400"
+                )}
+              >
+                <Check size={10} strokeWidth={3} />
+              </div>
+            </div>
+          )}
+          {/* Title - takes remaining width */}
+          <div className="flex-1 min-w-0">
             {isRenamingTitle ? (
               <input
                 type="text"
@@ -1128,7 +1088,7 @@ const CategoryCard = ({
                   e.stopPropagation();
                 }}
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs font-semibold text-stone-800 bg-white border-2 border-[#0E4268] rounded px-1.5 py-0.5 outline-none flex-1 min-w-0 shadow-sm"
+                className="w-full text-xs font-semibold text-stone-800 bg-white border-2 border-[#0E4268] rounded px-1.5 py-0.5 outline-none shadow-sm"
                 autoFocus
               />
             ) : (
@@ -1137,11 +1097,17 @@ const CategoryCard = ({
                   e.stopPropagation();
                   setIsRenamingTitle(true);
                 }}
-                className="group text-xs font-semibold text-stone-800 truncate text-left hover:text-[#0E4268] hover:bg-stone-50 rounded px-1 py-0.5 -mx-1 transition-all flex-1 min-w-0 flex items-center gap-1"
+                className="group w-full text-xs font-semibold text-stone-800 truncate text-left hover:text-[#0E4268] rounded transition-all flex items-center gap-1"
                 title="Click to rename"
                 aria-label="Rename document"
               >
                 <span className="truncate">{group.title}</span>
+                {group.hasChanges && (
+                  <span
+                    className="size-1.5 rounded-full bg-blue-500 shrink-0"
+                    title="Recently updated"
+                  />
+                )}
                 <Pencil
                   size={10}
                   className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[#0E4268]"
@@ -1149,28 +1115,25 @@ const CategoryCard = ({
               </button>
             )}
           </div>
+        </div>
+
+        {/* Row 2: File Type + Status badges */}
+        <div className="flex items-center justify-between">
+          <div className="text-[9px] text-stone-400 uppercase tracking-wide font-medium">
+            {displayType}
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {group.hasChanges && (
-              <span
-                className="size-1.5 rounded-full bg-blue-500"
-                title="Recently updated"
-              />
-            )}
             {isPending ? (
-              <span className="px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded whitespace-nowrap">
-                Pending Review
+              <span className="px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 bg-amber-50 rounded whitespace-nowrap">
+                Pending
               </span>
             ) : totalPages > 0 ? (
-              <span className="px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded flex items-center gap-0.5">
-                <Check size={10} strokeWidth={3} />
+              <span className="px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 bg-emerald-50 rounded flex items-center gap-0.5">
+                <Check size={8} strokeWidth={3} />
                 Ready
               </span>
             ) : null}
           </div>
-        </div>
-        {/* File Type Display - uppercase with tracking */}
-        <div className="text-[9px] text-stone-400 uppercase tracking-wide font-medium">
-          {displayType}
         </div>
       </div>
 
@@ -1233,7 +1196,7 @@ const CategoryCard = ({
           </>
         ) : (
           <div className="w-full h-full p-2 flex items-center justify-center">
-            <div className="h-full aspect-[1/1.414] rounded border border-dashed border-stone-200 p-2 relative bg-white flex items-center justify-center">
+            <div className="h-full aspect-[1/1.414] rounded border border-dashed border-stone-200 p-2 relative bg-white flex flex-col items-center justify-center">
               <div className="text-center">
                 <Inbox size={18} className="mx-auto mb-1 text-stone-300" />
                 <p className="text-[10px] text-stone-400">No files</p>
@@ -1258,14 +1221,155 @@ const CategoryCard = ({
 
       {/* Card Footer */}
       <div className="px-2 py-1.5 border-t border-stone-100 flex items-center gap-1 bg-white shrink-0">
-        <button
-          onClick={handleUpload}
-          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors flex-1 justify-center"
-          aria-label="Add files to category"
-        >
-          <FilePlus size={11} />
-          <span>Add</span>
-        </button>
+        {/* Add dropdown menu with cascading options */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors flex-1 justify-center cursor-pointer"
+              aria-label="Add files to category"
+            >
+              <FilePlus size={11} />
+              <span>Add</span>
+              <ChevronDown size={10} className="ml-0.5 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            side="top"
+            className="min-w-[180px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Option 1: Upload from local */}
+            <DropdownMenuItem
+              onClick={handleUpload}
+              className="text-xs cursor-pointer"
+            >
+              <Upload size={14} className="mr-2" />
+              Upload from device
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* Option 2: Select from Unclassified pages */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                className="text-xs cursor-pointer"
+                disabled={unclassifiedFiles.length === 0}
+              >
+                <Inbox size={14} className="mr-2" />
+                <span>From Unclassified</span>
+                {unclassifiedFiles.length > 0 && (
+                  <span className="ml-auto text-[10px] text-stone-400">
+                    {unclassifiedFiles.length}
+                  </span>
+                )}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-[200px] max-h-[280px] overflow-y-auto">
+                {unclassifiedFiles.length === 0 ? (
+                  <div className="px-2 py-3 text-xs text-stone-400 text-center">
+                    No unclassified pages
+                  </div>
+                ) : (
+                  unclassifiedFiles.map((file) => (
+                    <DropdownMenuItem
+                      key={file.id}
+                      onClick={() => addFilesToGroup(group.id, [file.id])}
+                      className="text-xs cursor-pointer group relative"
+                      onMouseEnter={() => setHoveredFileId(file.id)}
+                      onMouseLeave={() => setHoveredFileId(null)}
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="size-8 rounded border border-stone-200 bg-stone-50 shrink-0 flex items-center justify-center overflow-hidden">
+                          <File size={12} className="text-stone-400" />
+                        </div>
+                        <span className="truncate">{file.name}</span>
+                      </div>
+                      {/* Thumbnail preview on hover */}
+                      {hoveredFileId === file.id && (
+                        <div className="absolute left-full top-0 ml-2 z-50 pointer-events-none">
+                          <div className="w-32 aspect-[1/1.414] bg-white rounded-lg shadow-xl border border-stone-200 p-2">
+                            <div className="w-full h-full bg-stone-50 rounded flex items-center justify-center">
+                              <DocumentPreviewContent size="sm" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {/* Option 3: Select complete logical documents */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs cursor-pointer">
+                <FileStack size={14} className="mr-2" />
+                <span>From Documents</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-[220px] max-h-[320px] overflow-y-auto">
+                {allGroups
+                  .filter(
+                    (g) =>
+                      g.id !== "unclassified" &&
+                      g.id !== group.id &&
+                      g.files.filter((f) => !f.isRemoved).length > 0
+                  )
+                  .map((sourceGroup) => {
+                    const activeFiles = sourceGroup.files.filter((f) => !f.isRemoved);
+                    const fileIds = activeFiles.map((f) => f.id);
+                    return (
+                      <DropdownMenuItem
+                        key={sourceGroup.id}
+                        onClick={() => addFilesToGroup(group.id, fileIds)}
+                        className="text-xs cursor-pointer group"
+                        onMouseEnter={() => setHoveredFileId(sourceGroup.id)}
+                        onMouseLeave={() => setHoveredFileId(null)}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {/* Mini thumbnail stack */}
+                          <div className="relative size-8 shrink-0">
+                            <div className="absolute inset-0 bg-stone-100 rounded border border-stone-200 translate-x-1 translate-y-1" />
+                            <div className="absolute inset-0 bg-stone-50 rounded border border-stone-200 translate-x-0.5 translate-y-0.5" />
+                            <div className="absolute inset-0 bg-white rounded border border-stone-200 flex items-center justify-center">
+                              <FileText size={12} className="text-stone-400" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate font-medium text-stone-700">{sourceGroup.title}</div>
+                            <div className="text-[10px] text-stone-400">{activeFiles.length} pages</div>
+                          </div>
+                        </div>
+                        {/* Document preview on hover */}
+                        {hoveredFileId === sourceGroup.id && (
+                          <div className="absolute left-full top-0 ml-2 z-50 pointer-events-none">
+                            <div className="w-32 bg-white rounded-lg shadow-xl border border-stone-200 p-2">
+                              <div className="aspect-[1/1.414] bg-stone-50 rounded flex items-center justify-center mb-1.5">
+                                <DocumentPreviewContent size="sm" />
+                              </div>
+                              <div className="text-[9px] text-stone-500 text-center">
+                                {activeFiles.length} page{activeFiles.length !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                {allGroups.filter(
+                  (g) =>
+                    g.id !== "unclassified" &&
+                    g.id !== group.id &&
+                    g.files.filter((f) => !f.isRemoved).length > 0
+                ).length === 0 && (
+                  <div className="px-2 py-3 text-xs text-stone-400 text-center">
+                    No other documents available
+                  </div>
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Confirm / Download - mutually exclusive */}
         {isPending ? (
@@ -1294,328 +1398,43 @@ const CategoryCard = ({
           </button>
         )}
       </div>
+
     </div>
   );
 };
 
 // ============================================================================
-// DRAGGABLE LINKED DOCUMENT ITEM - For reordering in Combined Evidence
+// FILE SELECTION MODAL - Select files from existing containers
 // ============================================================================
-const LINKED_DOC_ITEM_TYPE = "LINKED_DOC_ITEM";
-
-const DraggableLinkedDocumentItem = ({
-  group,
-  index,
-  onReviewGroup,
-  onUnlink,
-  moveDocument,
-}: {
-  group: DocumentGroup;
-  index: number;
-  onReviewGroup: (group: DocumentGroup) => void;
-  onUnlink: () => void;
-  moveDocument: (dragIndex: number, hoverIndex: number) => void;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const [{ isDragging }, drag, preview] = useDrag({
-    type: LINKED_DOC_ITEM_TYPE,
-    item: { index },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  });
-
-  const [{ isOver }, drop] = useDrop({
-    accept: LINKED_DOC_ITEM_TYPE,
-    hover: (item: { index: number }) => {
-      if (item.index !== index) {
-        moveDocument(item.index, index);
-        item.index = index;
-      }
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
-  });
-
-  drag(drop(ref));
-
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        "flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-stone-50 group transition-all",
-        isDragging && "opacity-50 bg-stone-100",
-        isOver && "bg-stone-100"
-      )}
-    >
-      {/* Drag handle */}
-      <GripVertical
-        size={12}
-        className="text-stone-300 shrink-0 cursor-grab active:cursor-grabbing"
-      />
-      <FileText size={14} className="text-stone-400 shrink-0" />
-      <button
-        onClick={() => onReviewGroup(group)}
-        className="flex-1 text-left text-xs font-medium text-stone-700 hover:text-stone-900 truncate"
-      >
-        {group.title}
-      </button>
-      <span className="text-[10px] text-stone-400 tabular-nums">
-        {group.files.filter((f) => !f.isRemoved).length} pages
-      </span>
-      <button
-        onClick={onUnlink}
-        className="p-1 text-stone-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-        title="Unlink"
-      >
-        <Unlink size={12} />
-      </button>
-    </div>
-  );
-};
-
-// ============================================================================
-// COMBINED EVIDENCE CARD - Container for grouping multiple logical files
-// ============================================================================
-const BundleCard = ({
-  bundle,
-  linkedGroups,
-  allGroups,
-  onReviewGroup,
-  onPreviewCombined,
-}: {
-  bundle: DocumentBundle;
-  linkedGroups: DocumentGroup[];
-  allGroups: DocumentGroup[];
-  onReviewGroup: (group: DocumentGroup) => void;
-  onPreviewCombined?: (bundle: DocumentBundle) => void;
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [editedName, setEditedName] = useState(bundle.name);
-
-  const renameDocumentBundle = useCaseDetailStore((state) => state.renameDocumentBundle);
-  const deleteDocumentBundle = useCaseDetailStore((state) => state.deleteDocumentBundle);
-  const unlinkGroupFromBundle = useCaseDetailStore((state) => state.unlinkGroupFromBundle);
-  const linkGroupToBundle = useCaseDetailStore((state) => state.linkGroupToBundle);
-  const reorderLinkedDocumentsInBundle = useCaseDetailStore((state) => state.reorderLinkedDocumentsInBundle);
-
-  // Drag-to-reorder handler
-  const moveDocument = (dragIndex: number, hoverIndex: number) => {
-    const newOrder = [...bundle.linkedGroupIds];
-    const [draggedItem] = newOrder.splice(dragIndex, 1);
-    newOrder.splice(hoverIndex, 0, draggedItem);
-    reorderLinkedDocumentsInBundle(bundle.id, newOrder);
-  };
-
-  // Groups that can still be linked (not already in this bundle)
-  const availableGroups = allGroups.filter(
-    (g) => g.id !== "unclassified" && !bundle.linkedGroupIds.includes(g.id)
-  );
-
-  const handleRenameSubmit = () => {
-    if (editedName.trim() && editedName !== bundle.name) {
-      renameDocumentBundle(bundle.id, editedName.trim());
-    } else {
-      setEditedName(bundle.name);
-    }
-    setIsRenaming(false);
-  };
-
-  const totalPages = linkedGroups.reduce((acc, g) => acc + g.files.filter(f => !f.isRemoved).length, 0);
-
-  return (
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden flex flex-col transition-all shadow-sm hover:shadow-md hover:border-stone-300">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-stone-100 shrink-0">
-        <div className="flex items-center gap-2">
-          {/* Combined icon */}
-          <Layers size={14} className="text-stone-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            {isRenaming ? (
-              <input
-                type="text"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                onBlur={handleRenameSubmit}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRenameSubmit();
-                  if (e.key === "Escape") {
-                    setEditedName(bundle.name);
-                    setIsRenaming(false);
-                  }
-                }}
-                className="text-xs font-semibold text-stone-800 bg-white border-2 border-stone-400 rounded px-1.5 py-0.5 outline-none w-full shadow-sm"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={() => setIsRenaming(true)}
-                className="group text-xs font-semibold text-stone-800 truncate text-left hover:text-stone-600 rounded px-1 py-0.5 -mx-1 transition-all flex items-center gap-1 w-full"
-              >
-                <span className="truncate">{bundle.name}</span>
-                <Pencil
-                  size={10}
-                  className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-stone-400"
-                />
-              </button>
-            )}
-            <p className="text-[10px] font-medium text-stone-500">
-              {linkedGroups.length} linked document{linkedGroups.length !== 1 ? "s" : ""} • {totalPages} pages
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Stacked preview - shows up to 4 linked groups */}
-      {/* Click background for combined preview, click individual thumbnail for that document */}
-      <div
-        className="flex-1 p-3 relative bg-stone-50/50 min-h-0 flex items-center justify-center cursor-pointer hover:bg-stone-100/50 transition-colors"
-        onClick={() => linkedGroups.length > 0 && onPreviewCombined?.(bundle)}
-      >
-        {linkedGroups.length > 0 ? (
-          <div className="flex -space-x-6">
-            {linkedGroups.slice(0, 4).map((group, idx) => (
-              <button
-                key={group.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReviewGroup(group);
-                }}
-                className="relative w-20 aspect-[1/1.414] rounded-lg border border-stone-200 bg-white shadow-sm hover:shadow-md hover:z-10 hover:scale-105 transition-all overflow-hidden"
-                style={{ zIndex: linkedGroups.length - idx }}
-              >
-                <div className="w-full h-full p-2">
-                  <div className="space-y-1">
-                    <div className="h-1 bg-stone-300 rounded w-1/3" />
-                    <div className="h-0.5 bg-stone-200 rounded w-full mt-1" />
-                    <div className="h-0.5 bg-stone-200 rounded w-4/5" />
-                    <div className="h-0.5 bg-stone-200 rounded w-full" />
-                    <div className="h-0.5 bg-stone-200 rounded w-2/3" />
-                    <div className="h-0.5 bg-stone-200 rounded w-full" />
-                    <div className="h-0.5 bg-stone-200 rounded w-3/4" />
-                  </div>
-                </div>
-                <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-stone-900/70 to-transparent">
-                  <p className="text-[8px] font-medium text-white truncate text-center">
-                    {group.title}
-                  </p>
-                </div>
-              </button>
-            ))}
-            {linkedGroups.length > 4 && (
-              <div className="w-20 aspect-[1/1.414] rounded-lg border-2 border-dashed border-stone-300 bg-stone-50 flex items-center justify-center">
-                <span className="text-sm font-bold text-stone-500">
-                  +{linkedGroups.length - 4}
-                </span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center">
-            <Layers size={20} className="mx-auto mb-1 text-stone-300" />
-            <p className="text-[10px] text-stone-400">No linked documents</p>
-          </div>
-        )}
-      </div>
-
-      {/* Expand/collapse button */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 py-2 border-t border-stone-100 flex items-center justify-center gap-1 text-[10px] font-medium text-stone-500 hover:bg-stone-50 transition-colors"
-      >
-        {isExpanded ? "Hide details" : "View linked documents"}
-        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-      </button>
-
-      {/* Expanded view - linked groups list */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-stone-100 bg-white"
-          >
-            <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
-              {linkedGroups.map((group, index) => (
-                <DraggableLinkedDocumentItem
-                  key={group.id}
-                  group={group}
-                  index={index}
-                  onReviewGroup={onReviewGroup}
-                  onUnlink={() => unlinkGroupFromBundle(group.id, bundle.id)}
-                  moveDocument={moveDocument}
-                />
-              ))}
-
-              {/* Add more groups dropdown */}
-              {availableGroups.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-dashed border-stone-300 text-[10px] font-medium text-stone-500 hover:border-stone-400 hover:text-stone-600 transition-colors">
-                      <Plus size={12} />
-                      Link another document
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-48">
-                    <DropdownMenuLabel className="text-xs">Available Documents</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {availableGroups.map((group) => (
-                      <DropdownMenuItem
-                        key={group.id}
-                        onClick={() => linkGroupToBundle(group.id, bundle.id)}
-                      >
-                        <FileText size={14} className="mr-2 text-stone-400" />
-                        {group.title}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-
-              {/* Delete button - only enabled when no linked documents */}
-              <button
-                onClick={() => linkedGroups.length === 0 && deleteDocumentBundle(bundle.id)}
-                disabled={linkedGroups.length > 0}
-                className={cn(
-                  "w-full flex items-center justify-center gap-1 px-2 py-1.5 mt-2 text-[10px] font-medium rounded-lg transition-colors",
-                  linkedGroups.length > 0
-                    ? "text-stone-300 cursor-not-allowed"
-                    : "text-red-500 hover:bg-red-50"
-                )}
-                title={linkedGroups.length > 0 ? "Unlink all documents before deleting" : "Delete this combined evidence"}
-              >
-                <Trash2 size={12} />
-                Delete
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-// ============================================================================
-// CREATE COMBINED EVIDENCE MODAL
-// ============================================================================
-const CreateBundleModal = ({
+const FileSelectionModal = ({
   groups,
+  targetGroupId,
+  targetGroupTitle,
   onClose,
-  onCreate,
+  onConfirm,
 }: {
   groups: DocumentGroup[];
+  targetGroupId: string;
+  targetGroupTitle: string;
   onClose: () => void;
-  onCreate: (name: string, linkedGroupIds: string[]) => void;
+  onConfirm: (orderedFileIds: string[]) => void;
 }) => {
-  const [name, setName] = useState("");
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const availableGroups = groups.filter((g) => g.id !== "unclassified");
+  // Only show groups with active files (exclude target group and unclassified)
+  const availableGroups = groups.filter(
+    (g) =>
+      g.id !== "unclassified" &&
+      g.id !== targetGroupId &&
+      g.files.filter((f) => !f.isRemoved).length > 0
+  );
+
+  // Auto-expand all groups on mount
+  useEffect(() => {
+    setExpandedGroups(new Set(availableGroups.map((g) => g.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Close on escape
   useEffect(() => {
@@ -1626,10 +1445,65 @@ const CreateBundleModal = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const handleSubmit = () => {
-    if (name.trim() && selectedGroups.length >= 2) {
-      onCreate(name.trim(), selectedGroups);
-      onClose();
+  // Toggle a file's selection
+  const toggleFile = (fileId: string) => {
+    setSelectedFileIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileId)) {
+        next.delete(fileId);
+      } else {
+        next.add(fileId);
+      }
+      return next;
+    });
+  };
+
+  // Toggle all files in a group
+  const toggleGroup = (group: DocumentGroup) => {
+    const activeFiles = group.files.filter((f) => !f.isRemoved);
+    const allSelected = activeFiles.every((f) => selectedFileIds.has(f.id));
+    setSelectedFileIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        activeFiles.forEach((f) => next.delete(f.id));
+      } else {
+        activeFiles.forEach((f) => next.add(f.id));
+      }
+      return next;
+    });
+  };
+
+  // Toggle group expand/collapse
+  const toggleExpand = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  // Count selected files in a group
+  const getGroupSelectionCount = (group: DocumentGroup) => {
+    const activeFiles = group.files.filter((f) => !f.isRemoved);
+    return activeFiles.filter((f) => selectedFileIds.has(f.id)).length;
+  };
+
+  const handleConfirm = () => {
+    if (selectedFileIds.size > 0) {
+      // Collect files in order (by group, then by file order within group)
+      const orderedFileIds: string[] = [];
+      for (const group of availableGroups) {
+        for (const file of group.files.filter((f) => !f.isRemoved)) {
+          if (selectedFileIds.has(file.id)) {
+            orderedFileIds.push(file.id);
+          }
+        }
+      }
+      onConfirm(orderedFileIds);
     }
   };
 
@@ -1647,7 +1521,7 @@ const CreateBundleModal = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.15 }}
-        className="relative bg-white rounded-xl shadow-2xl w-[380px] overflow-hidden"
+        className="relative bg-white rounded-xl shadow-2xl w-[420px] overflow-hidden"
       >
         {/* Header */}
         <div className="px-4 py-3 border-b border-stone-100">
@@ -1656,8 +1530,606 @@ const CreateBundleModal = ({
               <Layers size={16} className="text-stone-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-800">Create Combined Evidence</h3>
-              <p className="text-[10px] text-stone-500">Group related documents together</p>
+              <h3 className="text-sm font-semibold text-stone-800">
+                Add to {targetGroupTitle}
+              </h3>
+              <p className="text-[10px] text-stone-500">
+                Select files from existing documents
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          <div className="border border-stone-200 rounded-lg max-h-72 overflow-y-auto">
+            {availableGroups.length > 0 ? (
+              <div className="divide-y divide-stone-100">
+                {availableGroups.map((group) => {
+                  const activeFiles = group.files.filter((f) => !f.isRemoved);
+                  const selectedCount = getGroupSelectionCount(group);
+                  const allSelected =
+                    activeFiles.length > 0 &&
+                    activeFiles.every((f) => selectedFileIds.has(f.id));
+                  const someSelected = selectedCount > 0 && !allSelected;
+                  const isExpanded = expandedGroups.has(group.id);
+
+                  return (
+                    <div key={group.id}>
+                      {/* Container header */}
+                      <div
+                        className="flex items-center gap-2 px-3 py-2 bg-stone-50/80 hover:bg-stone-100/80 transition-colors cursor-pointer"
+                        onClick={() => toggleExpand(group.id)}
+                      >
+                        <ChevronDown
+                          size={12}
+                          className={cn(
+                            "text-stone-400 transition-transform shrink-0",
+                            !isExpanded && "-rotate-90"
+                          )}
+                        />
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected;
+                          }}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleGroup(group);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="size-3.5 rounded border-stone-300 text-stone-600 focus:ring-stone-500"
+                        />
+                        <FolderOpen size={13} className="text-stone-400 shrink-0" />
+                        <span className="text-xs font-medium text-stone-700 flex-1 truncate">
+                          {group.title}
+                        </span>
+                        {selectedCount > 0 && (
+                          <span className="text-[10px] font-medium text-stone-500 bg-stone-200 px-1.5 py-0.5 rounded-full tabular-nums">
+                            {selectedCount}/{activeFiles.length}
+                          </span>
+                        )}
+                        {selectedCount === 0 && (
+                          <span className="text-[10px] text-stone-400 tabular-nums">
+                            {activeFiles.length}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* File list (collapsible) */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="overflow-hidden"
+                          >
+                            {activeFiles.map((file) => (
+                              <label
+                                key={file.id}
+                                className={cn(
+                                  "flex items-center gap-2.5 pl-9 pr-3 py-1.5 cursor-pointer transition-colors",
+                                  selectedFileIds.has(file.id)
+                                    ? "bg-stone-50"
+                                    : "hover:bg-stone-50/50"
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedFileIds.has(file.id)}
+                                  onChange={() => toggleFile(file.id)}
+                                  className="size-3.5 rounded border-stone-300 text-stone-600 focus:ring-stone-500"
+                                />
+                                <FileText
+                                  size={12}
+                                  className="text-stone-400 shrink-0"
+                                />
+                                <span className="text-xs text-stone-700 flex-1 truncate">
+                                  {file.name}
+                                </span>
+                              </label>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-3 py-4 text-center">
+                <p className="text-xs text-stone-400">
+                  No documents available to add
+                </p>
+              </div>
+            )}
+          </div>
+          {selectedFileIds.size > 0 && (
+            <p className="text-xs text-stone-500 mt-2">
+              {selectedFileIds.size} file{selectedFileIds.size !== 1 ? "s" : ""} selected
+            </p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-stone-100 bg-stone-50 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={selectedFileIds.size === 0}
+            className="px-4 py-1.5 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+          >
+            <Plus size={14} />
+            Add Files
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ============================================================================
+// DRAGGABLE FILE ITEM - For reordering in Merge Documents Modal
+// ============================================================================
+const MERGE_FILE_ITEM_TYPE = "MERGE_FILE_ITEM";
+
+const DraggableMergeDocumentItem = ({
+  group,
+  index,
+  moveFile,
+}: {
+  group: DocumentGroup;
+  index: number;
+  moveFile: (dragIndex: number, hoverIndex: number) => void;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const activeFiles = group.files.filter((f) => !f.isRemoved);
+  const displayTag = group.tag.split("-").map((w) => w.toUpperCase()).join(" ");
+
+  const [{ isDragging }, drag] = useDrag({
+    type: MERGE_FILE_ITEM_TYPE,
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  const [{ isOver }, drop] = useDrop({
+    accept: MERGE_FILE_ITEM_TYPE,
+    hover: (item: { index: number }) => {
+      if (item.index !== index) {
+        moveFile(item.index, index);
+        item.index = index;
+      }
+    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
+  });
+
+  drag(drop(ref));
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex items-center gap-2 px-3 py-2.5 rounded-lg border border-stone-200 bg-white transition-all",
+        isDragging && "opacity-50 shadow-lg",
+        isOver && "border-stone-400 bg-stone-50"
+      )}
+    >
+      <GripVertical
+        size={14}
+        className="text-stone-300 shrink-0 cursor-grab active:cursor-grabbing"
+      />
+      <div className="relative size-9 shrink-0">
+        <div className="absolute inset-0 bg-stone-100 rounded border border-stone-200 translate-x-0.5 translate-y-0.5" />
+        <div className="absolute inset-0 bg-white rounded border border-stone-200 flex items-center justify-center">
+          <FileText size={14} className="text-stone-400" />
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-stone-700 truncate">{group.title}</p>
+        <p className="text-[10px] text-stone-400">
+          {displayTag} &middot; {activeFiles.length} page{activeFiles.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// MERGE DOCUMENTS MODAL - Combine individual files into "Other Documents"
+// ============================================================================
+const MergeDocumentsModal = ({
+  groups,
+  onClose,
+  onMerge,
+}: {
+  groups: DocumentGroup[];
+  onClose: () => void;
+  onMerge: (name: string, orderedFileIds: string[]) => void;
+}) => {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [name, setName] = useState("");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [orderedGroups, setOrderedGroups] = useState<DocumentGroup[]>([]);
+
+  // Collect available logical documents (groups with active files, excluding unclassified)
+  const availableGroups = groups.filter(
+    (g) => g.id !== "unclassified" && g.files.filter((f) => !f.isRemoved).length > 0
+  );
+
+  // Close on escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Toggle a group's selection
+  const toggleGroup = (groupId: string) => {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  // Select all / Deselect all
+  const toggleSelectAll = () => {
+    if (selectedGroupIds.size === availableGroups.length) {
+      setSelectedGroupIds(new Set());
+    } else {
+      setSelectedGroupIds(new Set(availableGroups.map((g) => g.id)));
+    }
+  };
+
+  // When moving to step 2, collect selected groups
+  const handleNextStep = () => {
+    const selected = availableGroups.filter((g) => selectedGroupIds.has(g.id));
+    setOrderedGroups(selected);
+    setStep(2);
+  };
+
+  const handleBack = () => {
+    setStep(1);
+  };
+
+  const moveFile = (dragIndex: number, hoverIndex: number) => {
+    const newGroups = [...orderedGroups];
+    const [draggedItem] = newGroups.splice(dragIndex, 1);
+    newGroups.splice(hoverIndex, 0, draggedItem);
+    setOrderedGroups(newGroups);
+  };
+
+  const handleMerge = () => {
+    if (name.trim() && orderedGroups.length > 0) {
+      // Collect all file IDs from selected groups in order
+      const allFileIds = orderedGroups.flatMap((g) =>
+        g.files.filter((f) => !f.isRemoved).map((f) => f.id)
+      );
+      onMerge(name.trim(), allFileIds);
+      onClose();
+    }
+  };
+
+  const canProceed = name.trim() && selectedGroupIds.size >= 2;
+  const allSelected = availableGroups.length > 0 && selectedGroupIds.size === availableGroups.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: 8 }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        className="relative bg-white rounded-2xl shadow-2xl w-[560px] max-h-[85vh] flex flex-col overflow-hidden"
+      >
+        {/* Header with integrated step indicator */}
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center shadow-sm">
+                <Layers size={18} className="text-stone-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-stone-900">Combine Documents</h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Create a new document from existing files
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors -mr-1 -mt-1"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Modern step indicator - subtle progress bar style */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <div
+                className={cn(
+                  "h-1 flex-1 rounded-full transition-colors duration-300",
+                  step >= 1 ? "bg-[#0E4268]" : "bg-stone-200"
+                )}
+              />
+              <div
+                className={cn(
+                  "h-1 flex-1 rounded-full transition-colors duration-300",
+                  step >= 2 ? "bg-[#0E4268]" : "bg-stone-200"
+                )}
+              />
+            </div>
+            <span className="text-[10px] font-medium text-stone-400 tabular-nums">
+              {step}/2
+            </span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-5 pb-5 flex-1 overflow-hidden flex flex-col">
+          {step === 1 ? (
+            <div className="space-y-4 flex-1 flex flex-col">
+              {/* Name input */}
+              <div>
+                <label className="text-xs font-medium text-stone-600 mb-1.5 block">
+                  Document Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Supporting Evidence, Travel History..."
+                  className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl focus:border-stone-400 focus:ring-2 focus:ring-stone-100 outline-none transition-all bg-stone-50/50"
+                  autoFocus
+                />
+              </div>
+
+              {/* Logical document selection list */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-stone-600">
+                    Select Documents <span className="text-stone-400 font-normal">(2 or more)</span>
+                  </label>
+                  {availableGroups.length > 0 && (
+                    <button
+                      onClick={toggleSelectAll}
+                      className="text-[10px] font-medium text-stone-500 hover:text-stone-700 transition-colors cursor-pointer"
+                    >
+                      {allSelected ? "Deselect all" : "Select all"}
+                    </button>
+                  )}
+                </div>
+                <div className="border border-stone-200 rounded-xl flex-1 overflow-hidden bg-stone-50/30">
+                  <div className="max-h-[280px] overflow-y-auto">
+                    {availableGroups.length > 0 ? (
+                      <div className="p-1.5 space-y-0.5">
+                        {availableGroups.map((group) => {
+                          const activeFiles = group.files.filter((f) => !f.isRemoved);
+                          const displayTag = group.tag.split("-").map((w) => w.toUpperCase()).join(" ");
+                          return (
+                            <label
+                              key={group.id}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
+                                selectedGroupIds.has(group.id)
+                                  ? "bg-white shadow-sm border border-stone-200"
+                                  : "hover:bg-white/60"
+                              )}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedGroupIds.has(group.id)}
+                                onChange={() => toggleGroup(group.id)}
+                                className="size-4 rounded border-stone-300 text-[#0E4268] focus:ring-[#0E4268]/30 focus:ring-offset-0 accent-[#0E4268]"
+                              />
+                              <div className="relative size-9 shrink-0">
+                                <div className="absolute inset-0 bg-stone-100 rounded border border-stone-200 translate-x-0.5 translate-y-0.5" />
+                                <div className="absolute inset-0 bg-white rounded border border-stone-200 flex items-center justify-center">
+                                  <FileText size={14} className="text-stone-400" />
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-stone-800 truncate">{group.title}</p>
+                                <p className="text-[10px] text-stone-400">
+                                  {displayTag} &middot; {activeFiles.length} page{activeFiles.length !== 1 ? "s" : ""}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="px-4 py-8 text-center">
+                        <Inbox size={24} className="mx-auto mb-2 text-stone-300" />
+                        <p className="text-xs text-stone-400">No documents available</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {selectedGroupIds.size > 0 && (
+                  <p className="text-xs text-stone-500 mt-2">
+                    {selectedGroupIds.size} document{selectedGroupIds.size !== 1 ? "s" : ""} selected
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Step 2: Reorder documents */
+            <div className="flex-1 flex flex-col min-h-0">
+              <label className="text-xs font-medium text-stone-600 mb-2 block">
+                Arrange Document Order <span className="text-stone-400 font-normal">(drag to reorder)</span>
+              </label>
+              <div className="border border-stone-200 rounded-xl flex-1 overflow-hidden bg-stone-50/30">
+                <div className="max-h-[340px] overflow-y-auto p-2 space-y-1.5">
+                  {orderedGroups.map((group, index) => (
+                    <DraggableMergeDocumentItem
+                      key={group.id}
+                      group={group}
+                      index={index}
+                      moveFile={moveFile}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-stone-500 mt-2">
+                {orderedGroups.length} document{orderedGroups.length !== 1 ? "s" : ""} will be combined in this order
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-stone-100 bg-stone-50/50 flex items-center justify-between">
+          {step === 2 ? (
+            <button
+              onClick={handleBack}
+              className="px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <ChevronLeft size={16} />
+              Back
+            </button>
+          ) : (
+            <div />
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            {step === 1 ? (
+              <button
+                onClick={handleNextStep}
+                disabled={!canProceed}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              >
+                Continue
+                <ChevronRight size={16} />
+              </button>
+            ) : (
+              <button
+                onClick={handleMerge}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <Layers size={16} />
+                Combine
+              </button>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ============================================================================
+// COMBINE FROM SELECTION MODAL - For multi-select combine workflow
+// ============================================================================
+const CombineFromSelectionModal = ({
+  selectedGroups,
+  onClose,
+  onCombine,
+}: {
+  selectedGroups: DocumentGroup[];
+  onClose: () => void;
+  onCombine: (name: string, orderedFileIds: string[]) => void;
+}) => {
+  const [name, setName] = useState("");
+  const [orderedDocs, setOrderedDocs] = useState<DocumentGroup[]>([]);
+
+  // Initialize ordered documents from selected groups
+  useEffect(() => {
+    setOrderedDocs([...selectedGroups]);
+  }, [selectedGroups]);
+
+  // Close on escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const moveFile = (dragIndex: number, hoverIndex: number) => {
+    const newDocs = [...orderedDocs];
+    const [draggedItem] = newDocs.splice(dragIndex, 1);
+    newDocs.splice(hoverIndex, 0, draggedItem);
+    setOrderedDocs(newDocs);
+  };
+
+  const handleCombine = () => {
+    if (name.trim() && orderedDocs.length > 0) {
+      // Collect all file IDs from ordered groups
+      const allFileIds = orderedDocs.flatMap((g) =>
+        g.files.filter((f) => !f.isRemoved).map((f) => f.id)
+      );
+      onCombine(name.trim(), allFileIds);
+    }
+  };
+
+  const canCombine = name.trim() && orderedDocs.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.15 }}
+        className="relative bg-white rounded-xl shadow-2xl w-[460px] overflow-hidden"
+      >
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-lg bg-stone-100 flex items-center justify-center">
+              <Layers size={16} className="text-stone-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-stone-800">Combine Documents</h3>
+              <p className="text-[10px] text-stone-500">
+                {selectedGroups.length} document{selectedGroups.length !== 1 ? "s" : ""} selected
+              </p>
             </div>
           </div>
           <button
@@ -1679,49 +2151,32 @@ const CreateBundleModal = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Financial Documents, Supporting Evidence..."
+              placeholder="e.g., Supporting Evidence, Travel History..."
               className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-stone-400 focus:ring-2 focus:ring-stone-100 outline-none transition-all"
               autoFocus
             />
           </div>
 
-          {/* Group selection */}
+          {/* Document reorder list */}
           <div>
             <label className="text-xs font-medium text-stone-600 mb-1.5 block">
-              Link Documents <span className="text-stone-400">(select 2 or more)</span>
+              Document Order <span className="text-stone-400">(drag to reorder)</span>
             </label>
-            <div className="border border-stone-200 rounded-lg max-h-48 overflow-y-auto">
-              {availableGroups.length > 0 ? (
-                availableGroups.map((group) => (
-                  <label
+            <div className="border border-stone-200 rounded-lg max-h-72 overflow-y-auto">
+              <div className="p-2 space-y-1.5">
+                {orderedDocs.map((group, index) => (
+                  <DraggableMergeDocumentItem
                     key={group.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-stone-50 cursor-pointer border-b border-stone-100 last:border-0 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedGroups.includes(group.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedGroups([...selectedGroups, group.id]);
-                        } else {
-                          setSelectedGroups(selectedGroups.filter((id) => id !== group.id));
-                        }
-                      }}
-                      className="size-4 rounded border-stone-300 text-stone-600 focus:ring-stone-500"
-                    />
-                    <FileText size={14} className="text-stone-400 shrink-0" />
-                    <span className="text-sm text-stone-700 flex-1 truncate">{group.title}</span>
-                    <span className="text-xs text-stone-400 tabular-nums">
-                      {group.files.filter((f) => !f.isRemoved).length} pages
-                    </span>
-                  </label>
-                ))
-              ) : (
-                <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-stone-400">No documents available to link</p>
-                </div>
-              )}
+                    group={group}
+                    index={index}
+                    moveFile={moveFile}
+                  />
+                ))}
+              </div>
             </div>
+            <p className="text-xs text-stone-500 mt-2">
+              {orderedDocs.length} document{orderedDocs.length !== 1 ? "s" : ""} will be combined
+            </p>
           </div>
         </div>
 
@@ -1734,12 +2189,12 @@ const CreateBundleModal = ({
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={!name.trim() || selectedGroups.length < 2}
-            className="px-4 py-1.5 text-sm font-medium text-white bg-stone-800 hover:bg-stone-900 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+            onClick={handleCombine}
+            disabled={!canCombine}
+            className="px-4 py-1.5 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
           >
             <Layers size={14} />
-            Create
+            Combine
           </button>
         </div>
       </motion.div>
@@ -1753,11 +2208,11 @@ const CreateBundleModal = ({
 const AddCategoryCard = ({
   onAdd,
   existingGroups,
-  onCreateBundle,
+  onMergeDocuments,
 }: {
   onAdd: (name: string) => void;
   existingGroups: DocumentGroup[];
-  onCreateBundle: () => void;
+  onMergeDocuments: () => void;
 }) => {
   const [isFileDragOver, setIsFileDragOver] = useState(false);
   const [droppedFileCount, setDroppedFileCount] = useState(0);
@@ -1896,14 +2351,14 @@ const AddCategoryCard = ({
                     <Plus size={16} className="text-stone-400" />
                   </div>
                   <span className="text-xs font-medium text-stone-500">
-                    Add Category
+                    New Category
                   </span>
                 </>
               )}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-48">
-            <DropdownMenuLabel>Add Category</DropdownMenuLabel>
+            <DropdownMenuLabel>Category Type</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => handleAddCategory("Passport")}>
               Passport
@@ -1928,9 +2383,9 @@ const AddCategoryCard = ({
               Other Documents
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onCreateBundle}>
+            <DropdownMenuItem onClick={onMergeDocuments} className="whitespace-nowrap">
               <Layers size={14} className="mr-2 text-stone-400" />
-              Create Combined Evidence
+              Merge Documents
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -2072,7 +2527,7 @@ const EmptyState = ({ onUpload }: { onUpload: () => void }) => {
             "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
             isDragOver
               ? "bg-[#0E4268] text-white"
-              : "bg-stone-800 text-white hover:bg-stone-700",
+              : "bg-[#0E4268] text-white hover:bg-[#0E4268]/90",
           )}
         >
           Upload Files
@@ -2164,15 +2619,14 @@ const LoadingState = () => {
 // ============================================================================
 export function FileHubContent() {
   const groups = useDocumentGroups();
-  const bundles = useDocumentBundles();
   const isLoading = useIsLoadingDocuments();
   const highlightedGroupId = useHighlightedGroupId();
   const uploadDocuments = useCaseDetailStore((state) => state.uploadDocuments);
   const addDocumentGroup = useCaseDetailStore(
     (state) => state.addDocumentGroup,
   );
-  const createDocumentBundle = useCaseDetailStore(
-    (state) => state.createDocumentBundle,
+  const mergeDocumentsIntoGroup = useCaseDetailStore(
+    (state) => state.mergeDocumentsIntoGroup,
   );
   const clearHighlightedGroup = useCaseDetailStore(
     (state) => state.clearHighlightedGroup,
@@ -2183,13 +2637,46 @@ export function FileHubContent() {
     file: DocumentFile;
     index: number;
   } | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showCreateBundleModal, setShowCreateBundleModal] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Collapsed by default
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [showCombineModal, setShowCombineModal] = useState(false);
+
+  // Toggle group selection
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedGroupIds(new Set());
+  };
+
+  // Get all files from selected groups for combine modal
+  const getSelectedGroupsFiles = () => {
+    const files: { file: DocumentFile; groupTitle: string }[] = [];
+    for (const groupId of selectedGroupIds) {
+      const group = groups.find((g) => g.id === groupId);
+      if (group) {
+        for (const file of group.files.filter((f) => !f.isRemoved)) {
+          files.push({ file, groupTitle: group.title });
+        }
+      }
+    }
+    return files;
+  };
 
   const classifiedGroups = groups.filter((g) => g.id !== "unclassified");
-  const unclassifiedGroup = groups.find((g) => g.id === "unclassified");
-  const unclassifiedFiles =
-    unclassifiedGroup?.files.filter((f) => !f.isRemoved) || [];
+  // Use the new 1:N model selector: unclassified = files with containerIds.length === 0
+  const unclassifiedFiles = useUnclassifiedFiles();
 
   if (isLoading) {
     return (
@@ -2202,7 +2689,7 @@ export function FileHubContent() {
     );
   }
 
-  const hasAnyFiles = groups.some((g) => g.files.length > 0);
+  const hasAnyFiles = groups.some((g) => (g.files?.length ?? 0) > 0) || unclassifiedFiles.length > 0;
 
   if (!hasAnyFiles && classifiedGroups.length === 0) {
     return (
@@ -2242,32 +2729,20 @@ export function FileHubContent() {
             key={group.id}
             group={group}
             allGroups={groups}
+            unclassifiedFiles={unclassifiedFiles}
             onReview={() => setReviewGroup(group)}
             isHighlighted={highlightedGroupId === group.id}
             onHighlightComplete={clearHighlightedGroup}
+            isSelected={selectedGroupIds.has(group.id)}
+            onToggleSelect={() => toggleGroupSelection(group.id)}
+            isSelectMode={selectedGroupIds.size > 0}
           />
         ))}
-
-        {/* Document Bundles */}
-        {bundles.map((bundle) => {
-          const linkedGroups = bundle.linkedGroupIds
-            .map((id) => groups.find((g) => g.id === id))
-            .filter((g): g is DocumentGroup => g !== undefined);
-          return (
-            <BundleCard
-              key={bundle.id}
-              bundle={bundle}
-              linkedGroups={linkedGroups}
-              allGroups={groups}
-              onReviewGroup={(group) => setReviewGroup(group)}
-            />
-          );
-        })}
 
         <AddCategoryCard
           onAdd={addDocumentGroup}
           existingGroups={classifiedGroups}
-          onCreateBundle={() => setShowCreateBundleModal(true)}
+          onMergeDocuments={() => setShowMergeModal(true)}
         />
       </div>
 
@@ -2292,16 +2767,66 @@ export function FileHubContent() {
         )}
       </AnimatePresence>
 
-      {/* Create Bundle Modal */}
+      {/* Combine Documents Modal */}
       <AnimatePresence>
-        {showCreateBundleModal && (
-          <CreateBundleModal
+        {showMergeModal && (
+          <MergeDocumentsModal
             groups={groups}
-            onClose={() => setShowCreateBundleModal(false)}
-            onCreate={(name, linkedGroupIds) => {
-              createDocumentBundle(name, linkedGroupIds);
+            onClose={() => setShowMergeModal(false)}
+            onMerge={(name, orderedFileIds) => {
+              mergeDocumentsIntoGroup(name, orderedFileIds);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Combine from Selection Modal */}
+      <AnimatePresence>
+        {showCombineModal && (
+          <CombineFromSelectionModal
+            selectedGroups={Array.from(selectedGroupIds)
+              .map((id) => groups.find((g) => g.id === id))
+              .filter((g): g is DocumentGroup => g !== undefined)}
+            onClose={() => setShowCombineModal(false)}
+            onCombine={(name, orderedFileIds) => {
+              mergeDocumentsIntoGroup(name, orderedFileIds);
+              clearSelection();
+              setShowCombineModal(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Floating Action Bar - shown when items are selected */}
+      <AnimatePresence>
+        {selectedGroupIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.15 }}
+            className="fixed bottom-6 left-0 right-0 z-40 flex justify-center pointer-events-none"
+          >
+            <div className="bg-white border border-stone-200 rounded-xl shadow-lg px-5 py-2.5 flex items-center gap-4 pointer-events-auto">
+              <span className="text-sm font-medium text-stone-700">
+                {selectedGroupIds.size} document{selectedGroupIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <div className="h-4 w-px bg-stone-200" />
+              <button
+                onClick={clearSelection}
+                className="text-sm text-stone-500 hover:text-stone-700 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowCombineModal(true)}
+                className="px-3 py-1.5 text-sm font-medium bg-[#0E4268] text-white rounded-lg hover:bg-[#0E4268]/90 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Layers size={14} />
+                Combine
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

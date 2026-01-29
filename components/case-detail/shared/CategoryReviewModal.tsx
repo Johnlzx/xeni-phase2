@@ -18,6 +18,7 @@ import {
   FolderInput,
   Trash2,
   RotateCcw,
+  Copy,
 } from "lucide-react";
 import { useCaseDetailStore } from "@/store/case-detail-store";
 import type { DocumentFile, DocumentGroup } from "@/types/case-detail";
@@ -392,6 +393,7 @@ export function CategoryReviewModal({
     (state) => state.clearGroupChangesFlag,
   );
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
+  const duplicateFileToGroup = useCaseDetailStore((state) => state.duplicateFileToGroup);
   const markFileForDeletion = useCaseDetailStore(
     (state) => state.markFileForDeletion,
   );
@@ -484,6 +486,13 @@ export function CategoryReviewModal({
   const handleMoveSelected = (targetGroupId: string) => {
     selectedPageIds.forEach((fileId) => {
       moveFileToGroup(fileId, targetGroupId);
+    });
+    handleClearSelection();
+  };
+
+  const handleDuplicateSelected = (targetGroupId: string) => {
+    selectedPageIds.forEach((fileId) => {
+      duplicateFileToGroup(fileId, targetGroupId);
     });
     handleClearSelection();
   };
@@ -817,6 +826,32 @@ export function CategoryReviewModal({
                             No other categories
                           </DropdownMenuItem>
                         )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Duplicate to dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 rounded transition-colors">
+                          <Copy size={12} />
+                          Duplicate to
+                          <ChevronDown size={10} />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        {allGroups
+                          .filter((g) => g.id !== "unclassified")
+                          .map((g) => (
+                            <DropdownMenuItem
+                              key={g.id}
+                              onClick={() => handleDuplicateSelected(g.id)}
+                            >
+                              {g.title}
+                              {g.id === group.id && (
+                                <span className="ml-auto text-[10px] text-stone-400">current</span>
+                              )}
+                            </DropdownMenuItem>
+                          ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
 

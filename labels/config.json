@@ -32,6 +32,14 @@
             "light": "#06B6D4",
             "dark": "#22D3EE"
           }
+        },
+        {
+          "id": "git",
+          "name": "Git",
+          "color": {
+            "light": "#F97316",
+            "dark": "#FB923C"
+          }
         }
       ]
     },
