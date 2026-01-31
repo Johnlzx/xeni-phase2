@@ -900,6 +900,7 @@ const convertLegacyGroupsToNewModel = (
     documentGroups.push({
       id: group.id,
       title: group.title,
+      originalTitle: group.title,
       tag: group.tag,
       mergedFileName: group.mergedFileName,
       status: group.status,
@@ -1233,6 +1234,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             const newGroup: DocumentGroup = {
               id: `group_${Date.now()}`,
               title: templateName,
+              originalTitle: templateName,
               tag: templateName,
               mergedFileName: `${templateName}.pdf`,
               status: "pending",
@@ -1270,11 +1272,32 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         set(
           (state) => ({
             documentGroups: state.documentGroups.map((g) =>
-              g.id === groupId ? { ...g, title: newTitle } : g,
+              g.id === groupId
+                ? {
+                    ...g,
+                    title: newTitle,
+                    // Capture original title on first rename if not already set
+                    originalTitle: g.originalTitle ?? g.title,
+                  }
+                : g,
             ),
           }),
           false,
           "renameDocumentGroup",
+        );
+      },
+
+      resetGroupTitle: (groupId: string) => {
+        set(
+          (state) => ({
+            documentGroups: state.documentGroups.map((g) =>
+              g.id === groupId && g.originalTitle
+                ? { ...g, title: g.originalTitle }
+                : g,
+            ),
+          }),
+          false,
+          "resetGroupTitle",
         );
       },
 
@@ -1911,6 +1934,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             const newGroup: DocumentGroup = {
               id: newGroupId,
               title: name,
+              originalTitle: name,
               tag: "Other Documents",
               mergedFileName: `${name.replace(/\s+/g, "_")}_Merged.pdf`,
               status: "pending",
@@ -2023,6 +2047,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               newGroups.push({
                 id: groupId,
                 title: generatedName,
+                originalTitle: generatedName,
                 tag,
                 mergedFileName: `${generatedName}.pdf`,
                 status: "pending",
@@ -4231,6 +4256,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         const caseNotesGroup: DocumentGroup = {
           id: "case_notes",
           title: "Case Notes",
+          originalTitle: "Case Notes",
           tag: "Case Notes",
           mergedFileName: data.caseNotesFileName,
           status: "reviewed", // Auto-confirmed, no review needed
@@ -4243,6 +4269,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         const passportGroup: DocumentGroup = {
           id: "passport",
           title: "Passport",
+          originalTitle: "Passport",
           tag: "Passport",
           mergedFileName: data.passportFileName,
           status: "pending", // Requires confirm review
@@ -4254,6 +4281,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         const unclassifiedGroup: DocumentGroup = {
           id: "unclassified",
           title: "Unclassified",
+          originalTitle: "Unclassified",
           tag: "unclassified",
           status: "pending",
           fileIds: [],

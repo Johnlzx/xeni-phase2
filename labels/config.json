@@ -74,6 +74,14 @@
             "light": "#D946EF",
             "dark": "#E879F9"
           }
+        },
+        {
+          "id": "documents",
+          "name": "Documents",
+          "color": {
+            "light": "#14B8A6",
+            "dark": "#2DD4BF"
+          }
         }
       ]
     },

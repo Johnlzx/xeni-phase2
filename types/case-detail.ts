@@ -126,6 +126,7 @@ export interface DocumentFile {
 export interface DocumentGroup {
   id: string;
   title: string;
+  originalTitle?: string; // Original name before any renames, for reset functionality
   tag: string;
   mergedFileName?: string;
   status: "pending" | "reviewed";
@@ -482,6 +483,7 @@ export interface CaseDetailActions {
   addDocumentGroup: (templateName: string) => void;
   deleteDocumentGroup: (groupId: string) => void;
   renameDocumentGroup: (groupId: string, newTitle: string) => void;
+  resetGroupTitle: (groupId: string) => void;
   moveFileToGroup: (fileId: string, targetGroupId: string) => void;
   reorderFileInGroup: (
     groupId: string,
