@@ -26,6 +26,8 @@ import {
   Upload,
   FileStack,
   RotateCcw,
+  FileUp,
+  FolderUp,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -164,6 +166,7 @@ const Sidebar = ({
   const [processingLabel, setProcessingLabel] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const uploadAndAutoClassify = useCaseDetailStore((state) => state.uploadAndAutoClassify);
   const uploadFolder = useCaseDetailStore((state) => state.uploadFolder);
@@ -234,6 +237,23 @@ const Sidebar = ({
     if (!isProcessing && folderInputRef.current) {
       folderInputRef.current.click();
     }
+  };
+
+  // Trigger file input click
+  const handleFileUploadClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isProcessing && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Handle individual file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    // Use the same processing workflow as drag-and-drop
+    await runProcessingWorkflow();
+    e.target.value = "";
   };
 
   // Drop target for internal page drags
@@ -328,9 +348,9 @@ const Sidebar = ({
           {/* Divider */}
           <div className="mx-2 h-px bg-stone-100" />
 
-          {/* Upload button */}
+          {/* Upload file button */}
           <button
-            onClick={() => !isProcessing && runProcessingWorkflow()}
+            onClick={handleFileUploadClick}
             disabled={isProcessing}
             className={cn(
               "size-11 flex items-center justify-center transition-colors",
@@ -339,14 +359,48 @@ const Sidebar = ({
                 : "text-stone-400 hover:text-[#0E4268] hover:bg-stone-50",
             )}
             aria-label="Upload files"
+            title="Upload files"
           >
             {isProcessing ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              <Plus size={18} />
+              <FileUp size={16} />
             )}
           </button>
+
+          {/* Upload folder button */}
+          <button
+            onClick={handleFolderUploadClick}
+            disabled={isProcessing}
+            className={cn(
+              "size-11 flex items-center justify-center transition-colors",
+              isProcessing
+                ? "text-[#0E4268] cursor-default"
+                : "text-stone-400 hover:text-[#0E4268] hover:bg-stone-50",
+            )}
+            aria-label="Upload folder"
+            title="Upload folder"
+          >
+            <FolderUp size={16} />
+          </button>
         </div>
+        {/* Hidden file inputs (needed for collapsed state too) */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileSelect}
+          accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+          multiple
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFolderSelect}
+          {...{ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>}
+          multiple
+        />
       </div>
     );
   }
@@ -411,7 +465,15 @@ const Sidebar = ({
         )}
       </div>
 
-      {/* Hidden folder input */}
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileSelect}
+        accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+        multiple
+      />
       <input
         ref={folderInputRef}
         type="file"
@@ -421,17 +483,17 @@ const Sidebar = ({
         multiple
       />
 
-      {/* Upload Zone - Simple unified upload area */}
-      <div className="shrink-0 p-3 border-t border-stone-100">
+      {/* Upload Zone */}
+      <div className="shrink-0 p-3 border-t border-stone-100 space-y-2">
+        {/* Dashed drop area */}
         <div
-          onClick={() => !isProcessing && folderInputRef.current?.click()}
           className={cn(
-            "w-full rounded-xl border-2 border-dashed cursor-pointer transition-all",
+            "w-full rounded-xl border-2 border-dashed transition-all",
             isProcessing
               ? "border-[#0E4268]/40 bg-[#0E4268]/5 cursor-default"
               : isAnyDragOver
                 ? "border-[#0E4268] bg-[#0E4268]/10 scale-[1.02]"
-                : "border-stone-300 hover:border-stone-400 hover:bg-stone-50/50",
+                : "border-stone-300",
           )}
         >
           {isProcessing ? (
@@ -442,7 +504,7 @@ const Sidebar = ({
               </span>
             </div>
           ) : (
-            <div className="w-full px-4 py-4 flex flex-col items-center justify-center gap-1.5">
+            <div className="w-full px-4 py-3.5 flex flex-col items-center justify-center gap-1">
               <div className={cn(
                 "size-8 rounded-lg flex items-center justify-center transition-colors",
                 isAnyDragOver ? "bg-[#0E4268]/10" : "bg-stone-100"
@@ -459,14 +521,30 @@ const Sidebar = ({
                 "text-xs font-medium transition-colors",
                 isAnyDragOver ? "text-[#0E4268]" : "text-stone-500"
               )}>
-                {isAnyDragOver ? "Drop here" : "Upload"}
-              </span>
-              <span className="text-[10px] text-stone-400">
-                Files or folder
+                {isAnyDragOver ? "Drop here" : "Drag & drop"}
               </span>
             </div>
           )}
         </div>
+
+        {/* Text button links for file / folder upload */}
+        {!isProcessing && !isAnyDragOver && (
+          <div className="flex items-center justify-center gap-1 text-[11px]">
+            <button
+              onClick={handleFileUploadClick}
+              className="font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
+            >
+              Upload Files
+            </button>
+            <span className="text-stone-300">|</span>
+            <button
+              onClick={handleFolderUploadClick}
+              className="font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
+            >
+              Upload Folder
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
