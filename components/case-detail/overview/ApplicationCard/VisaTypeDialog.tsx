@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from "react";
 import {
-  CheckCircle2,
-  Shield,
   FileText,
   Check,
   Circle,
   ArrowRight,
-  ChevronLeft,
 } from "lucide-react";
 import {
   Dialog,
@@ -86,132 +83,14 @@ export function getVisaConfig(visaId: VisaType) {
   return VISA_TYPES_CONFIG.find((v) => v.id === visaId);
 }
 
-// Visa Type Card Component
-function VisaTypeCard({
-  visa,
-  isSelected,
-  onSelect,
-}: {
-  visa: (typeof VISA_TYPES_CONFIG)[0];
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  const Icon = visa.icon;
-
-  return (
-    <button
-      onClick={onSelect}
-      className={cn(
-        "group relative text-left p-4 rounded-xl border-2 transition-colors",
-        isSelected
-          ? "border-[#0E4268] bg-[#0E4268]/5"
-          : "border-stone-200 bg-white hover:border-stone-300",
-      )}
-    >
-      {isSelected && (
-        <div className="absolute top-3 right-3 size-5 bg-[#0E4268] rounded-full flex items-center justify-center">
-          <CheckCircle2 size={12} className="text-white" />
-        </div>
-      )}
-
-      <div
-        className={cn(
-          "size-10 rounded-lg flex items-center justify-center mb-3",
-          visa.bgColor,
-        )}
-      >
-        <Icon size={20} className={visa.color} />
-      </div>
-
-      <h3
-        className={cn(
-          "text-sm font-semibold mb-1 text-balance",
-          isSelected ? "text-[#0E4268]" : "text-stone-800",
-        )}
-      >
-        {visa.shortName}
-      </h3>
-      <p className="text-xs text-stone-500 leading-relaxed line-clamp-2 text-pretty">
-        {visa.description}
-      </p>
-    </button>
-  );
-}
-
-// Step 1: Visa Selection
-function VisaSelectionStep({
-  selectedVisa,
-  onSelectVisa,
-  onNext,
-  onCancel,
-}: {
-  selectedVisa: VisaType | null;
-  onSelectVisa: (visa: VisaType) => void;
-  onNext: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <>
-      <DialogHeader className="px-6 pt-6 pb-4 border-b border-stone-100">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="size-8 rounded-lg bg-[#0E4268]/5 flex items-center justify-center">
-            <Shield size={16} className="text-[#0E4268]" />
-          </div>
-          <DialogTitle className="text-balance">Select Visa Type</DialogTitle>
-        </div>
-        <DialogDescription className="text-pretty">
-          Choose a visa category to proceed with document analysis
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="p-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {VISA_TYPES_CONFIG.map((visa) => (
-            <VisaTypeCard
-              key={visa.id}
-              visa={visa}
-              isSelected={selectedVisa === visa.id}
-              onSelect={() => onSelectVisa(visa.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <DialogFooter className="px-6 py-4 border-t border-stone-100 bg-stone-50 flex-row justify-end gap-2">
-        <button
-          onClick={onCancel}
-          className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!selectedVisa}
-          className={cn(
-            "px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2",
-            selectedVisa
-              ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
-              : "bg-stone-100 text-stone-400 cursor-not-allowed",
-          )}
-        >
-          Continue
-          <ArrowRight size={14} />
-        </button>
-      </DialogFooter>
-    </>
-  );
-}
-
-// Step 2: Ready for Analysis
+// Ready for Analysis
 function ReadyForAnalysisStep({
   selectedVisa,
-  onBack,
   onStartAnalysis,
   onClose,
   isStarting,
 }: {
   selectedVisa: VisaType | null;
-  onBack: () => void;
   onStartAnalysis: () => void;
   onClose: () => void;
   isStarting: boolean;
@@ -474,13 +353,12 @@ function ReadyForAnalysisStep({
         </div>
       </div>
 
-      <DialogFooter className="px-6 py-4 border-t border-stone-100 bg-stone-50 flex-row justify-between">
+      <DialogFooter className="px-6 py-4 border-t border-stone-100 bg-stone-50 flex-row justify-end gap-2">
         <button
-          onClick={onBack}
-          className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1"
+          onClick={onClose}
+          className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
         >
-          <ChevronLeft size={14} />
-          Change Visa
+          Cancel
         </button>
         <button
           onClick={onStartAnalysis}
@@ -507,52 +385,23 @@ interface VisaTypeDialogProps {
 
 export function VisaTypeDialog({ open, onOpenChange }: VisaTypeDialogProps) {
   const currentVisaType = useCaseDetailStore((state) => state.selectedVisaType);
-  const setVisaType = useCaseDetailStore((state) => state.setVisaType);
-  const initFormSchema = useCaseDetailStore((state) => state.initFormSchema);
   const startAnalysis = useCaseDetailStore((state) => state.startAnalysis);
 
-  // Step 1 = visa selection, Step 2 = ready for analysis
-  const [step, setStep] = useState<1 | 2>(currentVisaType ? 2 : 1);
-  const [localSelectedVisa, setLocalSelectedVisa] = useState<VisaType | null>(
-    currentVisaType,
-  );
   const [isStarting, setIsStarting] = useState(false);
 
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      // If visa already selected, go to step 2
-      setStep(currentVisaType ? 2 : 1);
-      setLocalSelectedVisa(currentVisaType);
       setIsStarting(false);
     }
-  }, [open, currentVisaType]);
+  }, [open]);
 
-  const handleNext = () => {
-    if (localSelectedVisa) {
-      // Save visa selection and initialize form schema
-      setVisaType(localSelectedVisa);
-      initFormSchema(localSelectedVisa);
-      setStep(2);
-    }
-  };
-
-  const handleBack = () => {
-    setStep(1);
-  };
-
-  const handleCancel = () => {
-    setLocalSelectedVisa(currentVisaType);
+  const handleClose = () => {
     onOpenChange(false);
   };
 
   const handleStartAnalysis = async () => {
     setIsStarting(true);
-    // Ensure visa is saved if changed
-    if (localSelectedVisa && localSelectedVisa !== currentVisaType) {
-      setVisaType(localSelectedVisa);
-      initFormSchema(localSelectedVisa);
-    }
     // Close dialog immediately, analysis runs in background
     onOpenChange(false);
     // Start analysis
@@ -562,23 +411,12 @@ export function VisaTypeDialog({ open, onOpenChange }: VisaTypeDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-white p-0" hideCloseButton>
-        {step === 1 && (
-          <VisaSelectionStep
-            selectedVisa={localSelectedVisa}
-            onSelectVisa={setLocalSelectedVisa}
-            onNext={handleNext}
-            onCancel={handleCancel}
-          />
-        )}
-        {step === 2 && (
-          <ReadyForAnalysisStep
-            selectedVisa={localSelectedVisa}
-            onBack={handleBack}
-            onStartAnalysis={handleStartAnalysis}
-            onClose={handleCancel}
-            isStarting={isStarting}
-          />
-        )}
+        <ReadyForAnalysisStep
+          selectedVisa={currentVisaType}
+          onStartAnalysis={handleStartAnalysis}
+          onClose={handleClose}
+          isStarting={isStarting}
+        />
       </DialogContent>
     </Dialog>
   );

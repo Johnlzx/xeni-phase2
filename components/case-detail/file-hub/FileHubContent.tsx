@@ -65,44 +65,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CategoryReviewModal } from "../shared";
-
-// ============================================================================
-// REALISTIC DOCUMENT PREVIEW - Simulates scanned document appearance
-// ============================================================================
-const DocumentPreviewContent = ({
-  size = "sm",
-}: {
-  size?: "sm" | "md" | "lg";
-}) => {
-  const lineHeight = size === "sm" ? "h-0.5" : size === "md" ? "h-1" : "h-1.5";
-  const spacing =
-    size === "sm" ? "space-y-0.5" : size === "md" ? "space-y-1" : "space-y-2";
-  const marginTop = size === "sm" ? "mt-1" : size === "md" ? "mt-2" : "mt-4";
-
-  return (
-    <div className={spacing}>
-      <div className={cn(lineHeight, "bg-stone-300 rounded w-1/3")} />
-      <div
-        className={cn(lineHeight, "bg-stone-200 rounded w-1/4", marginTop)}
-      />
-      <div
-        className={cn(lineHeight, "bg-stone-200 rounded w-full", marginTop)}
-      />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-full")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-5/6")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-full")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-3/4")} />
-      <div
-        className={cn(lineHeight, "bg-stone-200 rounded w-full", marginTop)}
-      />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-4/5")} />
-      <div
-        className={cn(lineHeight, "bg-stone-300 rounded w-1/4", marginTop)}
-      />
-    </div>
-  );
-};
+import { CategoryReviewModal, DocumentPreviewContent } from "../shared";
 import type { DocumentGroup, DocumentFile } from "@/types/case-detail";
 
 const ItemTypes = {

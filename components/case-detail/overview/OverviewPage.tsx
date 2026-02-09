@@ -7,10 +7,10 @@ import { ApplicationCard } from "./ApplicationCard";
 import { VisaTypeDialog } from "./ApplicationCard/VisaTypeDialog";
 
 export function OverviewPage() {
-  const [visaDialogOpen, setVisaDialogOpen] = useState(false);
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
 
-  const handleOpenVisaDialog = () => {
-    setVisaDialogOpen(true);
+  const handleOpenAnalysisDialog = () => {
+    setAnalysisDialogOpen(true);
   };
 
   return (
@@ -19,7 +19,7 @@ export function OverviewPage() {
         {/* Top Row - Case Notes & Documents (side by side, fixed height) */}
         <div className="shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4 h-[280px]">
           {/* Case Notes Card */}
-          <CaseProfileCard onOpenVisaDialog={handleOpenVisaDialog} />
+          <CaseProfileCard />
 
           {/* Documents Card */}
           <FileUploadZone />
@@ -28,14 +28,14 @@ export function OverviewPage() {
         {/* Application Card - half height of container */}
         <div className="h-1/2 min-h-0">
           <ApplicationCard
-            onOpenVisaDialog={handleOpenVisaDialog}
+            onStartAnalysis={handleOpenAnalysisDialog}
             className="h-full"
           />
         </div>
       </div>
 
-      {/* Shared Visa Type Dialog */}
-      <VisaTypeDialog open={visaDialogOpen} onOpenChange={setVisaDialogOpen} />
+      {/* Analysis Confirmation Dialog */}
+      <VisaTypeDialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen} />
     </div>
   );
 }

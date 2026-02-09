@@ -35,7 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CategoryReviewModal } from "../../shared";
+import { CategoryReviewModal, DocumentPreviewContent } from "../../shared";
 
 interface ChecklistDetailPanelProps {
   sectionTitle: string;
@@ -113,25 +113,6 @@ function SourceBadge({
 
   return null;
 }
-
-// Document Preview Content - Simulates scanned document appearance
-const DocumentPreviewContent = ({ size = "sm" }: { size?: "sm" | "md" }) => {
-  const lineHeight = size === "sm" ? "h-0.5" : "h-1";
-  const spacing = size === "sm" ? "space-y-0.5" : "space-y-1";
-  const marginTop = size === "sm" ? "mt-1" : "mt-2";
-
-  return (
-    <div className={spacing}>
-      <div className={cn(lineHeight, "bg-stone-300 rounded w-1/3")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-1/4", marginTop)} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-full", marginTop)} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-full")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-5/6")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-full")} />
-      <div className={cn(lineHeight, "bg-stone-200 rounded w-3/4")} />
-    </div>
-  );
-};
 
 // Link Documents Modal
 function FileHubPickerModal({

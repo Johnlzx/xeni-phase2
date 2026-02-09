@@ -13,11 +13,6 @@ export type CaseStatus =
   | 'approved'
   | 'rejected';
 
-// Issue status and type
-export type IssueStatus = 'open' | 'resolved' | 'pending';
-export type IssueType = 'quality' | 'logic' | 'missing' | 'expiry';
-export type IssueSeverity = 'low' | 'medium' | 'high' | 'critical';
-
 // User role
 export type UserRole = 'lawyer' | 'assistant' | 'applicant' | 'admin';
 
@@ -73,54 +68,4 @@ export interface Case {
   createdAt: string;
   updatedAt: string;
   stats: CaseStats;
-}
-
-// Document pipeline status
-export type DocumentPipelineStatus =
-  | 'uploading'
-  | 'processing'
-  | 'ready'
-  | 'error';
-
-// Document type
-export interface Document {
-  id: string;
-  caseId: string;
-  name: string;
-  fileName?: string;
-  documentTypeId: string;
-  fileType: string;
-  fileSize: number;
-  pipelineStatus: DocumentPipelineStatus;
-  uploadedAt: string;
-  assignedToSlots?: string[];
-  extractedData?: Record<string, unknown>;
-  thumbnailUrl?: string;
-  previewUrl?: string;
-}
-
-// Issue type
-export interface Issue {
-  id: string;
-  caseId: string;
-  documentId?: string;
-  targetSlotId?: string;
-  type: IssueType;
-  severity: IssueSeverity;
-  status: IssueStatus;
-  title: string;
-  description: string;
-  suggestedAction?: string;
-  createdAt: string;
-  resolvedAt?: string;
-}
-
-// Evidence slot template
-export interface EvidenceSlot {
-  id: string;
-  name: string;
-  description: string;
-  priority: 'required' | 'recommended' | 'optional';
-  category: string;
-  acceptedDocTypes: string[];
 }

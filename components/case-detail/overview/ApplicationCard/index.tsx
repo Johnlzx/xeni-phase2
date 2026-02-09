@@ -49,7 +49,7 @@ interface SectionData {
 
 interface ApplicationCardProps {
   className?: string;
-  onOpenVisaDialog: () => void;
+  onStartAnalysis?: () => void;
 }
 
 // Header component - shows status only (no action buttons)
@@ -63,18 +63,6 @@ function ApplicationHeader() {
   const newFilesCount = useNewFilesCount();
 
   const visaConfig = selectedVisaType ? getVisaConfig(selectedVisaType) : null;
-
-  // No visa type selected
-  if (!selectedVisaType) {
-    return (
-      <div className="shrink-0 h-12 px-4 flex items-center bg-stone-50 border-b border-stone-200">
-        <div>
-          <h3 className="text-sm font-semibold text-stone-800">Application</h3>
-          <p className="text-xs text-stone-400">Select visa type to begin</p>
-        </div>
-      </div>
-    );
-  }
 
   // Analyzing state
   if (isAnalyzingDocuments) {
@@ -261,37 +249,14 @@ function EmptyStateLayout({
 }
 
 // Empty state - before analysis
-function ApplicationEmptyState({ onOpenVisaDialog }: { onOpenVisaDialog: () => void }) {
-  const selectedVisaType = useCaseDetailStore((state) => state.selectedVisaType);
+function ApplicationEmptyState({ onStartAnalysis }: { onStartAnalysis?: () => void }) {
   const documentGroups = useCaseDetailStore((state) => state.documentGroups);
 
   const hasReviewedDocs = documentGroups.some(
     (g) => g.id !== "unclassified" && g.status === "reviewed" && g.files.some((f) => !f.isRemoved)
   );
 
-  // No visa type
-  if (!selectedVisaType) {
-    return (
-      <EmptyStateLayout
-        icon={FileSearch}
-        iconBgClass="bg-stone-100"
-        iconClass="text-stone-400"
-        title="Ready to Build Your Application"
-        description="Select a visa type to start gap analysis and generate your application checklist."
-        action={
-          <button
-            onClick={onOpenVisaDialog}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-2"
-          >
-            Select Visa Type
-            <ChevronRight className="size-4" />
-          </button>
-        }
-      />
-    );
-  }
-
-  // Visa selected but no reviewed documents
+  // No reviewed documents yet
   if (!hasReviewedDocs) {
     return (
       <EmptyStateLayout
@@ -311,7 +276,18 @@ function ApplicationEmptyState({ onOpenVisaDialog }: { onOpenVisaDialog: () => v
       iconBgClass="bg-emerald-50"
       iconClass="text-emerald-500"
       title="Documents Ready"
-      description="Click 'Run Gap Analysis' to identify missing information and generate your application checklist."
+      description="Your documents are reviewed and ready for gap analysis."
+      action={
+        onStartAnalysis && (
+          <button
+            onClick={onStartAnalysis}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-2"
+          >
+            Run Gap Analysis
+            <ChevronRight className="size-4" />
+          </button>
+        )
+      }
     />
   );
 }
@@ -358,7 +334,7 @@ function EmptyDetailPanel() {
   );
 }
 
-export function ApplicationCard({ className, onOpenVisaDialog }: ApplicationCardProps) {
+export function ApplicationCard({ className, onStartAnalysis }: ApplicationCardProps) {
   const lastAnalysisAt = useCaseDetailStore((state) => state.lastAnalysisAt);
   const isAnalyzing = useCaseDetailStore((state) => state.isAnalyzingDocuments);
   const selectedVisaType = useCaseDetailStore((state) => state.selectedVisaType);
@@ -548,7 +524,7 @@ export function ApplicationCard({ className, onOpenVisaDialog }: ApplicationCard
         </div>
       ) : (
         /* Empty state */
-        <ApplicationEmptyState onOpenVisaDialog={onOpenVisaDialog} />
+        <ApplicationEmptyState onStartAnalysis={onStartAnalysis} />
       )}
 
     </div>

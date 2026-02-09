@@ -11,6 +11,8 @@ import {
   ClipboardCheck,
   FileText,
   Plus,
+  X,
+  Check,
 } from "lucide-react";
 import {
   Select,
@@ -23,6 +25,8 @@ import { cn } from "@/lib/utils";
 import { VisaType, PassportInfo } from "@/types";
 import { useCaseDetailStore, useDocumentGroups } from "@/store/case-detail-store";
 import { LockedChecklistPreview } from "./LockedChecklistPreview";
+import { ProgressRing } from "../shared/ProgressRing";
+import { AddReferenceDocModal } from "../shared/AddReferenceDocModal";
 
 // Majority English-speaking countries for auto-detection
 const MAJORITY_ENGLISH_COUNTRIES = [
@@ -201,59 +205,6 @@ const CHECKLIST_SECTIONS = [
   { id: "education", title: "Education" },
   { id: "family", title: "Family Information" },
 ];
-
-// ============================================
-// Progress Ring Component
-// ============================================
-function ProgressRing({
-  percent,
-  isComplete,
-  size = 48,
-}: {
-  percent: number;
-  isComplete: boolean;
-  size?: number;
-}) {
-  const strokeWidth = 4;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percent / 100) * circumference;
-
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg className="-rotate-90" width={size} height={size}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-stone-200"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className={isComplete ? "text-emerald-500" : "text-amber-500"}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        {isComplete ? (
-          <CheckCircle2 className="size-5 text-emerald-500" />
-        ) : (
-          <span className="text-xs font-bold text-stone-700 tabular-nums">{percent}%</span>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ============================================
 // Assessment Field Component (Key-Value Style)
@@ -487,40 +438,63 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
   const passport = useCaseDetailStore((state) => state.clientProfile.passport);
   const caseReference = useCaseDetailStore((state) => state.caseReference);
   const submitQuestionnaireAnswers = useCaseDetailStore((state) => state.submitQuestionnaireAnswers);
+  const assessmentReferenceDocIds = useCaseDetailStore((state) => state.assessmentReferenceDocIds);
+  const addAssessmentReferenceDoc = useCaseDetailStore((state) => state.addAssessmentReferenceDoc);
+  const removeAssessmentReferenceDoc = useCaseDetailStore((state) => state.removeAssessmentReferenceDoc);
   const documentGroups = useDocumentGroups();
 
   const fields = useMemo(() => getAssessmentFields(visaType, passport), [visaType, passport]);
 
-  // Reference documents for Case Assessment - only show uploaded passport and case notes
+  // Reference documents for Case Assessment - passport and case notes are pinned, extras are unlinkable
   const referenceDocuments = useMemo(() => {
-    const docs: { id: string; name: string; fileName: string }[] = [];
+    const docs: { id: string; groupId: string; name: string; fileName: string; pinned: boolean }[] = [];
 
-    // Find passport document group
+    // Find passport document group (pinned)
     const passportGroup = documentGroups.find(
       (group) => group.title?.toLowerCase().includes("passport")
     );
     if (passportGroup && passportGroup.files.length > 0) {
       docs.push({
         id: "passport",
+        groupId: passportGroup.id,
         name: "Passport",
         fileName: passportGroup.files[0].name,
+        pinned: true,
       });
     }
 
-    // Find case notes document group
+    // Find case notes document group (pinned)
     const caseNotesGroup = documentGroups.find(
       (group) => group.title?.toLowerCase().includes("case note")
     );
     if (caseNotesGroup && caseNotesGroup.files.length > 0) {
       docs.push({
         id: "case-notes",
+        groupId: caseNotesGroup.id,
         name: "Case Notes",
         fileName: caseNotesGroup.files[0].name,
+        pinned: true,
       });
     }
 
+    // Add extra linked reference docs (not pinned)
+    assessmentReferenceDocIds.forEach((groupId) => {
+      // Skip if already included as pinned
+      if (docs.some((d) => d.groupId === groupId)) return;
+      const group = documentGroups.find((g) => g.id === groupId);
+      if (group && group.files.filter((f) => !f.isRemoved).length > 0) {
+        docs.push({
+          id: `ref-${groupId}`,
+          groupId: group.id,
+          name: group.title,
+          fileName: group.files.filter((f) => !f.isRemoved)[0].name,
+          pinned: false,
+        });
+      }
+    });
+
     return docs;
-  }, [documentGroups]);
+  }, [documentGroups, assessmentReferenceDocIds]);
 
   // Form state - initialize with pre-filled values
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -535,6 +509,7 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showAddDocModal, setShowAddDocModal] = useState(false);
 
   // Demo quick-fill shortcut: Cmd+Shift+D (Mac) or Ctrl+Shift+D (Windows)
   useEffect(() => {
@@ -665,34 +640,43 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
             {/* Right - Reference Documents (vertical layout) */}
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               {/* Header row */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
-                </div>
-                <button
-                  className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 rounded-md transition-colors"
-                >
-                  <Plus className="size-3" />
-                  Add
-                </button>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
               </div>
               {/* Document cards row (horizontal scroll) */}
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-h-[30px]">
                 {referenceDocuments.length > 0 ? (
                   referenceDocuments.map((doc) => (
-                    <button
-                      key={doc.id}
-                      className="group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
-                    >
-                      <FileText className="size-4 text-blue-500" />
-                      <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover:text-blue-700">
-                        {doc.fileName}
-                      </span>
-                    </button>
+                    <div key={doc.id} className="group/pill shrink-0 relative">
+                      <button
+                        className="inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
+                      >
+                        <FileText className="size-4 text-blue-500" />
+                        <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover/pill:text-blue-700">
+                          {doc.fileName}
+                        </span>
+                      </button>
+                      {!doc.pinned && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeAssessmentReferenceDoc(doc.groupId); }}
+                          className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-white border border-stone-300 shadow-sm flex items-center justify-center opacity-0 group-hover/pill:opacity-100 transition-opacity hover:bg-rose-50 hover:border-rose-400"
+                        >
+                          <X className="size-2.5 text-rose-500" />
+                        </button>
+                      )}
+                    </div>
                   ))
                 ) : (
                   <span className="text-xs text-stone-400">No documents uploaded</span>
                 )}
+                {/* Add button — inline after document cards */}
+                <button
+                  onClick={() => setShowAddDocModal(true)}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 hover:border-[#0E4268] hover:bg-[#0E4268]/5 text-stone-400 hover:text-[#0E4268] transition-colors text-xs"
+                >
+                  <Plus className="size-3.5" />
+                  Add reference
+                </button>
               </div>
             </div>
           </div>
@@ -769,6 +753,15 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
         onClose={() => setShowShareModal(false)}
         caseReference={caseReference}
       />
+
+      {/* Add Reference Document Modal */}
+      {showAddDocModal && (
+        <AddReferenceDocModal
+          documentGroups={documentGroups}
+          onClose={() => setShowAddDocModal(false)}
+          onLinkGroup={addAssessmentReferenceDoc}
+        />
+      )}
     </div>
   );
 }

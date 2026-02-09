@@ -10,11 +10,7 @@ import { TeamMemberEditor } from "./TeamMemberEditor";
 import { PassportPreviewModal } from "./PassportPreviewModal";
 import { CategoryReviewModal } from "../../shared";
 
-interface CaseProfileCardProps {
-  onOpenVisaDialog?: () => void;
-}
-
-export function CaseProfileCard({ onOpenVisaDialog }: CaseProfileCardProps) {
+export function CaseProfileCard() {
   const caseNotesSummary = useCaseNotesSummary();
   const clientProfile = useClientProfile();
   const documentGroups = useDocumentGroups();

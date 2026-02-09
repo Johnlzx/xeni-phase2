@@ -1,2 +1,5 @@
 export { CategoryReviewModal } from "./CategoryReviewModal";
 export type { CategoryReviewModalProps } from "./CategoryReviewModal";
+export { ProgressRing } from "./ProgressRing";
+export { DocumentPreviewContent } from "./DocumentPreviewContent";
+export { AddReferenceDocModal } from "./AddReferenceDocModal";

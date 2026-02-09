@@ -440,6 +440,9 @@ export interface CaseDetailState {
   // Forward to Client Modal state
   forwardModalOpen: boolean;
   forwardModalIssueId: string | null;
+
+  // Assessment Reference Documents (extra docs linked in CaseAssessmentForm)
+  assessmentReferenceDocIds: string[];
 }
 
 // Case Detail Store Actions
@@ -463,9 +466,6 @@ export interface CaseDetailActions {
   // Client Profile
   updateClientProfile: (updates: Partial<ClientProfile>) => void;
   setPassportInfo: (passport: PassportInfo) => void;
-
-  // Visa Type
-  setVisaType: (type: VisaType | null) => void;
 
   // Checklist
   setChecklistStage: (stage: ChecklistStage) => void;
@@ -587,6 +587,10 @@ export interface CaseDetailActions {
 
   // Unlink evidence from a document group
   unlinkEvidence: (evidenceId: string) => void;
+
+  // Assessment Reference Documents
+  addAssessmentReferenceDoc: (groupId: string) => void;
+  removeAssessmentReferenceDoc: (groupId: string) => void;
 
   // Initialize case from CreateCaseModal
   // Case Notes and Passport are special documents - auto-confirmed

@@ -3,8 +3,6 @@
  * Handles communication between Xeni app and Form Pilot extension/mock form
  */
 
-import type { ClientProfile } from "@/types/case-detail";
-
 // Field mapping type
 interface FormField {
   selector: string;
@@ -27,73 +25,6 @@ type CompletionCallback = (result: {
   filledFields?: number;
   error?: string;
 }) => void;
-
-/**
- * Map client profile to form fields
- */
-function mapToFormFields(
-  clientProfile?: ClientProfile | null
-): FormField[] {
-  const fields: FormField[] = [];
-
-  // Helper to add field if value exists
-  const addField = (
-    selector: string,
-    value: string | undefined | null,
-    type: FormField["type"] = "text"
-  ) => {
-    if (value) {
-      fields.push({ selector, value, type });
-    }
-  };
-
-  // Map from client profile passport data
-  if (clientProfile?.passport) {
-    const passport = clientProfile.passport;
-    addField("#givenNames", passport.givenNames);
-    addField("#surname", passport.surname);
-    addField("#dateOfBirth", passport.dateOfBirth, "date");
-    addField("#nationality", passport.nationality, "select");
-    addField('input[name="sex"]', passport.sex, "radio");
-    addField("#passportNumber", passport.passportNumber);
-    addField("#dateOfIssue", passport.dateOfIssue, "date");
-    addField("#dateOfExpiry", passport.dateOfExpiry, "date");
-  }
-
-  // Map from client profile contact info
-  if (clientProfile?.contactInfo) {
-    const contact = clientProfile.contactInfo;
-    addField("#email", contact.email, "email");
-    addField("#phone", contact.phone, "tel");
-    addField("#ukAddress", contact.address);
-  }
-
-  return fields;
-}
-
-/**
- * Prepare and store form pilot data in localStorage
- */
-export function prepareFormPilotData(
-  clientProfile?: ClientProfile | null,
-  caseId?: string,
-  visaType?: string
-): FormPilotPayload {
-  const fields = mapToFormFields(clientProfile);
-
-  const payload: FormPilotPayload = {
-    timestamp: new Date().toISOString(),
-    source: "xeni-app",
-    caseId,
-    visaType,
-    fields,
-  };
-
-  // Store in localStorage for extension/form to read
-  localStorage.setItem("form-pilot-data", JSON.stringify(payload));
-
-  return payload;
-}
 
 /**
  * Clear form pilot data
@@ -121,38 +52,6 @@ export function listenForCompletion(callback: CompletionCallback): () => void {
   // Return cleanup function
   return () => {
     window.removeEventListener("message", handler);
-  };
-}
-
-/**
- * Launch form pilot - open mock form and prepare data
- */
-export function launchFormPilot(
-  clientProfile?: ClientProfile | null,
-  caseId?: string,
-  visaType?: string
-): {
-  window: Window | null;
-  cleanup: () => void;
-} {
-  // Prepare data
-  const payload = prepareFormPilotData(
-    clientProfile,
-    caseId,
-    visaType
-  );
-
-  console.log("[Form Pilot Bridge] Prepared data:", payload);
-
-  // Open mock form in new tab
-  const formWindow = window.open("/mock-form", "_blank");
-
-  // Return window reference and cleanup function
-  return {
-    window: formWindow,
-    cleanup: () => {
-      clearFormPilotData();
-    },
   };
 }
 

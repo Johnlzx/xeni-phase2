@@ -224,30 +224,3 @@ export function parseDocumentPath(relativePath: string, filename: string): Parse
     originalFilename: filename,
   };
 }
-
-/**
- * Parse multiple files from a folder upload
- * Groups files by generated document type
- */
-export function parseFolderUpload(files: Array<{ relativePath: string; filename: string }>): ParsedDocument[] {
-  return files.map(file => parseDocumentPath(file.relativePath, file.filename));
-}
-
-/**
- * Group parsed documents by entity type
- */
-export function groupByEntity(documents: ParsedDocument[]): Record<EntityType, ParsedDocument[]> {
-  const grouped: Record<EntityType, ParsedDocument[]> = {
-    applicant: [],
-    sponsor: [],
-    dependant: [],
-    shared: [],
-    unknown: [],
-  };
-
-  for (const doc of documents) {
-    grouped[doc.who].push(doc);
-  }
-
-  return grouped;
-}

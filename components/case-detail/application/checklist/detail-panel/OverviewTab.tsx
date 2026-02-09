@@ -12,6 +12,7 @@ import {
   Upload,
   PenLine,
   Loader2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +23,9 @@ import {
 } from "@/types/case-detail";
 import { DocumentUploadModal } from "./DocumentUploadModal";
 import { CategoryReviewModal } from "@/components/case-detail/shared/CategoryReviewModal";
+import { AddReferenceDocModal } from "@/components/case-detail/shared/AddReferenceDocModal";
+import { useCaseDetailStore } from "@/store/case-detail-store";
+import { ProgressRing } from "@/components/case-detail/shared/ProgressRing";
 import type { DetailTabId } from "./ItemDetailTabs";
 
 // Assessment field interface
@@ -78,59 +82,6 @@ interface AssessmentOverviewProps {
 export type OverviewTabProps = ChecklistOverviewProps | AssessmentOverviewProps;
 
 // ============================================================================
-// Circular Progress Ring Component
-// ============================================================================
-function ProgressRing({
-  percent,
-  isComplete,
-  size = 56,
-}: {
-  percent: number;
-  isComplete: boolean;
-  size?: number;
-}) {
-  const strokeWidth = 5;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percent / 100) * circumference;
-
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg className="-rotate-90" width={size} height={size}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-stone-200"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className={isComplete ? "text-emerald-500" : "text-amber-500"}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        {isComplete ? (
-          <CheckCircle2 className="size-6 text-emerald-500" />
-        ) : (
-          <span className="text-sm font-bold text-stone-700 tabular-nums">{percent}%</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // Reference Document Item - Shows doc name and analysis time
 // ============================================================================
 function ReferenceDocItem({
@@ -180,9 +131,12 @@ function SummaryFieldsCard({
   formValues,
   referenceEvidence,
   isAnalyzing,
+  needsReanalysis,
   onFieldChange,
   onReferenceDocClick,
-  onUploadClick,
+  onAddReferenceClick,
+  onUnlinkEvidence,
+  onAnalyze,
 }: {
   status: "complete" | "partial" | "empty";
   totalFields: number;
@@ -191,9 +145,12 @@ function SummaryFieldsCard({
   formValues: Record<string, string>;
   referenceEvidence: RequiredEvidence[];
   isAnalyzing: boolean;
+  needsReanalysis: boolean;
   onFieldChange: (fieldId: string, value: string) => void;
   onReferenceDocClick: (evidence: RequiredEvidence) => void;
-  onUploadClick: () => void;
+  onAddReferenceClick: () => void;
+  onUnlinkEvidence?: (evidenceId: string) => void;
+  onAnalyze?: () => void;
 }) {
   const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
   const [manuallyEditedFields, setManuallyEditedFields] = useState<Set<string>>(new Set());
@@ -203,7 +160,8 @@ function SummaryFieldsCard({
   const percent = totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
   const isComplete = status === "complete";
   const missingFields = fields.filter(f => f.status === "missing");
-  const displayFields = showAllFields ? fields : missingFields;
+  const allComplete = missingFields.length === 0;
+  const displayFields = allComplete || showAllFields ? fields : missingFields;
 
   // Check if there are pending changes
   const pendingFieldIds = Object.keys(pendingChanges).filter(
@@ -286,56 +244,68 @@ function SummaryFieldsCard({
           {/* Divider */}
           <div className="w-px self-stretch bg-stone-200 shrink-0" />
 
-          {/* Right - Reference Documents (vertical layout) */}
+          {/* Right - Reference Documents */}
           <div className="flex-1 min-w-0 flex flex-col gap-2">
-            {/* Header row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
-                {isAnalyzing && (
-                  <Loader2 className="size-3 text-blue-600 animate-spin" />
-                )}
-              </div>
-              <button
-                onClick={onUploadClick}
-                className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 rounded-md transition-colors"
-              >
-                <Plus className="size-3" />
-                Add
-              </button>
-            </div>
-            {/* Document cards row (horizontal scroll) - fixed min-height to prevent layout shift */}
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-h-[30px]">
-              {referenceEvidence.length > 0 ? (
-                referenceEvidence.map((ev) => (
-                  <button
-                    key={ev.id}
-                    onClick={() => ev.isUploaded ? onReferenceDocClick(ev) : onUploadClick()}
-                    className={cn(
-                      "group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all",
-                      ev.isUploaded
-                        ? "border-stone-200 bg-white hover:border-blue-300"
-                        : "border-dashed border-stone-300 bg-stone-50 hover:border-stone-400"
-                    )}
-                  >
-                    {ev.isUploaded ? (
-                      <FileText className="size-4 text-blue-500" />
-                    ) : (
-                      <Upload className="size-3.5 text-stone-400" />
-                    )}
-                    <span className={cn(
-                      "text-xs font-medium truncate max-w-[120px]",
-                      ev.isUploaded
-                        ? "text-stone-700 group-hover:text-blue-700"
-                        : "text-stone-400"
-                    )}>
-                      {ev.isUploaded ? (ev.linkedFileName || ev.name) : ev.name}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <span className="text-xs text-stone-400 leading-[30px]">No documents required</span>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
+              {isAnalyzing && (
+                <Loader2 className="size-3 text-blue-600 animate-spin" />
               )}
+              <div className="flex-1" />
+              {needsReanalysis && onAnalyze && (() => {
+                const pendingCount = referenceEvidence.filter((ev) => ev.isUploaded).length;
+                return (
+                  <button
+                    onClick={onAnalyze}
+                    disabled={isAnalyzing}
+                    className="shrink-0 relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-stone-200 text-[11px] font-medium text-stone-600 bg-white hover:bg-stone-50 transition-colors disabled:opacity-50"
+                  >
+                    <Sparkles className="size-3" />
+                    Re-analyze
+                    {pendingCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+            </div>
+            {/* Document cards row — matches CaseAssessmentForm style */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-h-[30px]">
+              {referenceEvidence.filter((ev) => ev.isUploaded).map((ev) => {
+                const referenceKeywords = ["passport", "cos", "certificate of sponsorship", "biometric"];
+                const isPinned = referenceKeywords.some((kw) => ev.name.toLowerCase().includes(kw));
+                return (
+                  <div key={ev.id} className="group/pill shrink-0 relative">
+                    <button
+                      onClick={() => onReferenceDocClick(ev)}
+                      className="inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
+                    >
+                      <FileText className="size-4 text-blue-500" />
+                      <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover/pill:text-blue-700">
+                        {ev.linkedFileName || ev.name}
+                      </span>
+                    </button>
+                    {!isPinned && onUnlinkEvidence && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onUnlinkEvidence(ev.id); }}
+                        className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-white border border-stone-300 shadow-sm flex items-center justify-center opacity-0 group-hover/pill:opacity-100 transition-opacity hover:bg-rose-50 hover:border-rose-400"
+                      >
+                        <X className="size-2.5 text-rose-500" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              <button
+                onClick={onAddReferenceClick}
+                className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 hover:border-[#0E4268] hover:bg-[#0E4268]/5 text-stone-400 hover:text-[#0E4268] transition-colors text-xs"
+                title="Add reference document"
+              >
+                <Plus className="size-3.5" />
+                Add reference
+              </button>
             </div>
           </div>
         </div>
@@ -347,30 +317,23 @@ function SummaryFieldsCard({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <h4 className="text-xs font-medium text-stone-600">Fields</h4>
-            {missingFields.length > 0 && !showAllFields && (
+            {!allComplete && missingFields.length > 0 && !showAllFields && (
               <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded tabular-nums">
                 {missingFields.length} missing
               </span>
             )}
           </div>
-          <button
-            onClick={() => setShowAllFields(!showAllFields)}
-            className="text-xs font-medium text-stone-500 hover:text-stone-700 transition-colors"
-          >
-            {showAllFields ? "Show unanswered" : "Show all"}
-          </button>
+          {!allComplete && (
+            <button
+              onClick={() => setShowAllFields(!showAllFields)}
+              className="text-xs font-medium text-stone-500 hover:text-stone-700 transition-colors"
+            >
+              {showAllFields ? "Show unanswered" : "Show all"}
+            </button>
+          )}
         </div>
 
-        {missingFields.length === 0 && !showAllFields ? (
-          <div className="h-full flex flex-col items-center justify-center py-6 text-center">
-            <div className="size-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
-              <CheckCircle2 className="size-5 text-emerald-500" />
-            </div>
-            <p className="text-sm font-medium text-stone-700">All complete</p>
-            <p className="text-xs text-stone-400 mt-0.5 text-pretty">All fields have been filled</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
+        <div className="space-y-2">
             {displayFields.map((field) => {
               // Use pending value if exists, otherwise use stored value
               const storedValue = formValues[field.id] || field.value || "";
@@ -462,7 +425,6 @@ function SummaryFieldsCard({
               );
             })}
           </div>
-        )}
       </div>
 
       {/* Footer - shows when there are pending changes */}
@@ -499,116 +461,6 @@ function SummaryFieldsCard({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Original Summary Section Component (for non-employment sections)
-// ============================================================================
-function SummarySection({
-  status,
-  totalFields,
-  completedFields,
-  referenceEvidence,
-  onReferenceDocClick,
-  onUploadClick,
-}: {
-  status: "complete" | "partial" | "empty";
-  totalFields: number;
-  completedFields: number;
-  referenceEvidence: RequiredEvidence[];
-  onReferenceDocClick: (evidence: RequiredEvidence) => void;
-  onUploadClick: () => void;
-}) {
-  const percent = totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
-  const isComplete = status === "complete";
-
-  return (
-    <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
-      <div className="flex items-stretch">
-        {/* Left - Progress Summary */}
-        <div className="shrink-0 p-4 flex items-center gap-4 border-r border-stone-100">
-          <ProgressRing percent={percent} isComplete={isComplete} size={56} />
-          <div>
-            <span
-              className={cn(
-                "inline-flex items-center px-2 py-1 text-xs font-semibold rounded-md",
-                isComplete
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-amber-100 text-amber-700"
-              )}
-            >
-              {isComplete ? "Complete" : "In Progress"}
-            </span>
-            <p className="text-sm font-medium text-stone-700 mt-1.5 tabular-nums">
-              {completedFields}/{totalFields} fields
-            </p>
-          </div>
-        </div>
-
-        {/* Right - Reference Documents (flexible width) */}
-        <div className="flex-1 p-4">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h4 className="text-xs font-semibold text-stone-700 text-balance">Reference Documents</h4>
-              <p className="text-[10px] text-stone-400 text-pretty">Source files for data extraction</p>
-            </div>
-            <button
-              onClick={onUploadClick}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 rounded-lg transition-colors"
-            >
-              <Plus className="size-3.5" />
-              Add
-            </button>
-          </div>
-
-          {/* Document List */}
-          {referenceEvidence.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {referenceEvidence.map((ev) => (
-                <button
-                  key={ev.id}
-                  onClick={() => ev.isUploaded ? onReferenceDocClick(ev) : onUploadClick()}
-                  className={cn(
-                    "group inline-flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-lg border transition-all",
-                    ev.isUploaded
-                      ? "border-stone-200 bg-white hover:border-blue-300 hover:shadow-sm"
-                      : "border-dashed border-stone-300 bg-stone-50 hover:border-stone-400"
-                  )}
-                >
-                  <div className={cn(
-                    "size-8 rounded-md flex items-center justify-center shrink-0",
-                    ev.isUploaded ? "bg-blue-100" : "bg-stone-100"
-                  )}>
-                    {ev.isUploaded ? (
-                      <FileText className="size-4 text-blue-600" />
-                    ) : (
-                      <Upload className="size-4 text-stone-400" />
-                    )}
-                  </div>
-                  <div className="text-left min-w-0">
-                    <p className={cn(
-                      "text-xs font-medium truncate max-w-[140px] transition-colors",
-                      ev.isUploaded
-                        ? "text-stone-700 group-hover:text-blue-700"
-                        : "text-stone-400"
-                    )}>
-                      {ev.isUploaded ? (ev.linkedFileName || ev.name) : ev.name}
-                    </p>
-                    {ev.isUploaded && (
-                      <p className="text-[10px] text-stone-400">{ev.name}</p>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-stone-400 text-pretty">No documents required</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -743,11 +595,13 @@ function CombinedEvidenceSlotInline({
   relationship,
   documents,
   onAddClick,
+  onUnlinkEvidence,
 }: {
   title: string;
   relationship: "all" | "any";
   documents: RequiredEvidence[];
   onAddClick: (evidence: RequiredEvidence) => void;
+  onUnlinkEvidence?: (evidenceId: string) => void;
 }) {
   const uploadedCount = documents.filter(d => d.isUploaded).length;
   const totalCount = documents.length;
@@ -805,45 +659,55 @@ function CombinedEvidenceSlotInline({
           {documents.map((doc, idx) => (
             <Fragment key={doc.id}>
               {/* Slot - flex-1 for equal width, fixed height */}
-              <button
-                onClick={() => onAddClick(doc)}
-                className={cn(
-                  "flex-1 min-w-0 h-24 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-2 px-2",
-                  doc.isUploaded
-                    ? "border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:shadow-sm"
-                    : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100"
-                )}
-              >
-                {doc.isUploaded ? (
-                  <>
-                    {/* Uploaded state - document preview style */}
-                    <div className="relative">
-                      <div className="w-10 h-12 rounded bg-white border border-emerald-200 shadow-sm flex flex-col p-1.5 gap-0.5">
-                        <div className="h-0.5 bg-emerald-300 rounded w-2/3" />
-                        <div className="h-0.5 bg-emerald-200 rounded w-full" />
-                        <div className="h-0.5 bg-emerald-200 rounded w-full" />
-                        <div className="h-0.5 bg-emerald-200 rounded w-4/5" />
+              <div className="group/cslot flex-1 min-w-0 relative">
+                <button
+                  onClick={() => onAddClick(doc)}
+                  className={cn(
+                    "w-full h-24 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-2 px-2",
+                    doc.isUploaded
+                      ? "border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:shadow-sm"
+                      : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100"
+                  )}
+                >
+                  {doc.isUploaded ? (
+                    <>
+                      {/* Uploaded state - document preview style */}
+                      <div className="relative">
+                        <div className="w-10 h-12 rounded bg-white border border-emerald-200 shadow-sm flex flex-col p-1.5 gap-0.5">
+                          <div className="h-0.5 bg-emerald-300 rounded w-2/3" />
+                          <div className="h-0.5 bg-emerald-200 rounded w-full" />
+                          <div className="h-0.5 bg-emerald-200 rounded w-full" />
+                          <div className="h-0.5 bg-emerald-200 rounded w-4/5" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 size-4 rounded-full bg-emerald-500 flex items-center justify-center">
+                          <Check className="size-2.5 text-white" strokeWidth={3} />
+                        </div>
                       </div>
-                      <div className="absolute -top-1 -right-1 size-4 rounded-full bg-emerald-500 flex items-center justify-center">
-                        <Check className="size-2.5 text-white" strokeWidth={3} />
+                      <span className="text-[10px] font-medium text-emerald-700 text-center line-clamp-1 max-w-full">
+                        {doc.linkedFileName || doc.name}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {/* Empty state */}
+                      <div className="size-10 rounded-lg bg-white border-2 border-dashed border-stone-300 flex items-center justify-center">
+                        <Upload className="size-4 text-stone-400" />
                       </div>
-                    </div>
-                    <span className="text-[10px] font-medium text-emerald-700 text-center line-clamp-1 max-w-full">
-                      {doc.linkedFileName || doc.name}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    {/* Empty state */}
-                    <div className="size-10 rounded-lg bg-white border-2 border-dashed border-stone-300 flex items-center justify-center">
-                      <Upload className="size-4 text-stone-400" />
-                    </div>
-                    <span className="text-[10px] font-medium text-stone-500 text-center line-clamp-1 max-w-full">
-                      {doc.name}
-                    </span>
-                  </>
+                      <span className="text-[10px] font-medium text-stone-500 text-center line-clamp-1 max-w-full">
+                        {doc.name}
+                      </span>
+                    </>
+                  )}
+                </button>
+                {doc.isUploaded && onUnlinkEvidence && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onUnlinkEvidence(doc.id); }}
+                    className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-white border border-stone-300 shadow-sm flex items-center justify-center opacity-0 group-hover/cslot:opacity-100 transition-opacity hover:bg-rose-50 hover:border-rose-400"
+                  >
+                    <X className="size-2.5 text-rose-500" />
+                  </button>
                 )}
-              </button>
+              </div>
 
               {/* Connector between slots */}
               {idx < documents.length - 1 && (
@@ -875,10 +739,12 @@ function SupportingDocumentsCard({
   documents,
   onAddClick,
   onViewMore,
+  onUnlinkEvidence,
 }: {
   documents: RequiredEvidence[];
   onAddClick: (evidence: RequiredEvidence) => void;
   onViewMore?: () => void;
+  onUnlinkEvidence?: (evidenceId: string) => void;
 }) {
   // Group documents by type for combined evidence slots
   const groupedDocs = useMemo(() => {
@@ -932,25 +798,15 @@ function SupportingDocumentsCard({
     return { totalCount, uploadedCount };
   }, [groupedDocs]);
 
-  const percent = counts.totalCount > 0 ? Math.round((counts.uploadedCount / counts.totalCount) * 100) : 0;
-  const isComplete = counts.uploadedCount === counts.totalCount && counts.totalCount > 0;
-
   return (
     <div className="rounded-xl border border-stone-200 bg-white overflow-hidden h-full flex flex-col">
-      {/* Header - matches Application Fields box structure */}
-      <div className="shrink-0 p-4 border-b border-stone-100">
-        <div className="flex items-center gap-3">
-          <ProgressRing
-            percent={percent}
-            isComplete={isComplete}
-            size={48}
-          />
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-stone-700 text-balance">Supporting Documents</h3>
-            <p className="text-[11px] text-stone-400 tabular-nums">
-              {counts.uploadedCount} of {counts.totalCount} uploaded
-            </p>
-          </div>
+      {/* Header */}
+      <div className="shrink-0 px-4 py-3 border-b border-stone-100">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-stone-700">Supporting Documents</h3>
+          <span className="text-[11px] text-stone-400 tabular-nums">
+            {counts.uploadedCount}/{counts.totalCount}
+          </span>
         </div>
       </div>
 
@@ -972,6 +828,7 @@ function SupportingDocumentsCard({
                 relationship={group.relationship}
                 documents={group.documents}
                 onAddClick={onAddClick}
+                onUnlinkEvidence={onUnlinkEvidence}
               />
             ))}
 
@@ -979,57 +836,66 @@ function SupportingDocumentsCard({
             {groupedDocs.standalone.length > 0 && (
               <div className="space-y-2">
                 {groupedDocs.standalone.map((doc) => (
-                  <button
-                    key={doc.id}
-                    onClick={() => onAddClick(doc)}
-                    className={cn(
-                      "w-full p-3 rounded-lg border-2 transition-colors text-left",
-                      doc.isUploaded
-                        ? "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300"
-                        : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100/50"
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "size-9 rounded-lg flex items-center justify-center shrink-0",
+                  <div key={doc.id} className="group/slot relative">
+                    <button
+                      onClick={() => onAddClick(doc)}
+                      className={cn(
+                        "w-full p-3 rounded-lg border-2 transition-colors text-left",
                         doc.isUploaded
-                          ? "bg-emerald-100"
-                          : "bg-stone-100 border border-dashed border-stone-300"
-                      )}>
-                        {doc.isUploaded ? (
-                          <FileText className="size-4 text-emerald-600" />
-                        ) : (
-                          <Upload className="size-4 text-stone-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-xs font-medium truncate",
-                            doc.isUploaded ? "text-stone-700" : "text-stone-600"
-                          )}>
-                            {doc.name}
-                          </span>
-                          {doc.isUploaded && (
-                            <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                          ? "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300"
+                          : "border-dashed border-stone-300 bg-stone-50/50 hover:border-stone-400 hover:bg-stone-100/50"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "size-9 rounded-lg flex items-center justify-center shrink-0",
+                          doc.isUploaded
+                            ? "bg-emerald-100"
+                            : "bg-stone-100 border border-dashed border-stone-300"
+                        )}>
+                          {doc.isUploaded ? (
+                            <FileText className="size-4 text-emerald-600" />
+                          ) : (
+                            <Upload className="size-4 text-stone-400" />
                           )}
                         </div>
-                        {doc.isUploaded && doc.linkedFileName && (
-                          <p className="text-[11px] text-emerald-600 mt-0.5 truncate">
-                            {doc.linkedFileName}
-                          </p>
-                        )}
-                        {!doc.isUploaded && doc.description && (
-                          <p className="text-[10px] text-stone-400 mt-0.5 line-clamp-1 text-pretty">
-                            {doc.description}
-                          </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-xs font-medium truncate",
+                              doc.isUploaded ? "text-stone-700" : "text-stone-600"
+                            )}>
+                              {doc.name}
+                            </span>
+                            {doc.isUploaded && (
+                              <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                          {doc.isUploaded && doc.linkedFileName && (
+                            <p className="text-[11px] text-emerald-600 mt-0.5 truncate">
+                              {doc.linkedFileName}
+                            </p>
+                          )}
+                          {!doc.isUploaded && doc.description && (
+                            <p className="text-[10px] text-stone-400 mt-0.5 line-clamp-1 text-pretty">
+                              {doc.description}
+                            </p>
+                          )}
+                        </div>
+                        {!doc.isUploaded && (
+                          <Plus className="size-4 text-stone-400 shrink-0" />
                         )}
                       </div>
-                      {!doc.isUploaded && (
-                        <Plus className="size-4 text-stone-400 shrink-0" />
-                      )}
-                    </div>
-                  </button>
+                    </button>
+                    {doc.isUploaded && onUnlinkEvidence && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onUnlinkEvidence(doc.id); }}
+                        className="absolute top-1.5 right-1.5 size-5 rounded-full bg-white border border-stone-300 shadow-sm flex items-center justify-center opacity-0 group-hover/slot:opacity-100 transition-opacity hover:bg-rose-50 hover:border-rose-400"
+                      >
+                        <X className="size-3 text-rose-500" />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -1059,8 +925,11 @@ const MOCK_EXTRACTED_DATA: Record<string, { value: string; sourceDoc: string }> 
 // ============================================================================
 export function OverviewTab(props: OverviewTabProps) {
   const { itemType, formValues, documentGroups, onFieldChange, onNavigateToTab, onReanalyze } = props;
+  const unlinkEvidence = useCaseDetailStore((state) => state.unlinkEvidence);
+  const linkEvidenceToGroup = useCaseDetailStore((state) => state.linkEvidenceToGroup);
   const [selectedEvidence, setSelectedEvidence] = useState<RequiredEvidence | null>(null);
   const [previewGroup, setPreviewGroup] = useState<DocumentGroup | null>(null);
+  const [showAddRefModal, setShowAddRefModal] = useState(false);
   const [needsReanalysis, setNeedsReanalysis] = useState(false);
 
   // Analysis simulation state
@@ -1196,12 +1065,15 @@ export function OverviewTab(props: OverviewTabProps) {
     setSelectedEvidence(evidence);
   };
 
-  const handleUploadClick = () => {
-    const firstRef = stats.referenceEvidence.find((e) => !e.isUploaded);
-    if (firstRef) {
-      setSelectedEvidence(firstRef);
-    } else if (stats.referenceEvidence.length > 0) {
-      setSelectedEvidence(stats.referenceEvidence[0]);
+  const handleAddReferenceClick = () => {
+    setShowAddRefModal(true);
+  };
+
+  const handleLinkReferenceGroup = (groupId: string) => {
+    // Link the selected group to the first un-uploaded reference evidence
+    const firstUnlinked = stats.referenceEvidence.find((e) => !e.isUploaded);
+    if (firstUnlinked) {
+      linkEvidenceToGroup(firstUnlinked.id, groupId);
     }
   };
 
@@ -1247,14 +1119,13 @@ export function OverviewTab(props: OverviewTabProps) {
     }, 1500); // 1.5 second analysis simulation
   };
 
-  // Auto-analyze when new reference documents are added
+  // Flag manual re-analysis only when new reference documents are linked
   useEffect(() => {
     if (prevRefUploadedRef.current !== null && refUploaded > prevRefUploadedRef.current) {
-      // Auto-trigger analysis when new document is uploaded
-      handleAnalyze();
+      setNeedsReanalysis(true);
     }
     prevRefUploadedRef.current = refUploaded;
-  }, [refUploaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refUploaded]);
 
   return (
     <>
@@ -1271,36 +1142,23 @@ export function OverviewTab(props: OverviewTabProps) {
                 formValues={formValues}
                 referenceEvidence={stats.referenceEvidence}
                 isAnalyzing={isAnalyzing}
+                needsReanalysis={needsReanalysis}
                 onFieldChange={onFieldChange}
                 onReferenceDocClick={handleReferenceDocClick}
-                onUploadClick={handleUploadClick}
+                onAddReferenceClick={handleAddReferenceClick}
+                onUnlinkEvidence={unlinkEvidence}
+                onAnalyze={handleAnalyze}
               />
             </div>
             <SupportingDocumentsCard
               documents={stats.supportingEvidence}
               onAddClick={(evidence) => setSelectedEvidence(evidence)}
               onViewMore={() => onNavigateToTab?.("supporting-documents")}
+              onUnlinkEvidence={unlinkEvidence}
             />
           </div>
         </div>
 
-        {/* Footer with Analyze button */}
-        {needsReanalysis && onReanalyze && (
-          <div className="shrink-0 px-6 py-3 border-t border-stone-200 bg-stone-50">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-stone-600 text-pretty">
-                Reference documents ready for analysis.
-              </p>
-              <button
-                onClick={handleAnalyze}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0a3555] rounded-lg transition-colors"
-              >
-                <Sparkles className="size-4" />
-                Analyze
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Document Upload Modal */}
@@ -1317,6 +1175,15 @@ export function OverviewTab(props: OverviewTabProps) {
           group={previewGroup}
           allGroups={documentGroups}
           onClose={() => setPreviewGroup(null)}
+        />
+      )}
+
+      {/* Add Reference Document Modal */}
+      {showAddRefModal && (
+        <AddReferenceDocModal
+          documentGroups={documentGroups}
+          onClose={() => setShowAddRefModal(false)}
+          onLinkGroup={handleLinkReferenceGroup}
         />
       )}
     </>

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
-import { devtools } from "zustand/middleware";
+import { devtools, persist, createJSONStorage } from "zustand/middleware";
 import {
   CaseDetailStore,
   CaseDetailState,
@@ -806,6 +806,7 @@ const initialState: CaseDetailState = {
   selectedIssueId: null,
   forwardModalOpen: false,
   forwardModalIssueId: null,
+  assessmentReferenceDocIds: [],
 };
 
 // ============================================================================
@@ -954,6 +955,7 @@ const calculateProgress = (
 
 export const useCaseDetailStore = create<CaseDetailStore>()(
   devtools(
+    persist(
     (set, get) => ({
       ...initialState,
 
@@ -1032,11 +1034,6 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           false,
           "setPassportInfo",
         );
-      },
-
-      // Visa Type
-      setVisaType: (type: VisaType | null) => {
-        set({ selectedVisaType: type }, false, "setVisaType");
       },
 
       // Checklist
@@ -3915,6 +3912,7 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         // Evidence ID → Document Group ID mapping for auto-linking
         const EVIDENCE_GROUP_MAP: Record<string, string> = {
           ev_passport: "passport",
+          ev_cos: "employment_letter", // CoS auto-linked to employment docs
           ev_bank_statements: "bank_statement",
           ev_payslip: "bank_statement", // payslip may be in same group
           ev_employment_contract: "employment_letter",
@@ -4333,11 +4331,56 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         get().evolveChecklist();
       },
 
+      // Assessment Reference Documents
+      addAssessmentReferenceDoc: (groupId: string) => {
+        set(
+          (state) => ({
+            assessmentReferenceDocIds: state.assessmentReferenceDocIds.includes(groupId)
+              ? state.assessmentReferenceDocIds
+              : [...state.assessmentReferenceDocIds, groupId],
+          }),
+          false,
+          "addAssessmentReferenceDoc"
+        );
+      },
+
+      removeAssessmentReferenceDoc: (groupId: string) => {
+        set(
+          (state) => ({
+            assessmentReferenceDocIds: state.assessmentReferenceDocIds.filter(
+              (id) => id !== groupId
+            ),
+          }),
+          false,
+          "removeAssessmentReferenceDoc"
+        );
+      },
+
       // Reset
       reset: () => {
+        sessionStorage.removeItem("xeni-case-detail");
         set(initialState, false, "reset");
       },
     }),
+    {
+      name: "xeni-case-detail",
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => {
+        // Exclude transient UI state from persistence
+        const {
+          isLoadingDocuments,
+          isAnalyzingDocuments,
+          analysisProgress,
+          demoStage,
+          highlightedGroupId,
+          forwardModalOpen,
+          forwardModalIssueId,
+          ...persisted
+        } = state;
+        return persisted;
+      },
+    },
+    ),
     { name: "case-detail-store" },
   ),
 );
@@ -4353,8 +4396,6 @@ export const useCaseNotesSummary = () =>
   useCaseDetailStore((state) => state.caseNotesSummary);
 export const useSelectedVisaType = () =>
   useCaseDetailStore((state) => state.selectedVisaType);
-export const useChecklist = () =>
-  useCaseDetailStore((state) => state.checklist);
 export const useChecklistStage = () =>
   useCaseDetailStore((state) => state.checklist.stage);
 // Returns document groups with files resolved from allFiles (backward compatible)
@@ -4376,8 +4417,6 @@ export const useDocumentGroups = () => {
 };
 export const useIsLoadingDocuments = () =>
   useCaseDetailStore((state) => state.isLoadingDocuments);
-export const useUploadedFilePreviews = () =>
-  useCaseDetailStore((state) => state.uploadedFilePreviews);
 export const useApplicationPhase = () =>
   useCaseDetailStore((state) => state.applicationPhase);
 export const useFormSchema = () =>
@@ -4386,14 +4425,6 @@ export const useFormPilotStatus = () =>
   useCaseDetailStore((state) => state.formPilotStatus);
 export const useAnalyzedFiles = () =>
   useCaseDetailStore((state) => state.analyzedFiles);
-export const useApplicationChecklistItems = () =>
-  useCaseDetailStore((state) => state.applicationChecklistItems);
-export const useQualityIssues = () =>
-  useCaseDetailStore((state) => state.qualityIssues);
-export const useQuestionnaireAnswers = () =>
-  useCaseDetailStore((state) => state.questionnaireAnswers);
-export const useChecklistSectionExpanded = () =>
-  useCaseDetailStore((state) => state.checklistSectionExpanded);
 
 // Enhanced Checklist Workspace Selectors
 export const useEnhancedChecklistItems = () =>

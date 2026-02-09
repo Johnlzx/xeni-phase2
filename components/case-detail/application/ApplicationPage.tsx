@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Circle,
   FileText,
-  Forward,
   RefreshCw,
   ClipboardCheck,
   Check,
@@ -30,12 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { VisaTypeDialog, getVisaConfig } from "../overview/ApplicationCard/VisaTypeDialog";
+import { getVisaConfig } from "../overview/ApplicationCard/VisaTypeDialog";
 import { AnalysisPreviewDialog } from "../overview/ApplicationCard/AnalysisPreviewDialog";
 import { ChecklistSectionType, EnhancedChecklistItem, EnhancedQualityIssue } from "@/types/case-detail";
 import { ChecklistDetailPanel } from "./checklist/ChecklistDetailPanel";
 import { SendChecklistSummaryModal } from "./checklist/SendChecklistSummaryModal";
 import { CaseAssessmentForm } from "./CaseAssessmentForm";
+import { ProgressRing } from "../shared/ProgressRing";
 
 // Section configuration
 const SECTION_CONFIG: Record<
@@ -108,15 +108,9 @@ function ChecklistHeader({
   activeTab?: "overview" | "details" | "supporting-documents";
   onNavigateToOverview?: () => void;
 }) {
-  const [showAnalysisPreview, setShowAnalysisPreview] = useState(false);
-
-  const documentGroups = useCaseDetailStore((state) => state.documentGroups);
-  const reAnalyze = useCaseDetailStore((state) => state.reAnalyze);
   const hasNewFilesAfterAnalysis = useHasNewFilesAfterAnalysis();
   const newFilesCount = useNewFilesCount();
   const launchFormPilot = useCaseDetailStore((state) => state.launchFormPilot);
-
-  const handleConfirmAnalysis = () => reAnalyze();
 
   // Show breadcrumb when not on overview tab
   const showBreadcrumb = activeTab && activeTab !== "overview" && onNavigateToOverview;
@@ -170,27 +164,6 @@ function ChecklistHeader({
 
         {/* Right: Action buttons */}
         <div className="flex items-center gap-2">
-          {/* Re-analyze button - secondary style, shows when there are new files */}
-          {hasNewFilesAfterAnalysis && (
-            <button
-              onClick={() => setShowAnalysisPreview(true)}
-              className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors flex items-center gap-1.5"
-            >
-              <RefreshCw className="size-3.5" />
-              Re-analyze
-            </button>
-          )}
-
-          {/* Request Info button - secondary action */}
-          <button
-            onClick={onRequestInfo}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors flex items-center gap-1.5"
-            aria-label="Request missing information from client"
-          >
-            <Forward className="size-3.5" />
-            Request Info
-          </button>
-
           {/* Form Pilot button */}
           <button
             onClick={launchFormPilot}
@@ -201,13 +174,6 @@ function ChecklistHeader({
         </div>
       </div>
 
-      {/* Analysis Preview Dialog */}
-      <AnalysisPreviewDialog
-        open={showAnalysisPreview}
-        onOpenChange={setShowAnalysisPreview}
-        documentGroups={documentGroups}
-        onConfirm={handleConfirmAnalysis}
-      />
     </div>
   );
 }
@@ -255,37 +221,15 @@ function EmptyDetailPanel() {
 }
 
 // Application empty state
-function ApplicationEmptyState({ onOpenVisaDialog }: { onOpenVisaDialog: () => void }) {
-  const selectedVisaType = useCaseDetailStore((state) => state.selectedVisaType);
+function ApplicationEmptyState() {
   const documentGroups = useCaseDetailStore((state) => state.documentGroups);
+  const startAnalysis = useCaseDetailStore((state) => state.startAnalysis);
 
   const hasReviewedDocs = documentGroups.some(
     (g) => g.id !== "unclassified" && g.status === "reviewed" && g.files.some((f) => !f.isRemoved)
   );
 
-  // No visa type selected
-  if (!selectedVisaType) {
-    return (
-      <EmptyStateLayout
-        icon={FileSearch}
-        iconBgClass="bg-stone-100"
-        iconClass="text-stone-400"
-        title="Ready to Build Your Application"
-        description="Select a visa type to start gap analysis and generate your application checklist."
-        action={
-          <button
-            onClick={onOpenVisaDialog}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-2"
-          >
-            Select Visa Type
-            <ChevronRight className="size-4" />
-          </button>
-        }
-      />
-    );
-  }
-
-  // Visa selected but no reviewed documents
+  // No reviewed documents yet
   if (!hasReviewedDocs) {
     return (
       <EmptyStateLayout
@@ -305,7 +249,16 @@ function ApplicationEmptyState({ onOpenVisaDialog }: { onOpenVisaDialog: () => v
       iconBgClass="bg-emerald-50"
       iconClass="text-emerald-500"
       title="Documents Ready"
-      description="Click 'Run Gap Analysis' to identify missing information and generate your application checklist."
+      description="Your documents are reviewed and ready for gap analysis."
+      action={
+        <button
+          onClick={() => startAnalysis()}
+          className="px-4 py-2 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors flex items-center gap-2"
+        >
+          Run Gap Analysis
+          <ChevronRight className="size-4" />
+        </button>
+      }
     />
   );
 }
@@ -552,49 +505,6 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
   const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isComplete = completedCount === totalCount;
 
-  // Progress Ring Component (matches CaseAssessmentForm)
-  const ProgressRing = ({ percent, isComplete, size = 48 }: { percent: number; isComplete: boolean; size?: number }) => {
-    const strokeWidth = 4;
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (percent / 100) * circumference;
-
-    return (
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg className="-rotate-90" width={size} height={size}>
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={strokeWidth}
-            className="text-stone-200"
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            className={isComplete ? "text-emerald-500" : "text-amber-500"}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          {isComplete ? (
-            <CheckCircle2 className="size-5 text-emerald-500" />
-          ) : (
-            <span className="text-xs font-bold text-stone-700 tabular-nums">{percent}%</span>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header - Fixed height with Reference Documents, matches CaseAssessmentForm pattern */}
@@ -820,8 +730,6 @@ function ChecklistSidebarItem({
 }
 
 export function ApplicationPage() {
-  const [visaDialogOpen, setVisaDialogOpen] = useState(false);
-
   const lastAnalysisAt = useCaseDetailStore((state) => state.lastAnalysisAt);
   const isAnalyzing = useCaseDetailStore((state) => state.isAnalyzingDocuments);
   const selectedVisaType = useCaseDetailStore((state) => state.selectedVisaType);
@@ -849,8 +757,6 @@ export function ApplicationPage() {
   // Check if questionnaire needs to be shown - show when visa is selected but questionnaire not completed
   const needsQuestionnaire = selectedVisaType && Object.keys(questionnaireAnswers).length === 0;
   const hasAnsweredQuestionnaire = Object.keys(questionnaireAnswers).length > 0;
-
-  const handleOpenVisaDialog = () => setVisaDialogOpen(true);
 
   // Group items by section
   const sections = useMemo(() => {
@@ -1051,7 +957,7 @@ export function ApplicationPage() {
         ) : (
           /* Empty state - rounded container */
           <div className="flex-1 bg-white rounded-xl border border-stone-200 overflow-hidden">
-            <ApplicationEmptyState onOpenVisaDialog={handleOpenVisaDialog} />
+            <ApplicationEmptyState />
           </div>
         )}
       </div>
@@ -1065,8 +971,6 @@ export function ApplicationPage() {
         />
       )}
 
-      {/* Visa Type Dialog */}
-      <VisaTypeDialog open={visaDialogOpen} onOpenChange={setVisaDialogOpen} />
     </div>
   );
 }
