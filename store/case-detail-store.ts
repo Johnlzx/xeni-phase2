@@ -807,6 +807,7 @@ const initialState: CaseDetailState = {
   forwardModalOpen: false,
   forwardModalIssueId: null,
   assessmentReferenceDocIds: [],
+  sectionReferenceDocIds: {},
 };
 
 // ============================================================================
@@ -4353,6 +4354,40 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           }),
           false,
           "removeAssessmentReferenceDoc"
+        );
+      },
+
+      // Section-level Reference Documents
+      addSectionReferenceDoc: (sectionId: string, groupId: string) => {
+        set(
+          (state) => {
+            const current = state.sectionReferenceDocIds[sectionId] || [];
+            if (current.includes(groupId)) return state;
+            return {
+              sectionReferenceDocIds: {
+                ...state.sectionReferenceDocIds,
+                [sectionId]: [...current, groupId],
+              },
+            };
+          },
+          false,
+          "addSectionReferenceDoc"
+        );
+      },
+
+      removeSectionReferenceDoc: (sectionId: string, groupId: string) => {
+        set(
+          (state) => {
+            const current = state.sectionReferenceDocIds[sectionId] || [];
+            return {
+              sectionReferenceDocIds: {
+                ...state.sectionReferenceDocIds,
+                [sectionId]: current.filter((id) => id !== groupId),
+              },
+            };
+          },
+          false,
+          "removeSectionReferenceDoc"
         );
       },
 

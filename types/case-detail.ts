@@ -443,6 +443,9 @@ export interface CaseDetailState {
 
   // Assessment Reference Documents (extra docs linked in CaseAssessmentForm)
   assessmentReferenceDocIds: string[];
+
+  // Section-level Reference Documents (per checklist section, e.g. "personal", "employment")
+  sectionReferenceDocIds: Record<string, string[]>;
 }
 
 // Case Detail Store Actions
@@ -591,6 +594,10 @@ export interface CaseDetailActions {
   // Assessment Reference Documents
   addAssessmentReferenceDoc: (groupId: string) => void;
   removeAssessmentReferenceDoc: (groupId: string) => void;
+
+  // Section-level Reference Documents
+  addSectionReferenceDoc: (sectionId: string, groupId: string) => void;
+  removeSectionReferenceDoc: (sectionId: string, groupId: string) => void;
 
   // Initialize case from CreateCaseModal
   // Case Notes and Passport are special documents - auto-confirmed

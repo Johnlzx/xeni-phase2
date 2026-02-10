@@ -54,6 +54,14 @@ interface DisplayField {
   confidenceScore?: number;
 }
 
+// Reference document item for display in SummaryFieldsCard
+interface ReferenceDocItem {
+  id: string;
+  groupId: string;
+  name: string;
+  pinned: boolean;
+}
+
 // Props types
 interface ChecklistOverviewProps {
   itemType: "checklist";
@@ -129,13 +137,13 @@ function SummaryFieldsCard({
   completedFields,
   fields,
   formValues,
-  referenceEvidence,
+  referenceDocs,
   isAnalyzing,
   needsReanalysis,
   onFieldChange,
   onReferenceDocClick,
   onAddReferenceClick,
-  onUnlinkEvidence,
+  onRemoveReference,
   onAnalyze,
 }: {
   status: "complete" | "partial" | "empty";
@@ -143,13 +151,13 @@ function SummaryFieldsCard({
   completedFields: number;
   fields: DisplayField[];
   formValues: Record<string, string>;
-  referenceEvidence: RequiredEvidence[];
+  referenceDocs: ReferenceDocItem[];
   isAnalyzing: boolean;
   needsReanalysis: boolean;
   onFieldChange: (fieldId: string, value: string) => void;
-  onReferenceDocClick: (evidence: RequiredEvidence) => void;
+  onReferenceDocClick: (groupId: string) => void;
   onAddReferenceClick: () => void;
-  onUnlinkEvidence?: (evidenceId: string) => void;
+  onRemoveReference?: (groupId: string) => void;
   onAnalyze?: () => void;
 }) {
   const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
@@ -253,7 +261,7 @@ function SummaryFieldsCard({
               )}
               <div className="flex-1" />
               {needsReanalysis && onAnalyze && (() => {
-                const pendingCount = referenceEvidence.filter((ev) => ev.isUploaded).length;
+                const pendingCount = referenceDocs.length;
                 return (
                   <button
                     onClick={onAnalyze}
@@ -271,33 +279,30 @@ function SummaryFieldsCard({
                 );
               })()}
             </div>
-            {/* Document cards row — matches CaseAssessmentForm style */}
+            {/* Document cards row */}
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-h-[30px]">
-              {referenceEvidence.filter((ev) => ev.isUploaded).map((ev) => {
-                const referenceKeywords = ["passport", "cos", "certificate of sponsorship", "biometric"];
-                const isPinned = referenceKeywords.some((kw) => ev.name.toLowerCase().includes(kw));
-                return (
-                  <div key={ev.id} className="group/pill shrink-0 relative">
-                    <button
-                      onClick={() => onReferenceDocClick(ev)}
-                      className="inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
-                    >
-                      <FileText className="size-4 text-blue-500" />
-                      <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover/pill:text-blue-700">
-                        {ev.linkedFileName || ev.name}
-                      </span>
-                    </button>
-                    {!isPinned && onUnlinkEvidence && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onUnlinkEvidence(ev.id); }}
-                        className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-white border border-stone-300 shadow-sm flex items-center justify-center opacity-0 group-hover/pill:opacity-100 transition-opacity hover:bg-rose-50 hover:border-rose-400"
+              {referenceDocs.map((doc) => (
+                <div key={doc.id} className="group/pill shrink-0">
+                  <button
+                    onClick={() => onReferenceDocClick(doc.groupId)}
+                    className="inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
+                  >
+                    <FileText className="size-4 text-blue-500" />
+                    <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover/pill:text-blue-700">
+                      {doc.name}
+                    </span>
+                    {!doc.pinned && onRemoveReference && (
+                      <span
+                        role="button"
+                        onClick={(e) => { e.stopPropagation(); onRemoveReference(doc.groupId); }}
+                        className="ml-0.5 size-4 rounded-full bg-stone-100 flex items-center justify-center opacity-0 group-hover/pill:opacity-100 transition-opacity hover:bg-rose-100"
                       >
                         <X className="size-2.5 text-rose-500" />
-                      </button>
+                      </span>
                     )}
-                  </div>
-                );
-              })}
+                  </button>
+                </div>
+              ))}
               <button
                 onClick={onAddReferenceClick}
                 className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 hover:border-[#0E4268] hover:bg-[#0E4268]/5 text-stone-400 hover:text-[#0E4268] transition-colors text-xs"
@@ -927,6 +932,9 @@ export function OverviewTab(props: OverviewTabProps) {
   const { itemType, formValues, documentGroups, onFieldChange, onNavigateToTab, onReanalyze } = props;
   const unlinkEvidence = useCaseDetailStore((state) => state.unlinkEvidence);
   const linkEvidenceToGroup = useCaseDetailStore((state) => state.linkEvidenceToGroup);
+  const sectionReferenceDocIds = useCaseDetailStore((state) => state.sectionReferenceDocIds);
+  const addSectionReferenceDoc = useCaseDetailStore((state) => state.addSectionReferenceDoc);
+  const removeSectionReferenceDoc = useCaseDetailStore((state) => state.removeSectionReferenceDoc);
   const [selectedEvidence, setSelectedEvidence] = useState<RequiredEvidence | null>(null);
   const [previewGroup, setPreviewGroup] = useState<DocumentGroup | null>(null);
   const [showAddRefModal, setShowAddRefModal] = useState(false);
@@ -935,8 +943,8 @@ export function OverviewTab(props: OverviewTabProps) {
   // Analysis simulation state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Track reference document upload count to detect changes
-  const prevRefUploadedRef = useRef<number | null>(null);
+  // Track reference document count to detect changes (add/remove)
+  const prevRefCountRef = useRef<number | null>(null);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -1047,22 +1055,57 @@ export function OverviewTab(props: OverviewTabProps) {
     return "empty";
   };
 
-  const refUploaded = stats.referenceEvidence.filter((e) => e.isUploaded).length;
+  // Derive section ID for section-level reference tracking
+  const sectionId = itemType === "checklist" && props.items.length > 0
+    ? props.items[0].section
+    : "assessment";
 
-  // Handle reference doc click - find linked group and open preview
-  const handleReferenceDocClick = (evidence: RequiredEvidence) => {
-    if (evidence.linkedFileId) {
-      // Find the group containing this file
-      const group = documentGroups.find((g) =>
-        g.files.some((f) => f.id === evidence.linkedFileId)
-      );
-      if (group) {
-        setPreviewGroup(group);
-        return;
+  // Build reference documents list from section-level store + pinned evidence
+  const referenceDocs = useMemo((): ReferenceDocItem[] => {
+    const docs: ReferenceDocItem[] = [];
+    const pinnedKeywords = ["passport", "cos", "certificate of sponsorship", "biometric"];
+
+    // 1. Pinned references from linked evidence (passport, CoS, etc.)
+    stats.referenceEvidence
+      .filter((ev) => ev.isUploaded && pinnedKeywords.some((kw) => ev.name.toLowerCase().includes(kw)))
+      .forEach((ev) => {
+        if (ev.linkedFileId && !docs.some((d) => d.groupId === ev.linkedFileId)) {
+          docs.push({
+            id: `pinned-${ev.id}`,
+            groupId: ev.linkedFileId,
+            name: ev.linkedFileName || ev.name,
+            pinned: true,
+          });
+        }
+      });
+
+    // 2. User-added section references
+    const sectionRefIds = sectionReferenceDocIds[sectionId] || [];
+    sectionRefIds.forEach((groupId) => {
+      if (docs.some((d) => d.groupId === groupId)) return;
+      const group = documentGroups.find((g) => g.id === groupId);
+      if (group && group.files.filter((f) => !f.isRemoved).length > 0) {
+        docs.push({
+          id: `ref-${groupId}`,
+          groupId: group.id,
+          name: group.title,
+          pinned: false,
+        });
       }
+    });
+
+    return docs;
+  }, [stats.referenceEvidence, sectionReferenceDocIds, sectionId, documentGroups]);
+
+  // Track reference count for re-analysis trigger
+  const refCount = referenceDocs.length;
+
+  // Handle reference doc click - open preview
+  const handleReferenceDocClick = (groupId: string) => {
+    const group = documentGroups.find((g) => g.id === groupId);
+    if (group) {
+      setPreviewGroup(group);
     }
-    // Fallback: open upload modal
-    setSelectedEvidence(evidence);
   };
 
   const handleAddReferenceClick = () => {
@@ -1070,11 +1113,11 @@ export function OverviewTab(props: OverviewTabProps) {
   };
 
   const handleLinkReferenceGroup = (groupId: string) => {
-    // Link the selected group to the first un-uploaded reference evidence
-    const firstUnlinked = stats.referenceEvidence.find((e) => !e.isUploaded);
-    if (firstUnlinked) {
-      linkEvidenceToGroup(firstUnlinked.id, groupId);
-    }
+    addSectionReferenceDoc(sectionId, groupId);
+  };
+
+  const handleRemoveReference = (groupId: string) => {
+    removeSectionReferenceDoc(sectionId, groupId);
   };
 
   // Simulate document analysis
@@ -1119,13 +1162,13 @@ export function OverviewTab(props: OverviewTabProps) {
     }, 1500); // 1.5 second analysis simulation
   };
 
-  // Flag manual re-analysis only when new reference documents are linked
+  // Flag manual re-analysis when reference documents change (added or removed)
   useEffect(() => {
-    if (prevRefUploadedRef.current !== null && refUploaded > prevRefUploadedRef.current) {
+    if (prevRefCountRef.current !== null && refCount !== prevRefCountRef.current) {
       setNeedsReanalysis(true);
     }
-    prevRefUploadedRef.current = refUploaded;
-  }, [refUploaded]);
+    prevRefCountRef.current = refCount;
+  }, [refCount]);
 
   return (
     <>
@@ -1140,13 +1183,13 @@ export function OverviewTab(props: OverviewTabProps) {
                 completedFields={stats.completedFields}
                 fields={displayFields}
                 formValues={formValues}
-                referenceEvidence={stats.referenceEvidence}
+                referenceDocs={referenceDocs}
                 isAnalyzing={isAnalyzing}
                 needsReanalysis={needsReanalysis}
                 onFieldChange={onFieldChange}
                 onReferenceDocClick={handleReferenceDocClick}
                 onAddReferenceClick={handleAddReferenceClick}
-                onUnlinkEvidence={unlinkEvidence}
+                onRemoveReference={handleRemoveReference}
                 onAnalyze={handleAnalyze}
               />
             </div>
