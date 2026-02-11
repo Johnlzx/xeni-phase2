@@ -460,7 +460,7 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
           {/* Document list - inline */}
           <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
             {referenceDocs.map((doc) => (
-              <div key={doc.id} className="group/item shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-50 border border-stone-150 hover:border-blue-200 transition-colors">
+              <div key={doc.id} className="group/item shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50/60 border border-blue-200/60 hover:border-blue-300 transition-colors">
                 <FileText className="size-3 text-blue-500" />
                 <span className="text-[11px] font-medium text-stone-600 truncate max-w-[100px]">
                   {doc.name}

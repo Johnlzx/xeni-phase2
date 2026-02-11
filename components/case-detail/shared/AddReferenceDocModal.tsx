@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { X, Check, FolderOpen, FileText, Circle } from "lucide-react";
+import { X, Check, FolderOpen, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DocumentGroup } from "@/types/case-detail";
 import { useCaseDetailStore } from "@/store/case-detail-store";
@@ -29,17 +29,20 @@ export function AddReferenceDocModal({
   onClose,
   onLinkGroup,
 }: AddReferenceDocModalProps) {
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
 
   // Read section linkage data from store
   const sectionReferenceDocIds = useCaseDetailStore((s) => s.sectionReferenceDocIds);
   const assessmentReferenceDocIds = useCaseDetailStore((s) => s.assessmentReferenceDocIds);
 
-  // Only show classified groups that have active files
+  // Only show reviewed, classified groups that have active files
   const classifiedGroups = useMemo(
     () =>
       documentGroups.filter(
-        (g) => g.id !== "unclassified" && g.files.filter((f) => !f.isRemoved).length > 0
+        (g) =>
+          g.id !== "unclassified" &&
+          g.status === "reviewed" &&
+          g.files.filter((f) => !f.isRemoved).length > 0
       ),
     [documentGroups]
   );
@@ -62,14 +65,21 @@ export function AddReferenceDocModal({
     return map;
   }, [classifiedGroups, sectionReferenceDocIds, assessmentReferenceDocIds]);
 
+  const toggleGroup = (groupId: string) => {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
+
   const hasDocuments = classifiedGroups.length > 0;
-  const hasSelection = selectedGroupId !== null;
-  const reviewedCount = classifiedGroups.filter((g) => g.status === "reviewed").length;
-  const pendingCount = classifiedGroups.filter((g) => g.status === "pending").length;
+  const selectionCount = selectedGroupIds.size;
 
   const handleConfirm = () => {
-    if (selectedGroupId && onLinkGroup) {
-      onLinkGroup(selectedGroupId);
+    if (onLinkGroup) {
+      selectedGroupIds.forEach((groupId) => onLinkGroup(groupId));
     }
     onClose();
   };
@@ -97,9 +107,9 @@ export function AddReferenceDocModal({
         {/* Header */}
         <div className="shrink-0 px-6 py-4 border-b border-stone-200 flex items-center justify-between">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-stone-900">Add Reference Document</h2>
+            <h2 className="text-lg font-semibold text-stone-900">Add Reference Documents</h2>
             <p className="text-sm text-stone-500 mt-0.5">
-              Select a reviewed document from File Hub
+              Select from your reviewed documents
             </p>
           </div>
           <button
@@ -117,10 +127,7 @@ export function AddReferenceDocModal({
             {/* Stats bar */}
             <div className="shrink-0 px-6 py-2.5 border-b border-stone-100 flex items-center gap-3">
               <span className="text-xs text-stone-500 tabular-nums">
-                {reviewedCount} ready
-                {pendingCount > 0 && (
-                  <span className="text-stone-300"> · {pendingCount} pending review</span>
-                )}
+                {classifiedGroups.length} document{classifiedGroups.length !== 1 ? "s" : ""} available
               </span>
             </div>
 
@@ -133,9 +140,6 @@ export function AddReferenceDocModal({
                     <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5">
                       Document
                     </th>
-                    <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5 w-24">
-                      Status
-                    </th>
                     <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5 w-20">
                       Pages
                     </th>
@@ -147,40 +151,26 @@ export function AddReferenceDocModal({
                 <tbody className="divide-y divide-stone-100">
                   {classifiedGroups.map((group) => {
                     const activeFiles = group.files.filter((f) => !f.isRemoved);
-                    const isReviewed = group.status === "reviewed";
-                    const isSelectable = isReviewed;
-                    const isSelected = selectedGroupId === group.id;
+                    const isSelected = selectedGroupIds.has(group.id);
                     const linked = linkedSectionsMap[group.id] || [];
 
                     return (
                       <tr
                         key={group.id}
-                        onClick={() => {
-                          if (!isSelectable) return;
-                          setSelectedGroupId(isSelected ? null : group.id);
-                        }}
+                        onClick={() => toggleGroup(group.id)}
                         className={cn(
-                          "transition-colors",
-                          isSelectable
-                            ? "cursor-pointer hover:bg-stone-50"
-                            : "opacity-40 cursor-not-allowed",
+                          "transition-colors cursor-pointer hover:bg-stone-50",
                           isSelected && "bg-[#0E4268]/5 hover:bg-[#0E4268]/5"
                         )}
                       >
-                        {/* Selection indicator */}
+                        {/* Selection indicator — checkbox style */}
                         <td className="px-3 py-3 text-center">
                           {isSelected ? (
-                            <div className="mx-auto size-5 rounded-full bg-[#0E4268] flex items-center justify-center">
+                            <div className="mx-auto size-5 rounded bg-[#0E4268] flex items-center justify-center">
                               <Check className="size-3 text-white" strokeWidth={3} />
                             </div>
                           ) : (
-                            <Circle
-                              className={cn(
-                                "mx-auto size-5",
-                                isSelectable ? "text-stone-300" : "text-stone-200"
-                              )}
-                              strokeWidth={1.5}
-                            />
+                            <div className="mx-auto size-5 rounded border border-stone-300 bg-white" />
                           )}
                         </td>
 
@@ -202,20 +192,6 @@ export function AddReferenceDocModal({
                               {group.title}
                             </span>
                           </div>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-3 py-3">
-                          {isReviewed ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded">
-                              <Check size={10} strokeWidth={3} />
-                              Reviewed
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded">
-                              Pending
-                            </span>
-                          )}
                         </td>
 
                         {/* Pages */}
@@ -252,31 +228,38 @@ export function AddReferenceDocModal({
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-stone-400">
             <FolderOpen className="size-8 mb-2" />
-            <p className="text-sm font-medium">No documents in File Hub</p>
-            <p className="text-xs mt-1">Upload and review files to get started</p>
+            <p className="text-sm font-medium">No reviewed documents</p>
+            <p className="text-xs mt-1">Review your uploaded documents first</p>
           </div>
         )}
 
         {/* Footer */}
-        <div className="shrink-0 px-6 py-4 border-t border-stone-200 bg-stone-50 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!hasSelection}
-            className={cn(
-              "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-              hasSelection
-                ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
-                : "bg-stone-200 text-stone-400 cursor-not-allowed"
-            )}
-          >
-            Confirm
-          </button>
+        <div className="shrink-0 px-6 py-4 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
+          <span className="text-sm text-stone-500 tabular-nums">
+            {selectionCount > 0 ? `${selectionCount} selected` : "\u00A0"}
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selectionCount === 0}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                selectionCount > 0
+                  ? "bg-[#0E4268] text-white hover:bg-[#0a3555]"
+                  : "bg-stone-200 text-stone-400 cursor-not-allowed"
+              )}
+            >
+              {selectionCount > 0
+                ? `Add ${selectionCount} document${selectionCount !== 1 ? "s" : ""}`
+                : "Add"}
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

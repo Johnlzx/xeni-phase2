@@ -129,9 +129,25 @@ export function FileUploadZone() {
                       title={isSpecial ? `${group.title} (Auto-confirmed)` : group.title}
                       className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors hover:bg-stone-50"
                     >
-                      {/* File icon with status badge */}
+                      {/* Mini PDF page thumbnail with status badge */}
                       <div className="relative">
-                        <FileText className="size-8 text-stone-400" />
+                        {/* Page body */}
+                        <div className="relative w-10 h-[52px] bg-white rounded-[3px] border border-stone-200 shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+                          {/* Dog-ear / folded corner */}
+                          <div className="absolute top-0 right-0 w-[10px] h-[10px]">
+                            <div className="absolute top-0 right-0 w-0 h-0 border-t-[10px] border-t-stone-100 border-l-[10px] border-l-transparent" />
+                            <div className="absolute top-0 right-0 w-[10px] h-[1px] bg-stone-200 origin-top-right rotate-45 translate-y-[6.5px] -translate-x-[1px]" />
+                          </div>
+                          {/* Simulated text lines */}
+                          <div className="px-[5px] pt-[13px] space-y-[3px]">
+                            <div className="h-[2px] rounded-full bg-stone-200 w-full" />
+                            <div className="h-[2px] rounded-full bg-stone-200 w-[85%]" />
+                            <div className="h-[2px] rounded-full bg-stone-100 w-full" />
+                            <div className="h-[2px] rounded-full bg-stone-100 w-[70%]" />
+                            <div className="h-[2px] rounded-full bg-stone-100 w-[90%]" />
+                            <div className="h-[2px] rounded-full bg-stone-100 w-[50%]" />
+                          </div>
+                        </div>
                         {/* Status badge - bottom right */}
                         <div className={cn(
                           "absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center",

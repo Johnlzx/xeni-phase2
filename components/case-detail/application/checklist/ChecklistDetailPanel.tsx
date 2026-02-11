@@ -282,26 +282,45 @@ export function ChecklistDetailPanel({
 
           {/* Document list - inline */}
           <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-            {referenceDocs.map((doc) => (
-              <div key={doc.id} className="group/item shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-50 border border-stone-150 hover:border-blue-200 transition-colors">
-                <FileText className="size-3 text-blue-500" />
-                <button
-                  onClick={() => {
-                    const g = documentGroups.find((g) => g.id === doc.groupId);
-                    if (g) setPreviewGroup(g);
-                  }}
-                  className="text-[11px] font-medium text-stone-600 hover:text-blue-600 truncate max-w-[100px] transition-colors"
+            {referenceDocs.map((doc) => {
+              const isAnalyzed = analyzedRefSnapshot.current
+                ? analyzedRefSnapshot.current.split(",").includes(doc.groupId)
+                : true; // first render before snapshot init, treat as analyzed
+
+              return (
+                <div
+                  key={doc.id}
+                  className={cn(
+                    "group/item shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors",
+                    isAnalyzed
+                      ? "bg-blue-50/60 border border-blue-200/60 hover:border-blue-300"
+                      : "bg-amber-50 border border-amber-200 hover:border-amber-300"
+                  )}
                 >
-                  {doc.name}
-                </button>
-                <button
-                  onClick={() => removeSectionReferenceDoc(sectionId, doc.groupId)}
-                  className="shrink-0 size-3.5 rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-400 hover:text-rose-500"
-                >
-                  <X className="size-2.5" />
-                </button>
-              </div>
-            ))}
+                  <FileText className={cn("size-3", isAnalyzed ? "text-blue-500" : "text-amber-500")} />
+                  <button
+                    onClick={() => {
+                      const g = documentGroups.find((g) => g.id === doc.groupId);
+                      if (g) setPreviewGroup(g);
+                    }}
+                    className={cn(
+                      "text-[11px] font-medium truncate max-w-[100px] transition-colors",
+                      isAnalyzed
+                        ? "text-stone-600 hover:text-blue-600"
+                        : "text-amber-700 hover:text-amber-800"
+                    )}
+                  >
+                    {doc.name}
+                  </button>
+                  <button
+                    onClick={() => removeSectionReferenceDoc(sectionId, doc.groupId)}
+                    className="shrink-0 size-3.5 rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-400 hover:text-rose-500"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
