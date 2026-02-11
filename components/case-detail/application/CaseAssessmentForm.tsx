@@ -13,6 +13,7 @@ import {
   Plus,
   X,
   Check,
+  FolderOpen,
 } from "lucide-react";
 import {
   Select,
@@ -445,56 +446,16 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
 
   const fields = useMemo(() => getAssessmentFields(visaType, passport), [visaType, passport]);
 
-  // Reference documents for Case Assessment - passport and case notes are pinned, extras are unlinkable
-  const referenceDocuments = useMemo(() => {
-    const docs: { id: string; groupId: string; name: string; fileName: string; pinned: boolean }[] = [];
-
-    // Find passport document group (pinned)
-    const passportGroup = documentGroups.find(
-      (group) => group.title?.toLowerCase().includes("passport")
-    );
-    if (passportGroup && passportGroup.files.length > 0) {
-      docs.push({
-        id: "passport",
-        groupId: passportGroup.id,
-        name: "Passport",
-        fileName: passportGroup.files[0].name,
-        pinned: true,
-      });
-    }
-
-    // Find case notes document group (pinned)
-    const caseNotesGroup = documentGroups.find(
-      (group) => group.title?.toLowerCase().includes("case note")
-    );
-    if (caseNotesGroup && caseNotesGroup.files.length > 0) {
-      docs.push({
-        id: "case-notes",
-        groupId: caseNotesGroup.id,
-        name: "Case Notes",
-        fileName: caseNotesGroup.files[0].name,
-        pinned: true,
-      });
-    }
-
-    // Add extra linked reference docs (not pinned)
-    assessmentReferenceDocIds.forEach((groupId) => {
-      // Skip if already included as pinned
-      if (docs.some((d) => d.groupId === groupId)) return;
-      const group = documentGroups.find((g) => g.id === groupId);
-      if (group && group.files.filter((f) => !f.isRemoved).length > 0) {
-        docs.push({
-          id: `ref-${groupId}`,
-          groupId: group.id,
-          name: group.title,
-          fileName: group.files.filter((f) => !f.isRemoved)[0].name,
-          pinned: false,
-        });
-      }
-    });
-
-    return docs;
-  }, [documentGroups, assessmentReferenceDocIds]);
+  // Reference documents — read exclusively from store (seeded at analysis time)
+  const referenceDocs = useMemo(() => {
+    return assessmentReferenceDocIds
+      .map((groupId) => {
+        const group = documentGroups.find((g) => g.id === groupId);
+        if (!group || group.files.filter((f) => !f.isRemoved).length === 0) return null;
+        return { id: `ref-${groupId}`, groupId: group.id, name: group.title };
+      })
+      .filter((d): d is NonNullable<typeof d> => d !== null);
+  }, [assessmentReferenceDocIds, documentGroups]);
 
   // Form state - initialize with pre-filled values
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -620,64 +581,48 @@ export function CaseAssessmentForm({ visaType, onComplete, embedded = false }: C
         "flex-1 flex flex-col min-w-0 bg-white overflow-hidden",
         !embedded && "rounded-xl border border-stone-200"
       )}>
-        {/* Header - Fixed height with Reference Documents, matches OverviewTab pattern */}
-        <div className="shrink-0 p-4 border-b border-stone-100">
-          <div className="flex items-center gap-4">
-            {/* Left - Progress Summary */}
-            <div className="shrink-0 flex items-center gap-3">
-              <ProgressRing percent={progressPercent} isComplete={progressPercent === 100} size={48} />
-              <div>
-                <h3 className="text-sm font-semibold text-stone-700">Case Assessment</h3>
-                <p className="text-[11px] text-stone-400 tabular-nums">
-                  {completedCount} of {totalCount} completed
-                </p>
-              </div>
+        {/* Header - matches ChecklistDetailPanel layout */}
+        <div className="shrink-0 border-b border-stone-100">
+          {/* Progress row */}
+          <div className="px-4 py-3 flex items-center gap-3">
+            <ProgressRing percent={progressPercent} isComplete={progressPercent === 100} size={48} />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-stone-700">Case Assessment</h3>
+              <p className="text-[11px] text-stone-400 tabular-nums">
+                {completedCount} of {totalCount} completed
+              </p>
             </div>
+          </div>
 
-            {/* Divider */}
-            <div className="w-px self-stretch bg-stone-200 shrink-0" />
+          {/* Reference Documents - always visible, inline (matches ChecklistDetailPanel) */}
+          <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-2 min-h-[36px]">
+            <FolderOpen className="size-4 text-stone-400 shrink-0" />
+            <span className="text-xs font-medium text-stone-500 shrink-0">References</span>
 
-            {/* Right - Reference Documents (vertical layout) */}
-            <div className="flex-1 min-w-0 flex flex-col gap-2">
-              {/* Header row */}
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
-              </div>
-              {/* Document cards row (horizontal scroll) */}
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-h-[30px]">
-                {referenceDocuments.length > 0 ? (
-                  referenceDocuments.map((doc) => (
-                    <div key={doc.id} className="group/pill shrink-0 relative">
-                      <button
-                        className="inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
-                      >
-                        <FileText className="size-4 text-blue-500" />
-                        <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover/pill:text-blue-700">
-                          {doc.fileName}
-                        </span>
-                      </button>
-                      {!doc.pinned && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeAssessmentReferenceDoc(doc.groupId); }}
-                          className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-white border border-stone-300 shadow-sm flex items-center justify-center opacity-0 group-hover/pill:opacity-100 transition-opacity hover:bg-rose-50 hover:border-rose-400"
-                        >
-                          <X className="size-2.5 text-rose-500" />
-                        </button>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <span className="text-xs text-stone-400">No documents uploaded</span>
-                )}
-                {/* Add button — inline after document cards */}
-                <button
-                  onClick={() => setShowAddDocModal(true)}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 hover:border-[#0E4268] hover:bg-[#0E4268]/5 text-stone-400 hover:text-[#0E4268] transition-colors text-xs"
-                >
-                  <Plus className="size-3.5" />
-                  Add reference
-                </button>
-              </div>
+            {/* Add button */}
+            <button
+              onClick={() => setShowAddDocModal(true)}
+              className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium text-stone-400 hover:text-[#0E4268] hover:bg-[#0E4268]/5 transition-colors"
+            >
+              <Plus className="size-3" />
+            </button>
+
+            {/* Document list - inline */}
+            <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+              {referenceDocs.map((doc) => (
+                <div key={doc.id} className="group/item shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-50 border border-stone-150 hover:border-blue-200 transition-colors">
+                  <FileText className="size-3 text-blue-500" />
+                  <span className="text-[11px] font-medium text-stone-600 truncate max-w-[100px]">
+                    {doc.name}
+                  </span>
+                  <button
+                    onClick={() => removeAssessmentReferenceDoc(doc.groupId)}
+                    className="shrink-0 size-3.5 rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-400 hover:text-rose-500"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

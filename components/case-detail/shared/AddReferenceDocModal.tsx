@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { X, Check, FolderOpen } from "lucide-react";
+import { useState, useMemo } from "react";
+import { motion } from "motion/react";
+import { X, Check, FolderOpen, FileText, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DocumentGroup } from "@/types/case-detail";
-import { DocumentPreviewContent } from "./DocumentPreviewContent";
+import { useCaseDetailStore } from "@/store/case-detail-store";
+
+// Section ID → short display label
+const SECTION_LABELS: Record<string, string> = {
+  personal: "Personal",
+  employment: "Employment",
+  financial: "Financial",
+  travel: "Travel",
+  education: "Education",
+  family: "Family",
+  other: "Other",
+};
 
 interface AddReferenceDocModalProps {
   documentGroups: DocumentGroup[];
@@ -19,12 +31,41 @@ export function AddReferenceDocModal({
 }: AddReferenceDocModalProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
+  // Read section linkage data from store
+  const sectionReferenceDocIds = useCaseDetailStore((s) => s.sectionReferenceDocIds);
+  const assessmentReferenceDocIds = useCaseDetailStore((s) => s.assessmentReferenceDocIds);
+
   // Only show classified groups that have active files
-  const classifiedGroups = documentGroups.filter(
-    (g) => g.id !== "unclassified" && g.files.filter((f) => !f.isRemoved).length > 0
+  const classifiedGroups = useMemo(
+    () =>
+      documentGroups.filter(
+        (g) => g.id !== "unclassified" && g.files.filter((f) => !f.isRemoved).length > 0
+      ),
+    [documentGroups]
   );
 
+  // Compute linked sections for a given group ID
+  const linkedSectionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    classifiedGroups.forEach((group) => {
+      const sections: string[] = [];
+      if (assessmentReferenceDocIds.includes(group.id)) {
+        sections.push("Assessment");
+      }
+      Object.entries(sectionReferenceDocIds).forEach(([sectionId, groupIds]) => {
+        if (groupIds.includes(group.id)) {
+          sections.push(SECTION_LABELS[sectionId] || sectionId);
+        }
+      });
+      map[group.id] = sections;
+    });
+    return map;
+  }, [classifiedGroups, sectionReferenceDocIds, assessmentReferenceDocIds]);
+
   const hasDocuments = classifiedGroups.length > 0;
+  const hasSelection = selectedGroupId !== null;
+  const reviewedCount = classifiedGroups.filter((g) => g.status === "reviewed").length;
+  const pendingCount = classifiedGroups.filter((g) => g.status === "pending").length;
 
   const handleConfirm = () => {
     if (selectedGroupId && onLinkGroup) {
@@ -33,11 +74,26 @@ export function AddReferenceDocModal({
     onClose();
   };
 
-  const hasSelection = selectedGroupId !== null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-[720px] max-w-[92vw] h-[520px] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
+
+      {/* Bottom sheet */}
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 30, stiffness: 300 }}
+        className="absolute inset-x-0 bottom-0 top-16 bg-white rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
+      >
         {/* Header */}
         <div className="shrink-0 px-6 py-4 border-b border-stone-200 flex items-center justify-between">
           <div className="min-w-0">
@@ -56,102 +112,150 @@ export function AddReferenceDocModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 p-6">
-          {hasDocuments ? (
-            <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between mb-3 shrink-0">
-                <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">
-                  Documents
-                </p>
-                <span className="text-[10px] text-stone-400 tabular-nums">
-                  {classifiedGroups.filter((g) => g.status === "reviewed").length} ready
-                  {classifiedGroups.some((g) => g.status === "pending") && (
-                    <span className="text-stone-300">
-                      {" · "}
-                      {classifiedGroups.filter((g) => g.status === "pending").length} pending
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="grid grid-cols-3 gap-3 auto-rows-min content-start">
+        {hasDocuments ? (
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* Stats bar */}
+            <div className="shrink-0 px-6 py-2.5 border-b border-stone-100 flex items-center gap-3">
+              <span className="text-xs text-stone-500 tabular-nums">
+                {reviewedCount} ready
+                {pendingCount > 0 && (
+                  <span className="text-stone-300"> · {pendingCount} pending review</span>
+                )}
+              </span>
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 z-10 bg-stone-50 border-b border-stone-200">
+                  <tr>
+                    <th className="w-10 px-3 py-2.5" />
+                    <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5">
+                      Document
+                    </th>
+                    <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5 w-24">
+                      Status
+                    </th>
+                    <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5 w-20">
+                      Pages
+                    </th>
+                    <th className="text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wider px-3 py-2.5">
+                      Linked Sections
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
                   {classifiedGroups.map((group) => {
                     const activeFiles = group.files.filter((f) => !f.isRemoved);
                     const isReviewed = group.status === "reviewed";
-                    const isPending = group.status === "pending";
                     const isSelectable = isReviewed;
                     const isSelected = selectedGroupId === group.id;
+                    const linked = linkedSectionsMap[group.id] || [];
 
                     return (
-                      <button
+                      <tr
                         key={group.id}
                         onClick={() => {
                           if (!isSelectable) return;
                           setSelectedGroupId(isSelected ? null : group.id);
                         }}
-                        disabled={!isSelectable}
                         className={cn(
-                          "rounded-xl border-2 overflow-hidden text-left transition-all",
-                          isSelected
-                            ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 shadow-sm"
-                            : isSelectable
-                              ? "border-stone-200 hover:border-stone-300 hover:shadow-sm"
-                              : "border-stone-200 opacity-50 cursor-not-allowed"
+                          "transition-colors",
+                          isSelectable
+                            ? "cursor-pointer hover:bg-stone-50"
+                            : "opacity-40 cursor-not-allowed",
+                          isSelected && "bg-[#0E4268]/5 hover:bg-[#0E4268]/5"
                         )}
                       >
-                        {/* Thumbnail area */}
-                        <div className="aspect-[4/3] bg-stone-50 p-3 flex items-center justify-center relative">
-                          <div className="h-full aspect-[1/1.414] bg-white rounded-md border border-stone-200 shadow-sm p-2">
-                            <DocumentPreviewContent />
-                          </div>
-                          {/* Status badge */}
-                          <div className="absolute top-2 right-2">
-                            {isPending ? (
-                              <span className="px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 bg-amber-100 rounded">
-                                Pending
-                              </span>
-                            ) : isReviewed ? (
-                              <span className="px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 bg-emerald-100 rounded flex items-center gap-0.5">
-                                <Check size={8} strokeWidth={3} />
-                                Ready
-                              </span>
-                            ) : null}
-                          </div>
-                          {/* Selection indicator */}
-                          {isSelected && (
-                            <div className="absolute top-2 left-2 size-5 rounded-full bg-[#0E4268] flex items-center justify-center shadow-sm">
+                        {/* Selection indicator */}
+                        <td className="px-3 py-3 text-center">
+                          {isSelected ? (
+                            <div className="mx-auto size-5 rounded-full bg-[#0E4268] flex items-center justify-center">
                               <Check className="size-3 text-white" strokeWidth={3} />
                             </div>
+                          ) : (
+                            <Circle
+                              className={cn(
+                                "mx-auto size-5",
+                                isSelectable ? "text-stone-300" : "text-stone-200"
+                              )}
+                              strokeWidth={1.5}
+                            />
                           )}
-                        </div>
-                        {/* Title and info */}
-                        <div className="px-2.5 py-2 border-t border-stone-100">
-                          <p
-                            className={cn(
-                              "text-xs font-medium truncate transition-colors",
-                              isSelected ? "text-[#0E4268]" : "text-stone-700"
-                            )}
-                          >
-                            {group.title}
-                          </p>
-                          <p className="text-[10px] text-stone-400 tabular-nums mt-0.5">
+                        </td>
+
+                        {/* Document name */}
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <FileText
+                              className={cn(
+                                "size-4 shrink-0",
+                                isSelected ? "text-[#0E4268]" : "text-stone-400"
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "text-sm font-medium truncate",
+                                isSelected ? "text-[#0E4268]" : "text-stone-700"
+                              )}
+                            >
+                              {group.title}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-3 py-3">
+                          {isReviewed ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded">
+                              <Check size={10} strokeWidth={3} />
+                              Reviewed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded">
+                              Pending
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Pages */}
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-stone-500 tabular-nums">
                             {activeFiles.length} page{activeFiles.length !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      </button>
+                          </span>
+                        </td>
+
+                        {/* Linked sections */}
+                        <td className="px-3 py-3">
+                          {linked.length > 0 ? (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {linked.map((label) => (
+                                <span
+                                  key={label}
+                                  className="px-1.5 py-0.5 text-[10px] font-medium text-stone-600 bg-stone-100 rounded"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-stone-300">—</span>
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-              </div>
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-stone-400">
-              <FolderOpen className="size-8 mb-2" />
-              <p className="text-sm font-medium">No documents in File Hub</p>
-              <p className="text-xs mt-1">Upload and review files to get started</p>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-stone-400">
+            <FolderOpen className="size-8 mb-2" />
+            <p className="text-sm font-medium">No documents in File Hub</p>
+            <p className="text-xs mt-1">Upload and review files to get started</p>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="shrink-0 px-6 py-4 border-t border-stone-200 bg-stone-50 flex justify-end gap-3">
@@ -174,7 +278,7 @@ export function AddReferenceDocModal({
             Confirm
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

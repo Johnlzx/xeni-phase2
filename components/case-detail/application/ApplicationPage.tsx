@@ -8,15 +8,17 @@ import {
   Circle,
   FileText,
   RefreshCw,
-  ClipboardCheck,
   Check,
   Edit3,
   Plus,
+  Play,
+  FolderOpen,
+  X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   useCaseDetailStore,
-  useHasNewFilesAfterAnalysis,
-  useNewFilesCount,
   useEnhancedChecklistItems,
   useEnhancedQualityIssues,
   useDocumentGroups,
@@ -36,6 +38,7 @@ import { ChecklistDetailPanel } from "./checklist/ChecklistDetailPanel";
 import { SendChecklistSummaryModal } from "./checklist/SendChecklistSummaryModal";
 import { CaseAssessmentForm } from "./CaseAssessmentForm";
 import { ProgressRing } from "../shared/ProgressRing";
+import { AddReferenceDocModal } from "../shared/AddReferenceDocModal";
 
 // Section configuration
 const SECTION_CONFIG: Record<
@@ -89,91 +92,21 @@ function EmptyStateLayout({
   );
 }
 
-// Tab label mapping for breadcrumb
-const TAB_LABELS: Record<string, string> = {
-  overview: "Overview",
-  details: "Details",
-  "supporting-documents": "Supporting Documents",
-};
 
-// Inline header for checklist view (integrated into main content area)
-function ChecklistHeader({
-  onRequestInfo,
-  sectionTitle,
-  activeTab,
-  onNavigateToOverview,
-}: {
-  onRequestInfo: () => void;
-  sectionTitle?: string;
-  activeTab?: "overview" | "details" | "supporting-documents";
-  onNavigateToOverview?: () => void;
-}) {
-  const hasNewFilesAfterAnalysis = useHasNewFilesAfterAnalysis();
-  const newFilesCount = useNewFilesCount();
+
+// Form Pilot button - fixed at sidebar bottom
+function FormPilotButton() {
   const launchFormPilot = useCaseDetailStore((state) => state.launchFormPilot);
 
-  // Show breadcrumb when not on overview tab
-  const showBreadcrumb = activeTab && activeTab !== "overview" && onNavigateToOverview;
-
   return (
-    <div className="shrink-0 px-5 py-3 bg-white border-b border-stone-200">
-      <div className="flex items-center justify-between">
-        {/* Left: Section title (or breadcrumb) + Status */}
-        <div className="flex items-center gap-4">
-          <div>
-            {showBreadcrumb ? (
-              /* Breadcrumb Navigation */
-              <nav className="flex items-center gap-1.5 text-sm">
-                <button
-                  onClick={onNavigateToOverview}
-                  className="font-medium text-stone-500 hover:text-stone-700 transition-colors"
-                >
-                  {sectionTitle}
-                </button>
-                <ChevronRight className="size-4 text-stone-400" />
-                <span className="font-semibold text-stone-800">
-                  {TAB_LABELS[activeTab]}
-                </span>
-              </nav>
-            ) : (
-              <h3 className="text-sm font-semibold text-stone-800 text-balance">
-                {sectionTitle || "Select a section"}
-              </h3>
-            )}
-            {/* Status: All files analyzed vs Update available */}
-            <div className="flex items-center gap-1.5 text-xs">
-              {hasNewFilesAfterAnalysis ? (
-                <>
-                  <div className="size-1.5 rounded-full bg-amber-500" />
-                  <span className="text-amber-600">Update available</span>
-                  {newFilesCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium tabular-nums">
-                      +{newFilesCount} file{newFilesCount > 1 ? "s" : ""}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="size-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-emerald-600">All files analyzed</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Action buttons */}
-        <div className="flex items-center gap-2">
-          {/* Form Pilot button */}
-          <button
-            onClick={launchFormPilot}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors"
-          >
-            Form Pilot
-          </button>
-        </div>
-      </div>
-
+    <div className="shrink-0 px-3 py-3 border-t border-stone-100">
+      <button
+        onClick={launchFormPilot}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0a3555] transition-colors"
+      >
+        <Play className="size-3.5" />
+        Form Pilot
+      </button>
     </div>
   );
 }
@@ -269,37 +202,22 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
   const questionnaireAnswers = useCaseDetailStore((state) => state.questionnaireAnswers);
   const submitQuestionnaireAnswers = useCaseDetailStore((state) => state.submitQuestionnaireAnswers);
   const documentGroups = useDocumentGroups();
+  const assessmentReferenceDocIds = useCaseDetailStore((state) => state.assessmentReferenceDocIds);
+  const addAssessmentReferenceDoc = useCaseDetailStore((state) => state.addAssessmentReferenceDoc);
+  const removeAssessmentReferenceDoc = useCaseDetailStore((state) => state.removeAssessmentReferenceDoc);
 
-  // Reference documents for Case Assessment - only show uploaded passport and case notes
-  const referenceDocuments = useMemo(() => {
-    const docs: { id: string; name: string; fileName: string }[] = [];
+  const [showAddRefModal, setShowAddRefModal] = useState(false);
 
-    // Find passport document group
-    const passportGroup = documentGroups.find(
-      (group) => group.title?.toLowerCase().includes("passport")
-    );
-    if (passportGroup && passportGroup.files.length > 0) {
-      docs.push({
-        id: "passport",
-        name: "Passport",
-        fileName: passportGroup.files[0].name,
-      });
-    }
-
-    // Find case notes document group
-    const caseNotesGroup = documentGroups.find(
-      (group) => group.title?.toLowerCase().includes("case note")
-    );
-    if (caseNotesGroup && caseNotesGroup.files.length > 0) {
-      docs.push({
-        id: "case-notes",
-        name: "Case Notes",
-        fileName: caseNotesGroup.files[0].name,
-      });
-    }
-
-    return docs;
-  }, [documentGroups]);
+  // Reference documents — read exclusively from store (seeded at analysis time)
+  const referenceDocs = useMemo(() => {
+    return assessmentReferenceDocIds
+      .map((groupId) => {
+        const group = documentGroups.find((g) => g.id === groupId);
+        if (!group || group.files.filter((f) => !f.isRemoved).length === 0) return null;
+        return { id: `ref-${groupId}`, groupId: group.id, name: group.title };
+      })
+      .filter((d): d is NonNullable<typeof d> => d !== null);
+  }, [assessmentReferenceDocIds, documentGroups]);
 
   // Assessment fields - same as in CaseAssessmentForm
   const MAJORITY_ENGLISH_COUNTRIES = [
@@ -505,57 +423,56 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
   const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isComplete = completedCount === totalCount;
 
+  // Field display toggle - default to showing only unfilled fields
+  const [showAllFields, setShowAllFields] = useState(false);
+  const missingVisibleFields = visibleFields.filter((f) => !values[f.id]);
+  const allFieldsComplete = missingVisibleFields.length === 0;
+  const displayFields = allFieldsComplete || showAllFields ? visibleFields : missingVisibleFields;
+
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Header - Fixed height with Reference Documents, matches CaseAssessmentForm pattern */}
-      <div className="shrink-0 p-4 border-b border-stone-100">
-        <div className="flex items-center gap-4">
-          {/* Left - Progress Summary */}
-          <div className="shrink-0 flex items-center gap-3">
-            <ProgressRing percent={percent} isComplete={isComplete} size={48} />
-            <div>
-              <h3 className="text-sm font-semibold text-stone-700">Case Assessment</h3>
-              <p className="text-[11px] text-stone-400 tabular-nums">
-                {completedCount} of {totalCount} completed
-              </p>
-            </div>
+      {/* Header */}
+      <div className="shrink-0 border-b border-stone-100">
+        {/* Progress row */}
+        <div className="px-4 py-3 flex items-center gap-3">
+          <ProgressRing percent={percent} isComplete={isComplete} size={48} />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-stone-700">Case Assessment</h3>
+            <p className="text-[11px] text-stone-400 tabular-nums">
+              {completedCount} of {totalCount} completed
+            </p>
           </div>
+        </div>
 
-          {/* Divider */}
-          <div className="w-px self-stretch bg-stone-200 shrink-0" />
+        {/* Reference Documents - always visible, inline (matches ChecklistDetailPanel) */}
+        <div className="border-t border-stone-100 px-4 py-2 flex items-center gap-2 min-h-[36px]">
+          <FolderOpen className="size-4 text-stone-400 shrink-0" />
+          <span className="text-xs font-medium text-stone-500 shrink-0">References</span>
 
-          {/* Right - Reference Documents (vertical layout) */}
-          <div className="flex-1 min-w-0 flex flex-col gap-2">
-            {/* Header row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs font-semibold text-stone-700">Reference Documents</h4>
+          {/* Add button */}
+          <button
+            onClick={() => setShowAddRefModal(true)}
+            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium text-stone-400 hover:text-[#0E4268] hover:bg-[#0E4268]/5 transition-colors"
+          >
+            <Plus className="size-3" />
+          </button>
+
+          {/* Document list - inline */}
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            {referenceDocs.map((doc) => (
+              <div key={doc.id} className="group/item shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-50 border border-stone-150 hover:border-blue-200 transition-colors">
+                <FileText className="size-3 text-blue-500" />
+                <span className="text-[11px] font-medium text-stone-600 truncate max-w-[100px]">
+                  {doc.name}
+                </span>
+                <button
+                  onClick={() => removeAssessmentReferenceDoc(doc.groupId)}
+                  className="shrink-0 size-3.5 rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-400 hover:text-rose-500"
+                >
+                  <X className="size-2.5" />
+                </button>
               </div>
-              <button
-                className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#0E4268] bg-[#0E4268]/5 hover:bg-[#0E4268]/10 rounded-md transition-colors"
-              >
-                <Plus className="size-3" />
-                Add
-              </button>
-            </div>
-            {/* Document cards row (horizontal scroll) */}
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-              {referenceDocuments.length > 0 ? (
-                referenceDocuments.map((doc) => (
-                  <button
-                    key={doc.id}
-                    className="group shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-blue-300 transition-all"
-                  >
-                    <FileText className="size-4 text-blue-500" />
-                    <span className="text-xs font-medium text-stone-700 truncate max-w-[120px] group-hover:text-blue-700">
-                      {doc.fileName}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <span className="text-xs text-stone-400">No documents uploaded</span>
-              )}
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -566,17 +483,27 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h4 className="text-xs font-medium text-stone-600">Questions</h4>
-            {totalCount - completedCount > 0 && (
+            {!showAllFields && missingVisibleFields.length > 0 && (
               <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded tabular-nums">
-                {totalCount - completedCount} remaining
+                {missingVisibleFields.length} remaining
               </span>
             )}
           </div>
+          {/* Toggle: show missing vs show all */}
+          {!allFieldsComplete && (
+            <button
+              onClick={() => setShowAllFields((v) => !v)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+            >
+              {showAllFields ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+              {showAllFields ? "Show missing" : "Show all"}
+            </button>
+          )}
         </div>
 
         {/* Fields List - matches CaseAssessmentForm AssessmentField component style */}
         <div className="space-y-1">
-          {visibleFields.map((field) => {
+          {displayFields.map((field) => {
             const value = values[field.id] || "";
             const hasValue = !!value;
             const isRequired = true;
@@ -655,6 +582,15 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
             </button>
           </div>
         </div>
+      )}
+
+      {/* Add Reference Document Modal */}
+      {showAddRefModal && (
+        <AddReferenceDocModal
+          documentGroups={documentGroups}
+          onClose={() => setShowAddRefModal(false)}
+          onLinkGroup={(groupId) => addAssessmentReferenceDoc(groupId)}
+        />
       )}
     </div>
   );
@@ -741,17 +677,9 @@ export function ApplicationPage() {
 
   const [selectedSectionId, setSelectedSectionId] = useState<ChecklistSectionType | "assessment" | null>(null);
   const [showSendSummaryModal, setShowSendSummaryModal] = useState(false);
-  const [detailActiveTab, setDetailActiveTab] = useState<"overview" | "details" | "supporting-documents">("overview");
 
-  // Reset to overview when section changes
   const handleSectionSelect = (sectionId: ChecklistSectionType | "assessment") => {
     setSelectedSectionId(sectionId);
-    setDetailActiveTab("overview");
-  };
-
-  // Navigate back to overview from breadcrumb
-  const handleNavigateToOverview = () => {
-    setDetailActiveTab("overview");
   };
 
   // Check if questionnaire needs to be shown - show when visa is selected but questionnaire not completed
@@ -873,7 +801,7 @@ export function ApplicationPage() {
               </div>
               {/* Checklist items - scrollable if needed */}
               <div className="flex-1 overflow-y-auto">
-                {/* Case Assessment - permanent item */}
+                {/* Case Assessment - permanent item, styled like ChecklistSidebarItem */}
                 <button
                   onClick={() => handleSectionSelect("assessment")}
                   className={cn(
@@ -883,13 +811,12 @@ export function ApplicationPage() {
                       : "hover:bg-stone-50 border-transparent"
                   )}
                 >
-                  <div className={cn(
-                    "shrink-0 size-6 rounded flex items-center justify-center",
-                    hasAnsweredQuestionnaire
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-[#0E4268]/10 text-[#0E4268]"
-                  )}>
-                    <ClipboardCheck className="size-3.5" />
+                  <div className="shrink-0">
+                    {hasAnsweredQuestionnaire ? (
+                      <CheckCircle2 className="size-4 text-emerald-500" />
+                    ) : (
+                      <Circle className="size-4 text-stone-300" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={cn(
@@ -898,13 +825,12 @@ export function ApplicationPage() {
                     )}>
                       Case Assessment
                     </p>
-                    <div className="flex items-center gap-2 text-[10px] tabular-nums">
-                      {hasAnsweredQuestionnaire ? (
-                        <span className="text-emerald-600">Complete</span>
-                      ) : (
-                        <span className="text-stone-400">Required</span>
-                      )}
-                    </div>
+                    <p className={cn(
+                      "text-[10px] truncate",
+                      hasAnsweredQuestionnaire ? "text-emerald-600" : "text-stone-400"
+                    )}>
+                      {hasAnsweredQuestionnaire ? "Complete" : "Required"}
+                    </p>
                   </div>
                 </button>
 
@@ -921,20 +847,13 @@ export function ApplicationPage() {
                   />
                 ))}
               </div>
+
+              {/* Form Pilot - fixed at sidebar bottom */}
+              <FormPilotButton />
             </div>
 
-            {/* Detail Panel - rounded container with integrated header */}
+            {/* Detail Panel - rounded container */}
             <div className="flex-1 flex flex-col bg-white rounded-xl border border-stone-200 overflow-hidden">
-              {/* Integrated header - only show for checklist sections, not Case Assessment */}
-              {selectedSectionId !== "assessment" && (
-                <ChecklistHeader
-                  onRequestInfo={() => setShowSendSummaryModal(true)}
-                  sectionTitle={selectedSection?.title}
-                  activeTab={selectedSectionId !== "employment" ? detailActiveTab : undefined}
-                  onNavigateToOverview={selectedSectionId !== "employment" ? handleNavigateToOverview : undefined}
-                />
-              )}
-
               {/* Detail content */}
               <div className="flex-1 min-h-0 overflow-hidden">
                 {selectedSectionId === "assessment" && selectedVisaType ? (
@@ -945,8 +864,6 @@ export function ApplicationPage() {
                     sectionId={selectedSection.id}
                     items={selectedSection.items}
                     issues={selectedSectionIssues}
-                    onTabChange={setDetailActiveTab}
-                    externalActiveTab={detailActiveTab}
                   />
                 ) : (
                   <EmptyDetailPanel />

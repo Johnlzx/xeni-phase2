@@ -2607,6 +2607,16 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             };
             newProfile.completeness = calculateCompleteness(newProfile);
 
+            // Seed assessmentReferenceDocIds with auto-detected docs
+            const assessmentKeywords = ["passport", "case note"];
+            const initialAssessmentRefIds = state.documentGroups
+              .filter((g) =>
+                g.id !== "unclassified" &&
+                g.files.filter((f) => !f.isRemoved).length > 0 &&
+                assessmentKeywords.some((kw) => g.title?.toLowerCase().includes(kw))
+              )
+              .map((g) => g.id);
+
             return {
               applicationPhase: "questionnaire",
               isAnalyzingDocuments: false,
@@ -2618,6 +2628,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               clientProfile: newProfile,
               // Reset questionnaire answers to trigger questionnaire flow
               questionnaireAnswers: {},
+              // Seed assessment reference docs from auto-detected groups
+              assessmentReferenceDocIds: initialAssessmentRefIds,
               // Mark analyzed files in allFiles
               allFiles: (() => {
                 const newAllFiles = { ...state.allFiles };
@@ -4192,12 +4204,32 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
           ...missingEvidenceIssues,
         ];
 
+        // Seed sectionReferenceDocIds with auto-linked evidence docs
+        const referenceKeywords = ["passport", "cos", "certificate of sponsorship", "biometric"];
+        const initialSectionRefIds: Record<string, string[]> = {};
+        enhancedItems.forEach((item) => {
+          item.requiredEvidence?.forEach((ev) => {
+            if (
+              ev.isUploaded &&
+              ev.linkedFileId &&
+              referenceKeywords.some((kw) => ev.name.toLowerCase().includes(kw))
+            ) {
+              if (!initialSectionRefIds[item.section]) initialSectionRefIds[item.section] = [];
+              if (!initialSectionRefIds[item.section].includes(ev.linkedFileId)) {
+                initialSectionRefIds[item.section].push(ev.linkedFileId);
+              }
+            }
+          });
+        });
+
         set(
           {
             enhancedChecklistItems: enhancedItems,
             enhancedQualityIssues: enhancedIssues,
             // Auto-select first item if available
             selectedChecklistItemId: enhancedItems.length > 0 ? enhancedItems[0].id : null,
+            // Seed initial reference docs per section from auto-linked evidence
+            sectionReferenceDocIds: initialSectionRefIds,
           },
           false,
           "generateEnhancedChecklist"
