@@ -109,7 +109,7 @@ export function AddReferenceDocModal({
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-stone-900">Add Reference Documents</h2>
             <p className="text-sm text-stone-500 mt-0.5">
-              Select from your reviewed documents
+              Only reviewed documents are available. Go to the Documents tab to review pending items first.
             </p>
           </div>
           <button
