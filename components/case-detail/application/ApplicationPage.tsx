@@ -635,25 +635,12 @@ function ChecklistSidebarItem({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const isComplete = section.missingDataCount === 0 && section.missingEvidenceCount === 0;
+  const isComplete = section.missingDataCount === 0;
   const hasMissingData = section.missingDataCount > 0;
-  const hasMissingEvidence = section.missingEvidenceCount > 0;
 
-  // Build status description
-  const getStatusText = () => {
-    if (isComplete) return null;
-
-    const parts: string[] = [];
-    if (hasMissingData) {
-      parts.push(`${section.missingDataCount} field${section.missingDataCount > 1 ? "s" : ""}`);
-    }
-    if (hasMissingEvidence) {
-      parts.push(`${section.missingEvidenceCount} doc${section.missingEvidenceCount > 1 ? "s" : ""}`);
-    }
-    return parts.join(", ") + " needed";
-  };
-
-  const statusText = getStatusText();
+  const statusText = hasMissingData
+    ? `${section.missingDataCount} field${section.missingDataCount > 1 ? "s" : ""} needed`
+    : null;
 
   return (
     <button
@@ -685,7 +672,7 @@ function ChecklistSidebarItem({
         {/* Status description */}
         <p className={cn(
           "text-[10px] truncate",
-          isComplete ? "text-emerald-600" : hasMissingEvidence ? "text-amber-600" : "text-stone-400"
+          isComplete ? "text-emerald-600" : "text-stone-400"
         )}>
           {isComplete ? "Complete" : statusText}
         </p>
