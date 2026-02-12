@@ -39,6 +39,16 @@ import { SendChecklistSummaryModal } from "./checklist/SendChecklistSummaryModal
 import { CaseAssessmentForm } from "./CaseAssessmentForm";
 import { ProgressRing } from "../shared/ProgressRing";
 import { AddReferenceDocModal } from "../shared/AddReferenceDocModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Section configuration
 const SECTION_CONFIG: Record<
@@ -207,6 +217,7 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
   const removeAssessmentReferenceDoc = useCaseDetailStore((state) => state.removeAssessmentReferenceDoc);
 
   const [showAddRefModal, setShowAddRefModal] = useState(false);
+  const [pendingRemoveDoc, setPendingRemoveDoc] = useState<string | null>(null);
 
   // Reference documents — read exclusively from store (seeded at analysis time)
   const referenceDocs = useMemo(() => {
@@ -466,7 +477,7 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
                   {doc.name}
                 </span>
                 <button
-                  onClick={() => removeAssessmentReferenceDoc(doc.groupId)}
+                  onClick={() => setPendingRemoveDoc(doc.groupId)}
                   className="shrink-0 size-3.5 rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-400 hover:text-rose-500"
                 >
                   <X className="size-2.5" />
@@ -592,6 +603,24 @@ function AssessmentDetailPanel({ visaType }: { visaType: import("@/types").VisaT
           onLinkGroup={(groupId) => addAssessmentReferenceDoc(groupId)}
         />
       )}
+
+      {/* Remove Reference Document Confirmation */}
+      <AlertDialog open={!!pendingRemoveDoc} onOpenChange={(open) => !open && setPendingRemoveDoc(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Reference Document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this reference document? You can re-add it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (pendingRemoveDoc) { removeAssessmentReferenceDoc(pendingRemoveDoc); setPendingRemoveDoc(null); } }}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -12,6 +12,8 @@ import {
   FolderOpen,
   RefreshCw,
   Loader2,
+  Undo2,
+  Unlink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCaseDetailStore, useDocumentGroups } from "@/store/case-detail-store";
@@ -24,6 +26,16 @@ import {
 import { CategoryReviewModal } from "../../shared";
 import { ProgressRing } from "../../shared/ProgressRing";
 import { AddReferenceDocModal } from "../../shared/AddReferenceDocModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ChecklistDetailPanelProps {
   sectionTitle: string;
@@ -123,6 +135,12 @@ export function ChecklistDetailPanel({
 
   const [showAddRefModal, setShowAddRefModal] = useState(false);
   const [previewGroup, setPreviewGroup] = useState<DocumentGroup | null>(null);
+  const [pendingRemoveDoc, setPendingRemoveDoc] = useState<{ sectionId: string; groupId: string } | null>(null);
+
+  // Track committed (analyzed) docs that were removed — shown as ghost pills until re-analysis
+  const [removedCommittedDocs, setRemovedCommittedDocs] = useState<
+    Record<string, Array<{ groupId: string; name: string }>>
+  >({});
 
   // --- Re-analysis state ---
   const [isReanalyzing, setIsReanalyzing] = useState(false);
@@ -182,7 +200,7 @@ export function ChecklistDetailPanel({
   };
 
   // Progress calculation
-  const completedCount = items.filter((i) => !!formValues[i.id] || !!i.value).length;
+  const completedCount = items.filter((i) => !!i.value).length;
   const totalCount = items.length;
   const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isComplete = completedCount === totalCount;
@@ -190,7 +208,7 @@ export function ChecklistDetailPanel({
 
   // Field display toggle - default to showing only unfilled fields
   const [showAllFields, setShowAllFields] = useState(false);
-  const missingItems = items.filter((i) => !formValues[i.id] && !i.value);
+  const missingItems = items.filter((i) => !i.value);
   const allFieldsComplete = missingItems.length === 0;
   const displayItems = allFieldsComplete || showAllFields ? items : missingItems;
 
@@ -205,6 +223,13 @@ export function ChecklistDetailPanel({
       })
       .filter((d): d is NonNullable<typeof d> => d !== null);
   }, [sectionReferenceDocIds, sectionId, documentGroups]);
+
+  // Ghost pills: filter out any that have been re-added
+  const currentRemovedDocs = useMemo(() => {
+    const removed = removedCommittedDocs[sectionId] || [];
+    const currentGroupIds = new Set(referenceDocs.map((d) => d.groupId));
+    return removed.filter((d) => !currentGroupIds.has(d.groupId));
+  }, [removedCommittedDocs, sectionId, referenceDocs]);
 
   // --- Re-analysis: track reference doc changes ---
   const currentRefKey = refDocsKey(referenceDocs);
@@ -239,7 +264,48 @@ export function ChecklistDetailPanel({
     analyzedRefSnapshot.current = currentRefKey;
     setIsReanalyzing(false);
     setReanalysisProgress(0);
-  }, [currentRefKey]);
+
+    // Clear ghost pills for this section — the new snapshot is now the source of truth
+    setRemovedCommittedDocs((prev) => {
+      const next = { ...prev };
+      delete next[sectionId];
+      return next;
+    });
+  }, [currentRefKey, sectionId]);
+
+  // Confirm-remove handler: ghost pill for committed docs, instant remove for uncommitted
+  const handleConfirmRemoveDoc = useCallback(() => {
+    if (!pendingRemoveDoc) return;
+    const { sectionId: sid, groupId } = pendingRemoveDoc;
+
+    const committedIds = analyzedRefSnapshot.current?.split(",") ?? [];
+    const isCommitted = committedIds.includes(groupId);
+
+    if (isCommitted) {
+      const doc = referenceDocs.find((d) => d.groupId === groupId);
+      if (doc) {
+        setRemovedCommittedDocs((prev) => ({
+          ...prev,
+          [sid]: [...(prev[sid] || []), { groupId, name: doc.name }],
+        }));
+      }
+    }
+
+    removeSectionReferenceDoc(sid, groupId);
+    setPendingRemoveDoc(null);
+  }, [pendingRemoveDoc, referenceDocs, removeSectionReferenceDoc]);
+
+  // Restore a ghost pill — re-add to store and remove from ghost list
+  const handleRestoreDoc = useCallback(
+    (groupId: string) => {
+      addSectionReferenceDoc(sectionId, groupId);
+      setRemovedCommittedDocs((prev) => ({
+        ...prev,
+        [sectionId]: (prev[sectionId] || []).filter((d) => d.groupId !== groupId),
+      }));
+    },
+    [sectionId, addSectionReferenceDoc]
+  );
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -283,7 +349,7 @@ export function ChecklistDetailPanel({
           {/* Document list - inline */}
           <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
             {referenceDocs.map((doc) => {
-              const isAnalyzed = analyzedRefSnapshot.current
+              const isAnalyzed = analyzedRefSnapshot.current !== null
                 ? analyzedRefSnapshot.current.split(",").includes(doc.groupId)
                 : true; // first render before snapshot init, treat as analyzed
 
@@ -313,14 +379,35 @@ export function ChecklistDetailPanel({
                     {doc.name}
                   </button>
                   <button
-                    onClick={() => removeSectionReferenceDoc(sectionId, doc.groupId)}
+                    onClick={() => setPendingRemoveDoc({ sectionId, groupId: doc.groupId })}
                     className="shrink-0 size-3.5 rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-400 hover:text-rose-500"
                   >
-                    <X className="size-2.5" />
+                    <Unlink className="size-2.5" />
                   </button>
                 </div>
               );
             })}
+
+            {/* Ghost pills — committed docs removed before re-analysis */}
+            {currentRemovedDocs.map((doc) => (
+              <div
+                key={`removed-${doc.groupId}`}
+                className="group/removed shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded
+                  bg-rose-50/40 border border-dashed border-rose-200/60"
+              >
+                <FileText className="size-3 text-rose-300" />
+                <span className="text-[11px] font-medium text-rose-300 truncate max-w-[100px] line-through">
+                  {doc.name}
+                </span>
+                <button
+                  onClick={() => handleRestoreDoc(doc.groupId)}
+                  className="shrink-0 size-3.5 rounded-full flex items-center justify-center
+                    opacity-0 group-hover/removed:opacity-100 transition-opacity text-rose-300 hover:text-[#0E4268]"
+                >
+                  <Undo2 className="size-2.5" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -339,7 +426,7 @@ export function ChecklistDetailPanel({
               <h4 className="text-xs font-medium text-stone-600">Fields</h4>
               {!showAllFields && missingCount > 0 && !isReanalyzing && (
                 <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded tabular-nums">
-                  {missingCount} remaining
+                  {missingCount} missing
                 </span>
               )}
             </div>
@@ -482,6 +569,24 @@ export function ChecklistDetailPanel({
           onClose={() => setPreviewGroup(null)}
         />
       )}
+
+      {/* Remove Reference Document Confirmation */}
+      <AlertDialog open={!!pendingRemoveDoc} onOpenChange={(open) => !open && setPendingRemoveDoc(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Reference Document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this reference document? You can re-add it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRemoveDoc}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
