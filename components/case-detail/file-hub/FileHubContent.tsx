@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useDrag, useDrop } from "react-dnd";
+import { useDrag, useDrop, useDragLayer } from "react-dnd";
+import { getEmptyImage } from "react-dnd-html5-backend";
 import { motion, AnimatePresence } from "motion/react";
 import {
   FileText,
@@ -28,8 +29,10 @@ import {
   RotateCcw,
   FileUp,
   FolderUp,
+  MoreVertical,
 } from "lucide-react";
 
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   useCaseDetailStore,
@@ -65,11 +68,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CategoryReviewModal, DocumentPreviewContent } from "../shared";
+import { CategoryReviewModal, DocumentPreviewContent, DeleteDocumentConfirmDialog } from "../shared";
+import { useGroupChecklistBindings } from "@/store/case-detail-store";
+import { CreateDocumentCategoryPopover } from "./CreateDocumentCategoryPopover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  DOCUMENT_CATEGORY_SUGGESTIONS,
+  DOCUMENT_CATEGORY_GROUPS,
+} from "@/data/document-categories";
 import type { DocumentGroup, DocumentFile } from "@/types/case-detail";
 
 const ItemTypes = {
   PAGE: "page",
+  GROUP: "group",
 };
 
 // Helper to generate unique name for duplicate categories
@@ -148,6 +167,9 @@ const Sidebar = ({
     // Auto-classify uploaded documents into categories
     const pageCount = Math.floor(Math.random() * 4) + 6; // 6-9 pages
     uploadAndAutoClassify(pageCount);
+    toast.success("Documents uploaded", {
+      description: `${pageCount} pages uploaded and auto-classified.`,
+    });
   };
 
   // Handle folder input change
@@ -185,6 +207,9 @@ const Sidebar = ({
     // Upload folder with parsed paths
     if (filesWithPaths.length > 0) {
       uploadFolder(filesWithPaths);
+      toast.success("Folder uploaded", {
+        description: `${filesWithPaths.length} files imported and classified.`,
+      });
     }
 
     setProcessingStage(null);
@@ -226,6 +251,7 @@ const Sidebar = ({
       drop: (item: { id: string; groupId: string }) => {
         if (item.groupId !== "unclassified") {
           moveFileToGroup(item.id, "unclassified");
+          toast.success("Page moved to Unclassified");
         }
       },
       collect: (monitor) => ({ isOver: monitor.isOver() }),
@@ -600,7 +626,10 @@ const SidebarPageItem = ({
             {classifiedGroups.map((group) => (
               <ContextMenuItem
                 key={group.id}
-                onClick={() => moveFileToGroup(file.id, group.id)}
+                onClick={() => {
+                  moveFileToGroup(file.id, group.id);
+                  toast.success("Page moved", { description: `Moved to "${group.title}".` });
+                }}
               >
                 <FileText size={14} className="mr-2 text-stone-400" />
                 {group.title}
@@ -782,6 +811,7 @@ const SinglePagePreviewModal = ({
                         key={group.id}
                         onClick={() => {
                           moveFileToGroup(file.id, group.id);
+                          toast.success("Page moved", { description: `Moved to "${group.title}".` });
                           onClose();
                         }}
                       >
@@ -876,7 +906,10 @@ const DraggableUnclassifiedPage = ({
             {classifiedGroups.map((group) => (
               <ContextMenuItem
                 key={group.id}
-                onClick={() => moveFileToGroup(file.id, group.id)}
+                onClick={() => {
+                  moveFileToGroup(file.id, group.id);
+                  toast.success("Page moved", { description: `Moved to "${group.title}".` });
+                }}
               >
                 <FileText size={14} className="mr-2 text-red-500" />
                 {group.title}
@@ -909,6 +942,8 @@ const CategoryCard = ({
   isSelected,
   onToggleSelect,
   isSelectMode,
+  selectedGroupIds,
+  onMergeComplete,
 }: {
   group: DocumentGroup;
   allGroups: DocumentGroup[];
@@ -919,6 +954,8 @@ const CategoryCard = ({
   isSelected?: boolean;
   onToggleSelect?: () => void;
   isSelectMode?: boolean;
+  selectedGroupIds?: Set<string>;
+  onMergeComplete?: () => void;
 }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -930,7 +967,13 @@ const CategoryCard = ({
   const [showHighlight, setShowHighlight] = useState(false);
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null);
   const [showAddFromDocsModal, setShowAddFromDocsModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingMergeGroupIds, setPendingMergeGroupIds] = useState<string[] | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+
+  const deleteDocumentGroup = useCaseDetailStore((state) => state.deleteDocumentGroup);
+  const mergeDocumentsIntoGroup = useCaseDetailStore((state) => state.mergeDocumentsIntoGroup);
+  const checklistBindings = useGroupChecklistBindings(group.id);
 
   // Handle highlight animation and scroll into view
   useEffect(() => {
@@ -995,6 +1038,9 @@ const CategoryCard = ({
       setIsFileDragOver(false);
       // Simulate uploading files - in real app would process actual files
       uploadToGroup(group.id, files.length);
+      toast.success("Files uploaded", {
+        description: `${files.length} page${files.length !== 1 ? "s" : ""} added to "${group.title}".`,
+      });
     }
   };
 
@@ -1002,6 +1048,9 @@ const CategoryCard = ({
     e.stopPropagation();
     const pageCount = Math.floor(Math.random() * 3) + 1;
     uploadToGroup(group.id, pageCount);
+    toast.success("Files uploaded", {
+      description: `${pageCount} page${pageCount !== 1 ? "s" : ""} added to "${group.title}".`,
+    });
   };
 
   const activeFiles = group.files.filter((f) => !f.isRemoved);
@@ -1025,6 +1074,9 @@ const CategoryCard = ({
   const handleConfirm = (e: React.MouseEvent) => {
     e.stopPropagation();
     confirmGroupReview(group.id);
+    toast.success("Review confirmed", {
+      description: `"${group.title}" marked as reviewed.`,
+    });
   };
 
   const effectiveOriginalTitle = group.originalTitle || initialTitle;
@@ -1033,6 +1085,9 @@ const CategoryCard = ({
   const handleRenameSubmit = () => {
     if (editedTitle.trim() && editedTitle !== group.title) {
       renameDocumentGroup(group.id, editedTitle.trim());
+      toast.success("Document renamed", {
+        description: `Renamed to "${editedTitle.trim()}".`,
+      });
     } else {
       setEditedTitle(group.title);
     }
@@ -1047,6 +1102,9 @@ const CategoryCard = ({
       // Fallback: use local initial title if store doesn't have originalTitle
       renameDocumentGroup(group.id, effectiveOriginalTitle);
     }
+    toast.success("Title restored", {
+      description: `Reset to "${effectiveOriginalTitle}".`,
+    });
     setEditedTitle(effectiveOriginalTitle);
   };
 
@@ -1063,19 +1121,67 @@ const CategoryCard = ({
     setCurrentPageIndex((prev) => Math.min(totalPages - 1, prev + 1));
   };
 
-  const [{ isOver }, drop] = useDrop<
-    { id: string; groupId: string },
+  // Drag hook: make this group draggable
+  const [{ isDragging }, drag, preview] = useDrag(
+    () => ({
+      type: ItemTypes.GROUP,
+      item: () => ({
+        groupId: group.id,
+        title: group.title,
+        pageCount: totalPages,
+        selectedGroupIds: selectedGroupIds?.has(group.id)
+          ? Array.from(selectedGroupIds)
+          : undefined,
+      }),
+      canDrag: () => totalPages > 0,
+      collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    }),
+    [group.id, group.title, totalPages, selectedGroupIds],
+  );
+
+  // Use empty image as drag preview to replace default full-size screenshot
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
+
+  // Drop hook: accept PAGE and GROUP drops
+  const [{ isOver, isGroupOver }, drop] = useDrop<
+    { id: string; groupId: string; title?: string; selectedGroupIds?: string[] },
     void,
-    { isOver: boolean }
+    { isOver: boolean; isGroupOver: boolean }
   >(
     () => ({
-      accept: ItemTypes.PAGE,
-      drop: (item) => {
-        if (item.groupId !== group.id) {
-          moveFileToGroup(item.id, group.id);
+      accept: [ItemTypes.PAGE, ItemTypes.GROUP],
+      drop: (item, monitor) => {
+        const itemType = monitor.getItemType();
+        if (itemType === ItemTypes.PAGE) {
+          if (item.groupId !== group.id) {
+            moveFileToGroup(item.id, group.id);
+            toast.success("Page moved", { description: `Moved to "${group.title}".` });
+          }
+        } else if (itemType === ItemTypes.GROUP) {
+          if (item.groupId !== group.id) {
+            const sourceIds = item.selectedGroupIds
+              ? item.selectedGroupIds.filter((id: string) => id !== group.id)
+              : [item.groupId];
+            if (sourceIds.length > 0) {
+              setPendingMergeGroupIds(sourceIds);
+            }
+          }
         }
       },
-      collect: (monitor) => ({ isOver: monitor.isOver() }),
+      canDrop: (item, monitor) => {
+        const itemType = monitor.getItemType();
+        if (itemType === ItemTypes.GROUP) {
+          if (item.groupId === group.id) return false;
+          if (item.selectedGroupIds?.includes(group.id)) return false;
+        }
+        return true;
+      },
+      collect: (monitor) => ({
+        isOver: monitor.isOver(),
+        isGroupOver: monitor.isOver() && monitor.getItemType() === ItemTypes.GROUP && monitor.canDrop(),
+      }),
     }),
     [group.id, moveFileToGroup],
   );
@@ -1086,10 +1192,10 @@ const CategoryCard = ({
     .map((word) => word.toUpperCase())
     .join(" ");
 
-  // Combine refs for both react-dnd and native drag
+  // Combine refs for react-dnd drag + drop and native drag
   const setRefs = (el: HTMLDivElement | null) => {
     cardRef.current = el;
-    drop(el);
+    drag(drop(el));
   };
 
   return (
@@ -1097,13 +1203,16 @@ const CategoryCard = ({
       ref={setRefs}
       className={cn(
         "bg-white rounded-xl border overflow-hidden flex flex-col transition-all cursor-pointer relative",
-        isOver || isFileDragOver
-          ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 scale-[1.02]"
-          : isSelected
-            ? "border-[#0E4268] ring-2 ring-[#0E4268]/20"
-            : showHighlight
-              ? "border-[#0E4268] ring-2 ring-[#0E4268]/30 shadow-lg shadow-[#0E4268]/10"
-              : "border-stone-200 hover:border-stone-300 hover:shadow-md",
+        isDragging && "opacity-50 scale-95",
+        isGroupOver
+          ? "border-blue-500 ring-2 ring-blue-500/30 border-dashed scale-[1.02]"
+          : isOver || isFileDragOver
+            ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 scale-[1.02]"
+            : isSelected
+              ? "border-[#0E4268] ring-2 ring-[#0E4268]/20"
+              : showHighlight
+                ? "border-[#0E4268] ring-2 ring-[#0E4268]/30 shadow-lg shadow-[#0E4268]/10"
+                : "border-stone-200 hover:border-stone-300 hover:shadow-md",
       )}
       onClick={onReview}
       onMouseEnter={() => setIsHovered(true)}
@@ -1302,30 +1411,56 @@ const CategoryCard = ({
             </div>
           </div>
         )}
+
+        {/* Group merge overlay */}
+        {isGroupOver && (
+          <div className="absolute inset-0 bg-blue-500/10 flex items-center justify-center z-20 pointer-events-none">
+            <div className="bg-white/95 rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
+              <Layers size={16} className="text-blue-600" />
+              <span className="text-sm font-medium text-blue-600">
+                Merge into {group.title}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Card Footer */}
-      <div className="px-2 py-1.5 border-t border-stone-100 flex items-center gap-1 bg-white shrink-0">
-        {/* Add dropdown menu with cascading options */}
+      <div className="px-3 py-2 border-t border-stone-100 flex items-center justify-between bg-white shrink-0">
+        {/* Left: CTA when pending, page info otherwise */}
+        {isPending ? (
+          <button
+            onClick={handleConfirm}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+            aria-label="Confirm review"
+          >
+            <Check size={10} strokeWidth={2.5} />
+            <span>Confirm</span>
+          </button>
+        ) : (
+          <span className="text-[10px] text-stone-400 tabular-nums">
+            {totalPages} {totalPages === 1 ? "page" : "pages"}
+          </span>
+        )}
+
+        {/* Right: Overflow menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors flex-1 justify-center cursor-pointer"
-              aria-label="Add files to category"
+              className="p-1 rounded text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+              aria-label="More options"
             >
-              <FilePlus size={11} />
-              <span>Add</span>
-              <ChevronDown size={10} className="ml-0.5 opacity-60" />
+              <MoreVertical size={12} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            align="start"
+            align="end"
             side="top"
             className="min-w-[180px]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Option 1: Upload from local */}
+            {/* Add options */}
             <DropdownMenuItem
               onClick={handleUpload}
               className="text-xs cursor-pointer"
@@ -1333,10 +1468,6 @@ const CategoryCard = ({
               <Upload size={14} className="mr-2" />
               Upload from device
             </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            {/* Option 2: Select from Unclassified pages */}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger
                 className="text-xs cursor-pointer"
@@ -1359,7 +1490,10 @@ const CategoryCard = ({
                   unclassifiedFiles.map((file) => (
                     <DropdownMenuItem
                       key={file.id}
-                      onClick={() => addFilesToGroup(group.id, [file.id])}
+                      onClick={() => {
+                        addFilesToGroup(group.id, [file.id]);
+                        toast.success("Page added", { description: `Added to "${group.title}".` });
+                      }}
                       className="text-xs cursor-pointer group relative"
                       onMouseEnter={() => setHoveredFileId(file.id)}
                       onMouseLeave={() => setHoveredFileId(null)}
@@ -1385,8 +1519,6 @@ const CategoryCard = ({
                 )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-
-            {/* Option 3: Select complete logical documents */}
             <DropdownMenuItem
               onClick={() => setShowAddFromDocsModal(true)}
               className="text-xs cursor-pointer"
@@ -1394,35 +1526,34 @@ const CategoryCard = ({
               <FileStack size={14} className="mr-2" />
               <span>From Documents</span>
             </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* Download */}
+            <DropdownMenuItem
+              onClick={handleDownload}
+              disabled={totalPages === 0}
+              className="text-xs cursor-pointer"
+            >
+              <Download size={14} className="mr-2" />
+              Download
+            </DropdownMenuItem>
+
+            {/* Delete */}
+            {!group.isSpecial && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-xs text-rose-600 focus:text-rose-600 cursor-pointer"
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* Confirm / Download - mutually exclusive */}
-        {isPending ? (
-          <button
-            onClick={handleConfirm}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors flex-1 justify-center"
-            aria-label="Confirm review"
-          >
-            <Check size={11} />
-            <span>Confirm</span>
-          </button>
-        ) : (
-          <button
-            onClick={handleDownload}
-            disabled={totalPages === 0}
-            className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors flex-1 justify-center",
-              totalPages === 0
-                ? "text-stone-300 cursor-not-allowed"
-                : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
-            )}
-            aria-label="Download category"
-          >
-            <Download size={11} />
-            <span>Download</span>
-          </button>
-        )}
       </div>
 
       {/* Add From Documents Modal */}
@@ -1435,6 +1566,46 @@ const CategoryCard = ({
           onConfirm={(orderedFileIds) => {
             addFilesToGroup(group.id, orderedFileIds);
             setShowAddFromDocsModal(false);
+            toast.success("Pages added", {
+              description: `${orderedFileIds.length} page${orderedFileIds.length !== 1 ? "s" : ""} added to "${group.title}".`,
+            });
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteDocumentConfirmDialog
+        open={showDeleteConfirm}
+        groupTitle={group.title}
+        fileCount={activeFiles.length}
+        checklistBindings={checklistBindings}
+        onConfirm={() => {
+          deleteDocumentGroup(group.id);
+          setShowDeleteConfirm(false);
+          toast.success("Document deleted", {
+            description: `"${group.title}" has been removed.`,
+          });
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      {/* Merge via Combine Modal */}
+      {pendingMergeGroupIds && (
+        <CombineFromSelectionModal
+          selectedGroups={[
+            group,
+            ...pendingMergeGroupIds
+              .map((id) => allGroups.find((g) => g.id === id))
+              .filter((g): g is DocumentGroup => g !== undefined),
+          ]}
+          onClose={() => setPendingMergeGroupIds(null)}
+          onCombine={(name, orderedFileIds) => {
+            mergeDocumentsIntoGroup(name, orderedFileIds);
+            onMergeComplete?.();
+            setPendingMergeGroupIds(null);
+            toast.success("Documents combined", {
+              description: `Created "${name}" with ${orderedFileIds.length} page${orderedFileIds.length !== 1 ? "s" : ""}.`,
+            });
           }}
         />
       )}
@@ -2554,6 +2725,7 @@ const AddCategoryCard = ({
   const [isFileDragOver, setIsFileDragOver] = useState(false);
   const [droppedFileCount, setDroppedFileCount] = useState(0);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [dropSearch, setDropSearch] = useState("");
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
@@ -2663,69 +2835,39 @@ const AddCategoryCard = ({
         onDrop={handleNativeDrop}
         className="relative"
       >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className={cn(
-                "w-full h-full bg-white rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer group",
-                isDragOver
-                  ? "border-[#0E4268] bg-[#0E4268]/5 scale-[1.02]"
-                  : "border-stone-200 hover:border-stone-300 hover:bg-stone-50/50",
-              )}
-            >
-              {isDragOver ? (
-                <>
-                  <div className="size-8 rounded-xl bg-[#0E4268]/10 flex items-center justify-center">
-                    <FilePlus size={16} className="text-[#0E4268]" />
-                  </div>
-                  <span className="text-xs font-medium text-[#0E4268]">
-                    Drop to create category
-                  </span>
-                </>
-              ) : (
-                <>
-                  <div className="size-8 rounded-xl bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center transition-colors">
-                    <Plus size={16} className="text-stone-400" />
-                  </div>
-                  <span className="text-xs font-medium text-stone-500">
-                    New Category
-                  </span>
-                </>
-              )}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" className="w-48">
-            <DropdownMenuLabel>Category Type</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleAddCategory("Passport")}>
-              Passport
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleAddCategory("Bank Statement")}
-            >
-              Bank Statement
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleAddCategory("Utility Bill")}>
-              Utility Bill
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleAddCategory("Employment Letter")}
-            >
-              Employment Letter
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => handleAddCategory("Other Documents")}
-            >
-              Other Documents
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onMergeDocuments} className="whitespace-nowrap">
-              <Layers size={14} className="mr-2 text-stone-400" />
-              Merge Documents
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <CreateDocumentCategoryPopover
+          onSelect={handleAddCategory}
+          onMergeDocuments={onMergeDocuments}
+        >
+          <button
+            className={cn(
+              "w-full h-full bg-white rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer group",
+              isDragOver
+                ? "border-[#0E4268] bg-[#0E4268]/5 scale-[1.02]"
+                : "border-stone-200 hover:border-stone-300 hover:bg-stone-50/50",
+            )}
+          >
+            {isDragOver ? (
+              <>
+                <div className="size-8 rounded-xl bg-[#0E4268]/10 flex items-center justify-center">
+                  <FilePlus size={16} className="text-[#0E4268]" />
+                </div>
+                <span className="text-xs font-medium text-[#0E4268]">
+                  Drop to create category
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="size-8 rounded-xl bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center transition-colors">
+                  <Plus size={16} className="text-stone-400" />
+                </div>
+                <span className="text-xs font-medium text-stone-500">
+                  New Category
+                </span>
+              </>
+            )}
+          </button>
+        </CreateDocumentCategoryPopover>
       </div>
 
       {/* Category picker dialog after file drop */}
@@ -2737,9 +2879,9 @@ const AddCategoryCard = ({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="bg-white rounded-xl shadow-xl p-4 w-64"
+              className="bg-white rounded-xl border border-stone-200 shadow-xl w-72"
             >
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between px-4 pt-4 pb-2">
                 <h3 className="text-sm font-semibold text-stone-800">
                   Select Category
                 </h3>
@@ -2748,6 +2890,7 @@ const AddCategoryCard = ({
                     setShowCategoryPicker(false);
                     setDroppedFileCount(0);
                     setPendingPageMove(null);
+                    setDropSearch("");
                   }}
                   className="p-1 text-stone-400 hover:text-stone-600 rounded transition-colors"
                   aria-label="Close"
@@ -2755,28 +2898,68 @@ const AddCategoryCard = ({
                   <X size={14} />
                 </button>
               </div>
-              <p className="text-xs text-stone-500 mb-3">
+              <p className="text-xs text-stone-500 px-4 pb-2">
                 {pendingPageMove
                   ? "Page will be moved to the new category"
                   : `${droppedFileCount} file${droppedFileCount > 1 ? "s" : ""} will be added to the new category`}
               </p>
-              <div className="space-y-1">
-                {[
-                  "Passport",
-                  "Bank Statement",
-                  "Utility Bill",
-                  "Employment Letter",
-                  "Other Documents",
-                ].map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => handleAddCategoryWithFiles(category)}
-                    className="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
+              <Command shouldFilter={true}>
+                <CommandInput
+                  placeholder="Type a name or pick below..."
+                  value={dropSearch}
+                  onValueChange={setDropSearch}
+                />
+                <CommandList className="max-h-[320px]">
+                  <CommandEmpty className="py-3 text-center text-xs text-stone-500">
+                    No matching categories
+                  </CommandEmpty>
+
+                  {/* Custom name create action */}
+                  {dropSearch.trim().length > 0 && !DOCUMENT_CATEGORY_SUGGESTIONS.some(
+                    (s) => s.name.toLowerCase() === dropSearch.trim().toLowerCase(),
+                  ) && (
+                    <>
+                      <CommandGroup>
+                        <CommandItem
+                          value={`__create__${dropSearch.trim()}`}
+                          onSelect={() => {
+                            handleAddCategoryWithFiles(dropSearch.trim());
+                            setDropSearch("");
+                          }}
+                          className="text-sm font-medium text-[#0E4268]"
+                        >
+                          <Plus size={14} className="mr-2 text-[#0E4268]" />
+                          Create &ldquo;{dropSearch.trim()}&rdquo;
+                        </CommandItem>
+                      </CommandGroup>
+                      <CommandSeparator />
+                    </>
+                  )}
+
+                  {/* Grouped suggestions */}
+                  {DOCUMENT_CATEGORY_GROUPS.map((group) => (
+                    <CommandGroup
+                      key={group}
+                      heading={group}
+                      className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-stone-400 [&_[cmdk-group-heading]]:font-medium"
+                    >
+                      {DOCUMENT_CATEGORY_SUGGESTIONS.filter((s) => s.group === group).map((item) => (
+                        <CommandItem
+                          key={item.name}
+                          value={item.name}
+                          onSelect={() => {
+                            handleAddCategoryWithFiles(item.name);
+                            setDropSearch("");
+                          }}
+                          className="text-sm"
+                        >
+                          {item.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  ))}
+                </CommandList>
+              </Command>
             </motion.div>
           </div>
         )}
@@ -2952,6 +3135,43 @@ const LoadingState = () => {
 };
 
 // ============================================================================
+// GROUP DRAG LAYER - Compact custom drag preview for group cards
+// ============================================================================
+const GroupDragLayer = () => {
+  const { itemType, item, isDragging, currentOffset } = useDragLayer((monitor) => ({
+    itemType: monitor.getItemType(),
+    item: monitor.getItem() as { groupId: string; title: string; pageCount: number; selectedGroupIds?: string[] } | null,
+    isDragging: monitor.isDragging(),
+    currentOffset: monitor.getSourceClientOffset(),
+  }));
+
+  if (!isDragging || itemType !== ItemTypes.GROUP || !currentOffset || !item) return null;
+
+  const isMultiSelect = item.selectedGroupIds && item.selectedGroupIds.length > 1;
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-50">
+      <div
+        style={{ transform: `translate(${currentOffset.x}px, ${currentOffset.y}px)` }}
+        className="inline-flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-xl border border-stone-200 max-w-[200px]"
+      >
+        <Layers size={14} className="text-[#0E4268] shrink-0" />
+        {isMultiSelect ? (
+          <span className="text-xs font-semibold text-stone-800 truncate">
+            {item.selectedGroupIds!.length} documents
+          </span>
+        ) : (
+          <>
+            <span className="text-xs font-semibold text-stone-800 truncate">{item.title}</span>
+            <span className="text-[10px] text-stone-400 shrink-0">{item.pageCount}p</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // MAIN FILE HUB CONTENT
 // ============================================================================
 export function FileHubContent() {
@@ -3073,6 +3293,8 @@ export function FileHubContent() {
             isSelected={selectedGroupIds.has(group.id)}
             onToggleSelect={() => toggleGroupSelection(group.id)}
             isSelectMode={selectedGroupIds.size > 0}
+            selectedGroupIds={selectedGroupIds}
+            onMergeComplete={clearSelection}
           />
         ))}
 
@@ -3082,6 +3304,9 @@ export function FileHubContent() {
           onMergeDocuments={() => setShowMergeModal(true)}
         />
       </div>
+
+      {/* Custom drag preview for group cards */}
+      <GroupDragLayer />
 
       <AnimatePresence>
         {reviewGroup && (
@@ -3112,6 +3337,9 @@ export function FileHubContent() {
             onClose={() => setShowMergeModal(false)}
             onMerge={(name, orderedFileIds) => {
               mergeDocumentsIntoGroup(name, orderedFileIds);
+              toast.success("Documents combined", {
+                description: `Created "${name}" with ${orderedFileIds.length} page${orderedFileIds.length !== 1 ? "s" : ""}.`,
+              });
             }}
           />
         )}
@@ -3129,6 +3357,9 @@ export function FileHubContent() {
               mergeDocumentsIntoGroup(name, orderedFileIds);
               clearSelection();
               setShowCombineModal(false);
+              toast.success("Documents combined", {
+                description: `Created "${name}" with ${orderedFileIds.length} page${orderedFileIds.length !== 1 ? "s" : ""}.`,
+              });
             }}
           />
         )}
