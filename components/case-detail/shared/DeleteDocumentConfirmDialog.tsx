@@ -44,7 +44,7 @@ export function DeleteDocumentConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <AlertDialogContent>
+      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
         <AlertDialogHeader>
           <AlertDialogTitle className="text-balance">
             Delete &ldquo;{groupTitle}&rdquo;?
