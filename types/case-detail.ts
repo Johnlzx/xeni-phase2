@@ -529,6 +529,9 @@ export interface CaseDetailActions {
     orderedFileIds: string[]
   ) => void;
 
+  // Move all files from source groups into target group (group-to-group merging)
+  moveDocumentsIntoGroup: (targetGroupId: string, sourceGroupIds: string[]) => void;
+
   // Folder Upload (recursive folder upload with path parsing)
   uploadFolder: (files: Array<{ file: File; relativePath: string }>) => void;
 

@@ -19,9 +19,11 @@ import {
   Trash2,
   RotateCcw,
   Copy,
+  MoreVertical,
 } from "lucide-react";
-import { useCaseDetailStore } from "@/store/case-detail-store";
+import { useCaseDetailStore, useGroupChecklistBindings } from "@/store/case-detail-store";
 import type { DocumentFile, DocumentGroup } from "@/types/case-detail";
+import { DeleteDocumentConfirmDialog } from "./DeleteDocumentConfirmDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -174,12 +176,14 @@ const GridThumbnail = ({
   groupId,
   isSelected,
   onToggleSelect,
+  selectedPageIds,
 }: {
   page: DocumentFile;
   pageIndex: number;
   groupId: string;
   isSelected: boolean;
   onToggleSelect: (pageId: string, shiftKey: boolean) => void;
+  selectedPageIds: Set<string>;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const reorderFileInGroup = useCaseDetailStore(
@@ -199,12 +203,19 @@ const GridThumbnail = ({
 
   const [{ isDragging }, drag] = useDrag({
     type: ItemTypes.PAGE,
-    item: () => ({ id: page.id, pageIndex, groupId }),
+    item: () => ({
+      id: page.id,
+      pageIndex,
+      groupId,
+      selectedIds: selectedPageIds.has(page.id)
+        ? Array.from(selectedPageIds)
+        : undefined,
+    }),
     collect: (monitor) => ({ isDragging: monitor.isDragging() }),
   });
 
   const [{ isOver }, drop] = useDrop<
-    { id: string; pageIndex: number; groupId: string },
+    { id: string; pageIndex: number; groupId: string; selectedIds?: string[] },
     void,
     { isOver: boolean }
   >(
@@ -312,6 +323,68 @@ const GridThumbnail = ({
 };
 
 // ============================================================================
+// GRID SIDEBAR DROP TARGET (for drag-to-move in grid view)
+// ============================================================================
+const GridSidebarDropTarget = ({
+  group,
+  onDrop,
+}: {
+  group: DocumentGroup;
+  onDrop: (
+    targetGroupId: string,
+    targetGroupTitle: string,
+    draggedFileId: string,
+    selectedIds: string[] | undefined,
+  ) => void;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const [{ isOver }, drop] = useDrop<
+    { id: string; pageIndex: number; groupId: string; selectedIds?: string[] },
+    void,
+    { isOver: boolean }
+  >(
+    () => ({
+      accept: ItemTypes.PAGE,
+      drop: (item) => {
+        onDrop(group.id, group.title, item.id, item.selectedIds);
+      },
+      collect: (monitor) => ({ isOver: monitor.isOver({ shallow: true }) }),
+    }),
+    [group.id, group.title, onDrop],
+  );
+
+  drop(ref);
+
+  const activeFiles = group.files.filter((f) => !f.isRemoved);
+  const displayType = group.tag
+    .split("-")
+    .map((word) => word.toUpperCase())
+    .join(" ");
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "px-2.5 py-2 rounded-lg border transition-all cursor-default",
+        isOver
+          ? "border-[#0E4268] ring-2 ring-[#0E4268]/20 bg-[#0E4268]/5"
+          : "border-stone-200 bg-stone-50 hover:border-stone-300",
+      )}
+    >
+      <p className="text-xs font-medium text-stone-700 truncate leading-tight">
+        {group.title}
+      </p>
+      <p className="text-[10px] text-stone-400 mt-0.5">
+        <span className="uppercase tracking-wide">{displayType}</span>
+        <span className="mx-1">&middot;</span>
+        <span>{activeFiles.length}p</span>
+      </p>
+    </div>
+  );
+};
+
+// ============================================================================
 // CATEGORY REVIEW MODAL
 // ============================================================================
 export interface CategoryReviewModalProps {
@@ -335,6 +408,11 @@ export function CategoryReviewModal({
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(
     null,
   );
+  const [pendingMoveTarget, setPendingMoveTarget] = useState<{
+    targetGroupId: string;
+    targetGroupTitle: string;
+    fileIds: string[];
+  } | null>(null);
 
   const confirmGroupReview = useCaseDetailStore(
     (state) => state.confirmGroupReview,
@@ -351,6 +429,7 @@ export function CategoryReviewModal({
   const deleteDocumentGroup = useCaseDetailStore(
     (state) => state.deleteDocumentGroup,
   );
+  const checklistBindings = useGroupChecklistBindings(group.id);
 
   // Clear hasChanges flag when modal opens
   useEffect(() => {
@@ -465,6 +544,27 @@ export function CategoryReviewModal({
     });
     handleClearSelection();
     setShowDeleteConfirm(false);
+  };
+
+  // Sidebar drop handler
+  const handleSidebarDrop = (
+    targetGroupId: string,
+    targetGroupTitle: string,
+    draggedFileId: string,
+    selectedIds: string[] | undefined,
+  ) => {
+    const fileIds =
+      selectedIds && selectedIds.length > 0 ? selectedIds : [draggedFileId];
+    setPendingMoveTarget({ targetGroupId, targetGroupTitle, fileIds });
+  };
+
+  const confirmMove = () => {
+    if (!pendingMoveTarget) return;
+    pendingMoveTarget.fileIds.forEach((fileId) => {
+      moveFileToGroup(fileId, pendingMoveTarget.targetGroupId);
+    });
+    handleClearSelection();
+    setPendingMoveTarget(null);
   };
 
   // Close on escape
@@ -583,6 +683,28 @@ export function CategoryReviewModal({
               <FilePlus size={12} />
               Add
             </button>
+
+            {!group.isSpecial && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-1 rounded text-stone-400 hover:text-stone-600 hover:bg-stone-200 transition-colors"
+                    aria-label="More options"
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[140px]">
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteCategoryConfirm(true)}
+                    className="text-xs text-rose-600 focus:text-rose-600 cursor-pointer"
+                  >
+                    <Trash2 size={14} className="mr-2" />
+                    Delete Category
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
 
@@ -642,9 +764,39 @@ export function CategoryReviewModal({
                   {/* Preview Footer - same height as Grid footer */}
                   <div className="shrink-0 px-4 py-2 bg-white border-t border-stone-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-stone-500 tabular-nums">
-                        Page {currentPageIndex + 1} of {activeFiles.length}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-stone-500 tabular-nums">
+                          Page {currentPageIndex + 1} of {activeFiles.length}
+                        </span>
+                        {/* Move to dropdown for current page */}
+                        {currentPage && otherGroups.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 rounded transition-colors">
+                                <FolderInput size={12} />
+                                Move to
+                                <ChevronDown size={10} />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                              {otherGroups.map((g) => (
+                                <DropdownMenuItem
+                                  key={g.id}
+                                  onClick={() => {
+                                    moveFileToGroup(currentPage.id, g.id);
+                                    // Adjust page index if needed
+                                    if (currentPageIndex >= activeFiles.length - 1 && currentPageIndex > 0) {
+                                      setCurrentPageIndex(currentPageIndex - 1);
+                                    }
+                                  }}
+                                >
+                                  {g.title}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                       {isPending && (
                         <button
                           onClick={handleConfirm}
@@ -718,20 +870,45 @@ export function CategoryReviewModal({
               )}
             </div>
 
-            {/* Grid content - shows all pages including removed ones with visual marker */}
-            <div className="flex-1 overflow-auto p-6 bg-stone-50">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {group.files.map((page, idx) => (
-                  <GridThumbnail
-                    key={page.id}
-                    page={page}
-                    pageIndex={idx}
-                    groupId={group.id}
-                    isSelected={selectedPageIds.has(page.id)}
-                    onToggleSelect={handleToggleSelect}
-                  />
-                ))}
+            {/* Grid content + sidebar */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Grid content - shows all pages including removed ones with visual marker */}
+              <div className="flex-1 overflow-auto p-6 bg-stone-50">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {group.files.map((page, idx) => (
+                    <GridThumbnail
+                      key={page.id}
+                      page={page}
+                      pageIndex={idx}
+                      groupId={group.id}
+                      isSelected={selectedPageIds.has(page.id)}
+                      onToggleSelect={handleToggleSelect}
+                      selectedPageIds={selectedPageIds}
+                    />
+                  ))}
+                </div>
               </div>
+
+              {/* Right sidebar - drop targets for other groups (only when pages selected) */}
+              {hasSelection && otherGroups.length > 0 && (
+                <div className="w-48 shrink-0 border-l border-stone-200 bg-white overflow-y-auto">
+                  <div className="p-3 space-y-2">
+                    <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
+                      Move to
+                    </p>
+                    <p className="text-[10px] text-stone-400 mb-2">
+                      Drag pages here
+                    </p>
+                    {otherGroups.map((g) => (
+                      <GridSidebarDropTarget
+                        key={g.id}
+                        group={g}
+                        onDrop={handleSidebarDrop}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Grid Footer - shows selection actions OR confirm button */}
@@ -894,16 +1071,16 @@ export function CategoryReviewModal({
           )}
         </AnimatePresence>
 
-        {/* Delete Category Confirmation Dialog */}
+        {/* Move Confirmation Dialog */}
         <AnimatePresence>
-          {showDeleteCategoryConfirm && (
+          {pendingMoveTarget && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
               className="absolute inset-0 z-10 flex items-center justify-center bg-black/40"
-              onClick={() => setShowDeleteCategoryConfirm(false)}
+              onClick={() => setPendingMoveTarget(null)}
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
@@ -913,34 +1090,46 @@ export function CategoryReviewModal({
                 className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4"
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold text-stone-800 mb-2 text-balance">
-                  Remove "{group.title}" category?
+                <h3 className="text-lg font-semibold text-stone-800 mb-2">
+                  Move {pendingMoveTarget.fileIds.length} page
+                  {pendingMoveTarget.fileIds.length > 1 ? "s" : ""} to &ldquo;
+                  {pendingMoveTarget.targetGroupTitle}&rdquo;?
                 </h3>
-                <p className="text-sm text-stone-500 mb-6 text-pretty">
-                  This empty category will be removed from your document list.
-                  You can always create a new category later.
+                <p className="text-sm text-stone-500 mb-6">
+                  The selected page{pendingMoveTarget.fileIds.length > 1 ? "s" : ""} will be moved to the target document.
                 </p>
                 <div className="flex items-center justify-end gap-2">
                   <button
-                    onClick={() => setShowDeleteCategoryConfirm(false)}
+                    onClick={() => setPendingMoveTarget(null)}
                     className="px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={() => {
-                      deleteDocumentGroup(group.id);
-                      onClose();
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
+                    onClick={confirmMove}
+                    className="px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg transition-colors"
                   >
-                    Remove
+                    Move
                   </button>
                 </div>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Delete Category Confirmation Dialog */}
+        <DeleteDocumentConfirmDialog
+          open={showDeleteCategoryConfirm}
+          groupTitle={group.title}
+          fileCount={activeFiles.length}
+          checklistBindings={checklistBindings}
+          onConfirm={() => {
+            onClose();
+            // Delay deletion to next frame so modal closes first
+            setTimeout(() => deleteDocumentGroup(group.id), 0);
+          }}
+          onCancel={() => setShowDeleteCategoryConfirm(false)}
+        />
         </motion.div>
       </div>
   );

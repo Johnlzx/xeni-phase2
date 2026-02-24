@@ -1251,13 +1251,54 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       deleteDocumentGroup: (groupId: string) => {
         set(
           (state) => {
+            const group = state.documentGroups.find((g) => g.id === groupId);
+            if (!group) return state;
+
+            const deletedFileIds = new Set(group.fileIds);
+            const newAllFiles = { ...state.allFiles };
+
+            // Clean up containerIds for files in the deleted group
+            for (const fileId of deletedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                const updatedContainerIds = file.containerIds.filter((cid) => cid !== groupId);
+                newAllFiles[fileId] = { ...file, containerIds: updatedContainerIds };
+              }
+            }
+
             const newGroups = state.documentGroups.filter(
               (g) => g.id !== groupId,
             );
-            const previews = syncFilePreviewsFromGroups(newGroups);
+
+            // Clean up assessmentReferenceDocIds
+            const newAssessmentRefIds = state.assessmentReferenceDocIds.filter(
+              (id) => id !== groupId,
+            );
+
+            // Clean up sectionReferenceDocIds
+            const newSectionRefIds: Record<string, string[]> = {};
+            for (const [sectionId, docIds] of Object.entries(state.sectionReferenceDocIds)) {
+              newSectionRefIds[sectionId] = docIds.filter((id) => id !== groupId);
+            }
+
+            // Clean up enhancedChecklistItems: unlink requiredEvidence referencing deleted files or groupId
+            const newEnhancedItems = state.enhancedChecklistItems.map((item) => ({
+              ...item,
+              requiredEvidence: item.requiredEvidence?.map((ev) =>
+                (ev.linkedFileId && (deletedFileIds.has(ev.linkedFileId) || ev.linkedFileId === groupId))
+                  ? { ...ev, linkedFileId: undefined, linkedFileName: undefined, isUploaded: false }
+                  : ev
+              ),
+            }));
+
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
             return {
+              allFiles: newAllFiles,
               documentGroups: newGroups,
               uploadedFilePreviews: previews,
+              assessmentReferenceDocIds: newAssessmentRefIds,
+              sectionReferenceDocIds: newSectionRefIds,
+              enhancedChecklistItems: newEnhancedItems,
             };
           },
           false,
@@ -1839,45 +1880,57 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       },
 
       // Add multiple files to an existing container (moves files from their current containers)
-      // Copy files into a target group - source files remain unchanged
+      // Move files into a target group (move semantics - removes from source containers)
       addFilesToGroup: (groupId: string, orderedFileIds: string[]) => {
         set(
           (state) => {
             const targetGroup = state.documentGroups.find((g) => g.id === groupId);
             if (!targetGroup) return state;
 
-            const timestamp = Date.now();
             const newAllFiles = { ...state.allFiles };
-            const copiedFileIds: string[] = [];
+            const movedFileIds: string[] = [];
 
-            // Create COPIES of each file for the target group
-            // Original files remain unchanged in their source containers
-            for (let i = 0; i < orderedFileIds.length; i++) {
-              const originalFileId = orderedFileIds[i];
-              const originalFile = newAllFiles[originalFileId];
-              if (originalFile) {
-                const newFileId = `${originalFileId}_copy_${timestamp}_${i}`;
-                newAllFiles[newFileId] = {
-                  ...originalFile,
-                  id: newFileId,
+            // Move each file: update containerIds, no copies
+            for (const fileId of orderedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                // Remove from old containers, add to target
+                const oldContainerIds = file.containerIds.filter((cid) => cid !== groupId);
+                newAllFiles[fileId] = {
+                  ...file,
                   containerIds: [groupId],
                   isNew: true,
                 };
-                copiedFileIds.push(newFileId);
+                movedFileIds.push(fileId);
               }
             }
 
-            // Only update the target group - source groups remain unchanged
-            const updatedGroups = state.documentGroups.map((group) => {
+            // Update groups: add files to target, remove from sources
+            const movedFileIdSet = new Set(movedFileIds);
+            let updatedGroups = state.documentGroups.map((group) => {
               if (group.id === groupId) {
+                // Add moved files to target (avoid duplicates)
+                const existingIds = new Set(group.fileIds);
+                const newFileIds = movedFileIds.filter((id) => !existingIds.has(id));
                 return {
                   ...group,
-                  fileIds: [...group.fileIds, ...copiedFileIds],
+                  fileIds: [...group.fileIds, ...newFileIds],
                   hasChanges: true,
                 };
               }
+              // Remove moved files from source groups
+              const filteredFileIds = group.fileIds.filter((id) => !movedFileIdSet.has(id));
+              if (filteredFileIds.length !== group.fileIds.length) {
+                return { ...group, fileIds: filteredFileIds };
+              }
               return group;
             });
+
+            // Remove empty source groups (excluding unclassified and target)
+            const emptyGroupIds = updatedGroups
+              .filter((g) => g.id !== groupId && g.id !== "unclassified" && g.fileIds.length === 0)
+              .map((g) => g.id);
+            updatedGroups = updatedGroups.filter((g) => !emptyGroupIds.includes(g.id));
 
             const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
 
@@ -1892,8 +1945,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
-      // Merge (copy) multiple files into a new combined document group
-      // Source files remain unchanged - this creates copies for the merged document
+      // Merge files into a new combined document group (move semantics)
+      // Files are moved from source containers, not copied
       mergeDocumentsIntoGroup: (
         name: string,
         orderedFileIds: string[]
@@ -1903,32 +1956,60 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             const timestamp = Date.now();
             const newGroupId = `merged_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
             const newAllFiles = { ...state.allFiles };
+            const movedFileIds: string[] = [];
 
-            // Create COPIES of selected files for the merged document
-            // Original files remain unchanged in their source containers
-            const copiedFileIds: string[] = [];
-
-            for (let i = 0; i < orderedFileIds.length; i++) {
-              const originalFileId = orderedFileIds[i];
-              const originalFile = newAllFiles[originalFileId];
-              if (originalFile) {
-                // Create a new file ID for the copy
-                const newFileId = `${originalFileId}_copy_${timestamp}_${i}`;
-
-                // Create a copy of the file for the new merged group
-                newAllFiles[newFileId] = {
-                  ...originalFile,
-                  id: newFileId,
+            // Move files: update containerIds to point to new group
+            for (const fileId of orderedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                newAllFiles[fileId] = {
+                  ...file,
                   containerIds: [newGroupId],
                   isNew: true,
                 };
-                copiedFileIds.push(newFileId);
+                movedFileIds.push(fileId);
               }
             }
 
-            // Source groups remain unchanged - no files are removed
+            const movedFileIdSet = new Set(movedFileIds);
 
-            // Create new merged group with copied files
+            // Remove moved files from source groups
+            let updatedGroups = state.documentGroups.map((group) => {
+              const filteredFileIds = group.fileIds.filter((id) => !movedFileIdSet.has(id));
+              if (filteredFileIds.length !== group.fileIds.length) {
+                return { ...group, fileIds: filteredFileIds };
+              }
+              return group;
+            });
+
+            // Remove empty source groups (excluding unclassified)
+            const emptyGroupIds = updatedGroups
+              .filter((g) => g.id !== "unclassified" && g.fileIds.length === 0)
+              .map((g) => g.id);
+
+            // Clean up checklist references for removed groups
+            let newAssessmentRefIds = state.assessmentReferenceDocIds;
+            const newSectionRefIds = { ...state.sectionReferenceDocIds };
+            let newEnhancedItems = state.enhancedChecklistItems;
+
+            if (emptyGroupIds.length > 0) {
+              const emptySet = new Set(emptyGroupIds);
+              updatedGroups = updatedGroups.filter((g) => !emptySet.has(g.id));
+              newAssessmentRefIds = newAssessmentRefIds.filter((id) => !emptySet.has(id));
+              for (const [sectionId, docIds] of Object.entries(newSectionRefIds)) {
+                newSectionRefIds[sectionId] = docIds.filter((id) => !emptySet.has(id));
+              }
+              newEnhancedItems = newEnhancedItems.map((item) => ({
+                ...item,
+                requiredEvidence: item.requiredEvidence?.map((ev) =>
+                  (ev.linkedFileId && emptySet.has(ev.linkedFileId))
+                    ? { ...ev, linkedFileId: undefined, linkedFileName: undefined, isUploaded: false }
+                    : ev
+                ),
+              }));
+            }
+
+            // Create new merged group with moved files
             const newGroup: DocumentGroup = {
               id: newGroupId,
               title: name,
@@ -1936,22 +2017,114 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
               tag: "Other Documents",
               mergedFileName: `${name.replace(/\s+/g, "_")}_Merged.pdf`,
               status: "pending",
-              fileIds: copiedFileIds,
+              fileIds: movedFileIds,
               files: [],
               hasChanges: true,
             };
 
-            const updatedGroups = [...state.documentGroups, newGroup];
+            updatedGroups = [...updatedGroups, newGroup];
             const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
 
             return {
               allFiles: newAllFiles,
               documentGroups: updatedGroups,
               uploadedFilePreviews: previews,
+              assessmentReferenceDocIds: newAssessmentRefIds,
+              sectionReferenceDocIds: newSectionRefIds,
+              enhancedChecklistItems: newEnhancedItems,
             };
           },
           false,
           "mergeDocumentsIntoGroup",
+        );
+      },
+
+      // Move all files from source groups into target group (for group-to-group merging)
+      moveDocumentsIntoGroup: (targetGroupId: string, sourceGroupIds: string[]) => {
+        set(
+          (state) => {
+            const targetGroup = state.documentGroups.find((g) => g.id === targetGroupId);
+            if (!targetGroup) return state;
+
+            const newAllFiles = { ...state.allFiles };
+            const allMovedFileIds: string[] = [];
+            const sourceIdSet = new Set(sourceGroupIds);
+
+            // Collect all file IDs from source groups and update their containerIds
+            for (const sourceId of sourceGroupIds) {
+              const sourceGroup = state.documentGroups.find((g) => g.id === sourceId);
+              if (sourceGroup) {
+                for (const fileId of sourceGroup.fileIds) {
+                  const file = newAllFiles[fileId];
+                  if (file) {
+                    // Replace source container with target
+                    const newContainerIds = file.containerIds
+                      .filter((cid) => !sourceIdSet.has(cid))
+                      .concat(targetGroupId);
+                    // Deduplicate
+                    newAllFiles[fileId] = {
+                      ...file,
+                      containerIds: [...new Set(newContainerIds)],
+                    };
+                    allMovedFileIds.push(fileId);
+                  }
+                }
+              }
+            }
+
+            // Update target group: add moved files
+            const existingTargetIds = new Set(targetGroup.fileIds);
+            const newFileIds = allMovedFileIds.filter((id) => !existingTargetIds.has(id));
+
+            let updatedGroups = state.documentGroups.map((group) => {
+              if (group.id === targetGroupId) {
+                return {
+                  ...group,
+                  fileIds: [...group.fileIds, ...newFileIds],
+                  hasChanges: true,
+                };
+              }
+              // Clear source groups
+              if (sourceIdSet.has(group.id)) {
+                return { ...group, fileIds: [] };
+              }
+              return group;
+            });
+
+            // Remove now-empty source groups
+            updatedGroups = updatedGroups.filter((g) => !sourceIdSet.has(g.id));
+
+            // Clean up checklist references for removed source groups
+            let newAssessmentRefIds = state.assessmentReferenceDocIds;
+            const newSectionRefIds = { ...state.sectionReferenceDocIds };
+            let newEnhancedItems = state.enhancedChecklistItems;
+
+            newAssessmentRefIds = newAssessmentRefIds.filter((id) => !sourceIdSet.has(id));
+            for (const [sectionId, docIds] of Object.entries(newSectionRefIds)) {
+              newSectionRefIds[sectionId] = docIds.filter((id) => !sourceIdSet.has(id));
+            }
+            newEnhancedItems = newEnhancedItems.map((item) => ({
+              ...item,
+              requiredEvidence: item.requiredEvidence?.map((ev) =>
+                (ev.linkedFileId && sourceIdSet.has(ev.linkedFileId))
+                  ? { ...ev, linkedFileId: undefined, linkedFileName: undefined, isUploaded: false }
+                  : ev
+              ),
+            }));
+
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
+              assessmentReferenceDocIds: newAssessmentRefIds,
+              sectionReferenceDocIds: newSectionRefIds,
+              enhancedChecklistItems: newEnhancedItems,
+            };
+          },
+          false,
+          "moveDocumentsIntoGroup",
         );
       },
 
@@ -4640,3 +4813,26 @@ export const useIsFileShared = (fileId: string) =>
     const file = state.allFiles[fileId];
     return (file?.containerIds.length ?? 0) > 1;
   });
+
+// Get checklist bindings for a document group (used in delete confirmation)
+export type GroupChecklistBinding =
+  | { type: 'assessment' }
+  | { type: 'section'; sectionId: string };
+
+export const useGroupChecklistBindings = (groupId: string): GroupChecklistBinding[] => {
+  const assessmentRefIds = useCaseDetailStore((state) => state.assessmentReferenceDocIds);
+  const sectionRefIds = useCaseDetailStore((state) => state.sectionReferenceDocIds);
+
+  return useMemo(() => {
+    const bindings: GroupChecklistBinding[] = [];
+    if (assessmentRefIds.includes(groupId)) {
+      bindings.push({ type: 'assessment' });
+    }
+    for (const [sectionId, docIds] of Object.entries(sectionRefIds)) {
+      if (docIds.includes(groupId)) {
+        bindings.push({ type: 'section', sectionId });
+      }
+    }
+    return bindings;
+  }, [groupId, assessmentRefIds, sectionRefIds]);
+};
