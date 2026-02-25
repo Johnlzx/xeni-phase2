@@ -1058,12 +1058,15 @@ const CategoryCard = ({
   const activeFiles = group.files.filter((f) => !f.isRemoved);
   const totalPages = activeFiles.length;
 
-  // Jump to latest page when new files are added
+  // Keep currentPageIndex in bounds when pages change
   const prevTotalPagesRef = useRef(totalPages);
   useEffect(() => {
     if (totalPages > prevTotalPagesRef.current) {
       // New files added, jump to the last page
       setCurrentPageIndex(totalPages - 1);
+    } else if (totalPages < prevTotalPagesRef.current && totalPages > 0) {
+      // Pages removed, clamp index to last available page
+      setCurrentPageIndex((prev) => Math.min(prev, totalPages - 1));
     }
     prevTotalPagesRef.current = totalPages;
   }, [totalPages]);
