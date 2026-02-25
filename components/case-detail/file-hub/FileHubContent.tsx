@@ -3215,7 +3215,8 @@ export function FileHubContent() {
     (state) => state.clearHighlightedGroup,
   );
 
-  const [reviewGroup, setReviewGroup] = useState<DocumentGroup | null>(null);
+  const [reviewGroupId, setReviewGroupId] = useState<string | null>(null);
+  const reviewGroup = reviewGroupId ? groups.find((g) => g.id === reviewGroupId) ?? null : null;
   const [previewPage, setPreviewPage] = useState<{
     file: DocumentFile;
     index: number;
@@ -3313,7 +3314,7 @@ export function FileHubContent() {
             group={group}
             allGroups={groups}
             unclassifiedFiles={unclassifiedFiles}
-            onReview={() => setReviewGroup(group)}
+            onReview={() => setReviewGroupId(group.id)}
             isHighlighted={highlightedGroupId === group.id}
             onHighlightComplete={clearHighlightedGroup}
             isSelected={selectedGroupIds.has(group.id)}
@@ -3339,7 +3340,7 @@ export function FileHubContent() {
           <CategoryReviewModal
             group={reviewGroup}
             allGroups={groups}
-            onClose={() => setReviewGroup(null)}
+            onClose={() => setReviewGroupId(null)}
           />
         )}
       </AnimatePresence>
