@@ -30,6 +30,7 @@ import {
   FileUp,
   FolderUp,
   MoreVertical,
+  RefreshCw,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -996,6 +997,7 @@ const CategoryCard = ({
     (state) => state.confirmGroupReview,
   );
   const uploadToGroup = useCaseDetailStore((state) => state.uploadToGroup);
+  const replaceGroupFiles = useCaseDetailStore((state) => state.replaceGroupFiles);
   const renameDocumentGroup = useCaseDetailStore(
     (state) => state.renameDocumentGroup,
   );
@@ -1526,6 +1528,27 @@ const CategoryCard = ({
               <FileStack size={14} className="mr-2" />
               <span>From Documents</span>
             </DropdownMenuItem>
+
+            {/* Replace */}
+            {totalPages > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const pageCount = Math.floor(Math.random() * 3) + 1;
+                    replaceGroupFiles(group.id, pageCount);
+                    toast.success("Document replaced", {
+                      description: `"${group.title}" replaced with ${pageCount} new page${pageCount !== 1 ? "s" : ""}.`,
+                    });
+                  }}
+                  className="text-xs cursor-pointer"
+                >
+                  <RefreshCw size={14} className="mr-2" />
+                  Replace
+                </DropdownMenuItem>
+              </>
+            )}
 
             <DropdownMenuSeparator />
 

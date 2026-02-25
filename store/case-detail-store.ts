@@ -1716,6 +1716,65 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      replaceGroupFiles: (groupId: string, fileCount: number = 1) => {
+        set(
+          (state) => {
+            const group = state.documentGroups.find(g => g.id === groupId);
+            if (!group) return state;
+
+            const newAllFiles = { ...state.allFiles };
+
+            // Mark all existing files in the group as removed
+            for (const fileId of group.fileIds) {
+              const file = newAllFiles[fileId];
+              if (file && !file.isRemoved) {
+                newAllFiles[fileId] = { ...file, isRemoved: true, isNew: false };
+              }
+            }
+
+            // Upload new files (same logic as uploadToGroup)
+            const timestamp = Date.now();
+            const newFileIds: string[] = [];
+
+            for (let i = 0; i < fileCount; i++) {
+              const fileId = `file_${timestamp}_${i}`;
+              newAllFiles[fileId] = {
+                id: fileId,
+                name: `Replaced_Page_${i + 1}.pdf`,
+                size: "0.5 MB",
+                pages: 1,
+                date: "Just now",
+                type: "pdf",
+                isNew: true,
+                containerIds: [groupId],
+              };
+              newFileIds.push(fileId);
+            }
+
+            const newGroups = state.documentGroups.map(g => {
+              if (g.id === groupId) {
+                return {
+                  ...g,
+                  fileIds: [...g.fileIds, ...newFileIds],
+                  status: "pending" as const,
+                  hasChanges: true,
+                };
+              }
+              return g;
+            });
+
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
+            return {
+              allFiles: newAllFiles,
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "replaceGroupFiles",
+        );
+      },
+
       // Upload and auto-classify documents (simulates AI classification)
       uploadAndAutoClassify: (totalPages: number = 8) => {
         set(
