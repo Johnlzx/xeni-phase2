@@ -12,14 +12,17 @@ import {
   CheckCircle2,
   Clock,
   Check,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   useCaseDetailStore,
   useDocumentGroups,
   useIsLoadingDocuments,
+  useGroupChecklistBindings,
 } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
-import { CategoryReviewModal } from "../shared";
+import { CategoryReviewModal, DeleteDocumentConfirmDialog } from "../shared";
 import type { DocumentGroup } from "@/types/case-detail";
 
 export function FileUploadZone() {
@@ -118,61 +121,13 @@ export function FileUploadZone() {
             {/* Scrollable icon grid - hidden scrollbar */}
             <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
               <div className="grid grid-cols-4 gap-2">
-                {classifiedGroups.map((group) => {
-                  const isReviewed = group.status === "reviewed";
-                  const isSpecial = group.isSpecial;
-
-                  return (
-                    <button
-                      key={group.id}
-                      onClick={() => handleOpenReview(group)}
-                      title={isSpecial ? `${group.title} (Auto-confirmed)` : group.title}
-                      className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors hover:bg-stone-50"
-                    >
-                      {/* Mini PDF page thumbnail with status badge */}
-                      <div className="relative">
-                        {/* Page body */}
-                        <div className="relative w-10 h-[52px] bg-white rounded-[3px] border border-stone-200 shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
-                          {/* Dog-ear / folded corner */}
-                          <div className="absolute top-0 right-0 w-[10px] h-[10px]">
-                            <div className="absolute top-0 right-0 w-0 h-0 border-t-[10px] border-t-stone-100 border-l-[10px] border-l-transparent" />
-                            <div className="absolute top-0 right-0 w-[10px] h-[1px] bg-stone-200 origin-top-right rotate-45 translate-y-[6.5px] -translate-x-[1px]" />
-                          </div>
-                          {/* Simulated text lines */}
-                          <div className="px-[5px] pt-[13px] space-y-[3px]">
-                            <div className="h-[2px] rounded-full bg-stone-200 w-full" />
-                            <div className="h-[2px] rounded-full bg-stone-200 w-[85%]" />
-                            <div className="h-[2px] rounded-full bg-stone-100 w-full" />
-                            <div className="h-[2px] rounded-full bg-stone-100 w-[70%]" />
-                            <div className="h-[2px] rounded-full bg-stone-100 w-[90%]" />
-                            <div className="h-[2px] rounded-full bg-stone-100 w-[50%]" />
-                          </div>
-                        </div>
-                        {/* Status badge - bottom right */}
-                        <div className={cn(
-                          "absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center",
-                          isSpecial
-                            ? "bg-stone-500"
-                            : isReviewed
-                              ? "bg-emerald-500"
-                              : "bg-amber-500",
-                        )}>
-                          {isSpecial ? (
-                            <Check className="size-2.5 text-white" strokeWidth={3} />
-                          ) : isReviewed ? (
-                            <CheckCircle2 className="size-2.5 text-white" strokeWidth={3} />
-                          ) : (
-                            <Clock className="size-2.5 text-white" strokeWidth={3} />
-                          )}
-                        </div>
-                      </div>
-                      {/* File name */}
-                      <span className="text-xs font-medium text-stone-600 truncate max-w-[72px] text-center">
-                        {group.title}
-                      </span>
-                    </button>
-                  );
-                })}
+                {classifiedGroups.map((group) => (
+                  <DocumentThumbnailCard
+                    key={group.id}
+                    group={group}
+                    onOpenReview={handleOpenReview}
+                  />
+                ))}
               </div>
             </div>
 
@@ -215,5 +170,135 @@ export function FileUploadZone() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ============================================================================
+// DOCUMENT THUMBNAIL CARD — hover actions for confirm & delete
+// ============================================================================
+function DocumentThumbnailCard({
+  group,
+  onOpenReview,
+}: {
+  group: DocumentGroup;
+  onOpenReview: (group: DocumentGroup) => void;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const confirmGroupReview = useCaseDetailStore(
+    (state) => state.confirmGroupReview,
+  );
+  const deleteDocumentGroup = useCaseDetailStore(
+    (state) => state.deleteDocumentGroup,
+  );
+  const checklistBindings = useGroupChecklistBindings(group.id);
+
+  const isReviewed = group.status === "reviewed";
+  const isSpecial = group.isSpecial;
+  const activeFiles = group.files.filter((f) => !f.isRemoved);
+  const showActions = isHovered && !isSpecial;
+
+  return (
+    <>
+      <button
+        key={group.id}
+        onClick={() => onOpenReview(group)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        title={isSpecial ? `${group.title} (Auto-confirmed)` : group.title}
+        className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors hover:bg-stone-50 relative"
+      >
+        {/* Mini PDF page thumbnail with status badge */}
+        <div className="relative">
+          {/* Page body */}
+          <div className="relative w-10 h-[52px] bg-white rounded-[3px] border border-stone-200 shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+            {/* Dog-ear / folded corner */}
+            <div className="absolute top-0 right-0 w-[10px] h-[10px]">
+              <div className="absolute top-0 right-0 w-0 h-0 border-t-[10px] border-t-stone-100 border-l-[10px] border-l-transparent" />
+              <div className="absolute top-0 right-0 w-[10px] h-[1px] bg-stone-200 origin-top-right rotate-45 translate-y-[6.5px] -translate-x-[1px]" />
+            </div>
+            {/* Simulated text lines */}
+            <div className="px-[5px] pt-[13px] space-y-[3px]">
+              <div className="h-[2px] rounded-full bg-stone-200 w-full" />
+              <div className="h-[2px] rounded-full bg-stone-200 w-[85%]" />
+              <div className="h-[2px] rounded-full bg-stone-100 w-full" />
+              <div className="h-[2px] rounded-full bg-stone-100 w-[70%]" />
+              <div className="h-[2px] rounded-full bg-stone-100 w-[90%]" />
+              <div className="h-[2px] rounded-full bg-stone-100 w-[50%]" />
+            </div>
+          </div>
+          {/* Status badge - bottom right */}
+          <div className={cn(
+            "absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center",
+            isSpecial
+              ? "bg-stone-500"
+              : isReviewed
+                ? "bg-emerald-500"
+                : "bg-amber-500",
+          )}>
+            {isSpecial ? (
+              <Check className="size-2.5 text-white" strokeWidth={3} />
+            ) : isReviewed ? (
+              <CheckCircle2 className="size-2.5 text-white" strokeWidth={3} />
+            ) : (
+              <Clock className="size-2.5 text-white" strokeWidth={3} />
+            )}
+          </div>
+        </div>
+        {/* File name */}
+        <span className="text-xs font-medium text-stone-600 truncate max-w-[72px] text-center">
+          {group.title}
+        </span>
+
+        {/* Hover action buttons */}
+        {showActions && (
+          <div className="absolute top-0.5 right-0.5 flex flex-col gap-0.5">
+            {!isReviewed && (
+              <div
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  confirmGroupReview(group.id);
+                  toast.success("Review confirmed", {
+                    description: `"${group.title}" marked as reviewed.`,
+                  });
+                }}
+                title="Confirm review"
+                className="size-5 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+              >
+                <Check className="size-2.5 text-white" strokeWidth={3} />
+              </div>
+            )}
+            <div
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteConfirm(true);
+              }}
+              title="Delete"
+              className="size-5 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+            >
+              <Trash2 className="size-2.5 text-white" strokeWidth={3} />
+            </div>
+          </div>
+        )}
+      </button>
+
+      <DeleteDocumentConfirmDialog
+        open={showDeleteConfirm}
+        groupTitle={group.title}
+        fileCount={activeFiles.length}
+        checklistBindings={checklistBindings}
+        onConfirm={() => {
+          deleteDocumentGroup(group.id);
+          setShowDeleteConfirm(false);
+          toast.success("Document deleted", {
+            description: `"${group.title}" has been removed.`,
+          });
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+    </>
   );
 }
