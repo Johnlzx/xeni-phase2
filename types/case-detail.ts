@@ -530,6 +530,12 @@ export interface CaseDetailActions {
     orderedFileIds: string[]
   ) => void;
 
+  // Duplicate Documents into new group (copy semantics — source groups remain)
+  duplicateDocumentsIntoGroup: (
+    name: string,
+    orderedFileIds: string[]
+  ) => void;
+
   // Move all files from source groups into target group (group-to-group merging)
   moveDocumentsIntoGroup: (targetGroupId: string, sourceGroupIds: string[]) => void;
 

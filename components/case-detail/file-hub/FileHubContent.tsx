@@ -974,6 +974,7 @@ const CategoryCard = ({
 
   const deleteDocumentGroup = useCaseDetailStore((state) => state.deleteDocumentGroup);
   const mergeDocumentsIntoGroup = useCaseDetailStore((state) => state.mergeDocumentsIntoGroup);
+  const duplicateDocumentsIntoGroup = useCaseDetailStore((state) => state.duplicateDocumentsIntoGroup);
   const checklistBindings = useGroupChecklistBindings(group.id);
 
   // Handle highlight animation and scroll into view
@@ -1533,7 +1534,7 @@ const CategoryCard = ({
             </DropdownMenuItem>
 
             {/* Replace */}
-            {totalPages > 0 && (
+            {totalPages > 0 && (group.id === "case_notes" || group.id === "passport") && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -1625,8 +1626,12 @@ const CategoryCard = ({
               .filter((g): g is DocumentGroup => g !== undefined),
           ]}
           onClose={() => setPendingMergeGroupIds(null)}
-          onCombine={(name, orderedFileIds) => {
-            mergeDocumentsIntoGroup(name, orderedFileIds);
+          onCombine={(name, orderedFileIds, mode) => {
+            if (mode === "duplicate") {
+              duplicateDocumentsIntoGroup(name, orderedFileIds);
+            } else {
+              mergeDocumentsIntoGroup(name, orderedFileIds);
+            }
             onMergeComplete?.();
             setPendingMergeGroupIds(null);
             toast.success("Documents combined", {
@@ -2296,12 +2301,13 @@ const MergeDocumentsModal = ({
 }: {
   groups: DocumentGroup[];
   onClose: () => void;
-  onMerge: (name: string, orderedFileIds: string[]) => void;
+  onMerge: (name: string, orderedFileIds: string[], mode: "move" | "duplicate") => void;
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState("");
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [orderedGroups, setOrderedGroups] = useState<DocumentGroup[]>([]);
+  const [mode, setMode] = useState<"move" | "duplicate">("move");
 
   // Collect available logical documents (groups with active files, excluding unclassified)
   const availableGroups = groups.filter(
@@ -2363,7 +2369,7 @@ const MergeDocumentsModal = ({
       const allFileIds = orderedGroups.flatMap((g) =>
         g.files.filter((f) => !f.isRemoved).map((f) => f.id)
       );
-      onMerge(name.trim(), allFileIds);
+      onMerge(name.trim(), allFileIds, mode);
       onClose();
     }
   };
@@ -2521,25 +2527,61 @@ const MergeDocumentsModal = ({
             </div>
           ) : (
             /* Step 2: Reorder documents */
-            <div className="flex-1 flex flex-col min-h-0">
-              <label className="text-xs font-medium text-stone-600 mb-2 block">
-                Arrange Document Order <span className="text-stone-400 font-normal">(drag to reorder)</span>
-              </label>
-              <div className="border border-stone-200 rounded-xl flex-1 overflow-hidden bg-stone-50/30">
-                <div className="max-h-[340px] overflow-y-auto p-2 space-y-1.5">
-                  {orderedGroups.map((group, index) => (
-                    <DraggableMergeDocumentItem
-                      key={group.id}
-                      group={group}
-                      index={index}
-                      moveFile={moveFile}
-                    />
-                  ))}
+            <div className="flex-1 flex flex-col min-h-0 space-y-4">
+              {/* Move / Duplicate toggle */}
+              <div>
+                <label className="text-xs font-medium text-stone-600 mb-1.5 block">
+                  Mode
+                </label>
+                <div className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
+                  <button
+                    onClick={() => setMode("move")}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                      mode === "move"
+                        ? "bg-white text-stone-800 shadow-sm"
+                        : "text-stone-500 hover:text-stone-700"
+                    )}
+                  >
+                    Move
+                  </button>
+                  <button
+                    onClick={() => setMode("duplicate")}
+                    className={cn(
+                      "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                      mode === "duplicate"
+                        ? "bg-white text-stone-800 shadow-sm"
+                        : "text-stone-500 hover:text-stone-700"
+                    )}
+                  >
+                    Duplicate
+                  </button>
                 </div>
+                <p className="text-[10px] text-stone-400 mt-1">
+                  {mode === "move" ? "Source documents will be removed" : "Source documents will be kept"}
+                </p>
               </div>
-              <p className="text-xs text-stone-500 mt-2">
-                {orderedGroups.length} document{orderedGroups.length !== 1 ? "s" : ""} will be combined in this order
-              </p>
+
+              <div className="flex-1 flex flex-col min-h-0">
+                <label className="text-xs font-medium text-stone-600 mb-2 block">
+                  Arrange Document Order <span className="text-stone-400 font-normal">(drag to reorder)</span>
+                </label>
+                <div className="border border-stone-200 rounded-xl flex-1 overflow-hidden bg-stone-50/30">
+                  <div className="max-h-[340px] overflow-y-auto p-2 space-y-1.5">
+                    {orderedGroups.map((group, index) => (
+                      <DraggableMergeDocumentItem
+                        key={group.id}
+                        group={group}
+                        index={index}
+                        moveFile={moveFile}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-stone-500 mt-2">
+                  {orderedGroups.length} document{orderedGroups.length !== 1 ? "s" : ""} will be combined in this order
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -2578,8 +2620,8 @@ const MergeDocumentsModal = ({
                 onClick={handleMerge}
                 className="px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg transition-colors flex items-center gap-1.5"
               >
-                <Layers size={16} />
-                Combine
+                {mode === "duplicate" ? <Copy size={16} /> : <Layers size={16} />}
+                {mode === "move" ? "Move & Combine" : "Duplicate & Combine"}
               </button>
             )}
           </div>
@@ -2599,10 +2641,11 @@ const CombineFromSelectionModal = ({
 }: {
   selectedGroups: DocumentGroup[];
   onClose: () => void;
-  onCombine: (name: string, orderedFileIds: string[]) => void;
+  onCombine: (name: string, orderedFileIds: string[], mode: "move" | "duplicate") => void;
 }) => {
   const [name, setName] = useState("");
   const [orderedDocs, setOrderedDocs] = useState<DocumentGroup[]>([]);
+  const [mode, setMode] = useState<"move" | "duplicate">("move");
 
   // Initialize ordered documents from selected groups
   useEffect(() => {
@@ -2631,7 +2674,7 @@ const CombineFromSelectionModal = ({
       const allFileIds = orderedDocs.flatMap((g) =>
         g.files.filter((f) => !f.isRemoved).map((f) => f.id)
       );
-      onCombine(name.trim(), allFileIds);
+      onCombine(name.trim(), allFileIds, mode);
     }
   };
 
@@ -2691,6 +2734,40 @@ const CombineFromSelectionModal = ({
             />
           </div>
 
+          {/* Move / Duplicate toggle */}
+          <div>
+            <label className="text-xs font-medium text-stone-600 mb-1.5 block">
+              Mode
+            </label>
+            <div className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
+              <button
+                onClick={() => setMode("move")}
+                className={cn(
+                  "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                  mode === "move"
+                    ? "bg-white text-stone-800 shadow-sm"
+                    : "text-stone-500 hover:text-stone-700"
+                )}
+              >
+                Move
+              </button>
+              <button
+                onClick={() => setMode("duplicate")}
+                className={cn(
+                  "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                  mode === "duplicate"
+                    ? "bg-white text-stone-800 shadow-sm"
+                    : "text-stone-500 hover:text-stone-700"
+                )}
+              >
+                Duplicate
+              </button>
+            </div>
+            <p className="text-[10px] text-stone-400 mt-1">
+              {mode === "move" ? "Source documents will be removed" : "Source documents will be kept"}
+            </p>
+          </div>
+
           {/* Document reorder list */}
           <div>
             <label className="text-xs font-medium text-stone-600 mb-1.5 block">
@@ -2727,8 +2804,8 @@ const CombineFromSelectionModal = ({
             disabled={!canCombine}
             className="px-4 py-1.5 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
           >
-            <Layers size={14} />
-            Combine
+            {mode === "duplicate" ? <Copy size={14} /> : <Layers size={14} />}
+            {mode === "move" ? "Move & Combine" : "Duplicate & Combine"}
           </button>
         </div>
       </motion.div>
@@ -3211,6 +3288,9 @@ export function FileHubContent() {
   const mergeDocumentsIntoGroup = useCaseDetailStore(
     (state) => state.mergeDocumentsIntoGroup,
   );
+  const duplicateDocumentsIntoGroup = useCaseDetailStore(
+    (state) => state.duplicateDocumentsIntoGroup,
+  );
   const clearHighlightedGroup = useCaseDetailStore(
     (state) => state.clearHighlightedGroup,
   );
@@ -3362,8 +3442,12 @@ export function FileHubContent() {
           <MergeDocumentsModal
             groups={groups}
             onClose={() => setShowMergeModal(false)}
-            onMerge={(name, orderedFileIds) => {
-              mergeDocumentsIntoGroup(name, orderedFileIds);
+            onMerge={(name, orderedFileIds, mode) => {
+              if (mode === "duplicate") {
+                duplicateDocumentsIntoGroup(name, orderedFileIds);
+              } else {
+                mergeDocumentsIntoGroup(name, orderedFileIds);
+              }
               toast.success("Documents combined", {
                 description: `Created "${name}" with ${orderedFileIds.length} page${orderedFileIds.length !== 1 ? "s" : ""}.`,
               });
@@ -3380,8 +3464,12 @@ export function FileHubContent() {
               .map((id) => groups.find((g) => g.id === id))
               .filter((g): g is DocumentGroup => g !== undefined)}
             onClose={() => setShowCombineModal(false)}
-            onCombine={(name, orderedFileIds) => {
-              mergeDocumentsIntoGroup(name, orderedFileIds);
+            onCombine={(name, orderedFileIds, mode) => {
+              if (mode === "duplicate") {
+                duplicateDocumentsIntoGroup(name, orderedFileIds);
+              } else {
+                mergeDocumentsIntoGroup(name, orderedFileIds);
+              }
               clearSelection();
               setShowCombineModal(false);
               toast.success("Documents combined", {

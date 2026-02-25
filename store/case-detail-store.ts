@@ -2098,6 +2098,57 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      // Duplicate files into a new combined group (copy semantics — source groups remain)
+      duplicateDocumentsIntoGroup: (
+        name: string,
+        orderedFileIds: string[]
+      ) => {
+        set(
+          (state) => {
+            const timestamp = Date.now();
+            const newGroupId = `merged_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+            const newAllFiles = { ...state.allFiles };
+            const copiedFileIds: string[] = [];
+
+            // Add new group reference to each file (file stays in source containers too)
+            for (const fileId of orderedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                newAllFiles[fileId] = {
+                  ...file,
+                  containerIds: [...file.containerIds, newGroupId],
+                };
+                copiedFileIds.push(fileId);
+              }
+            }
+
+            // Create new group with copied file references
+            const newGroup: DocumentGroup = {
+              id: newGroupId,
+              title: name,
+              originalTitle: name,
+              tag: "Other Documents",
+              mergedFileName: `${name.replace(/\s+/g, "_")}_Merged.pdf`,
+              status: "pending",
+              fileIds: copiedFileIds,
+              files: [],
+              hasChanges: true,
+            };
+
+            const updatedGroups = [...state.documentGroups, newGroup];
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "duplicateDocumentsIntoGroup",
+        );
+      },
+
       // Move all files from source groups into target group (for group-to-group merging)
       moveDocumentsIntoGroup: (targetGroupId: string, sourceGroupIds: string[]) => {
         set(
