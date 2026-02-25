@@ -1940,6 +1940,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
       // Add multiple files to an existing container (moves files from their current containers)
       // Move files into a target group (move semantics - removes from source containers)
+      // orderedFileIds may include files already in the target — those are kept in place
+      // and the full list is used as the new fileIds order for the target group
       addFilesToGroup: (groupId: string, orderedFileIds: string[]) => {
         set(
           (state) => {
@@ -1948,32 +1950,28 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
 
             const newAllFiles = { ...state.allFiles };
             const movedFileIds: string[] = [];
+            const existingTargetFileIds = new Set(targetGroup.fileIds);
 
-            // Move each file: update containerIds, no copies
+            // Move each file: update containerIds, skip files already in target
             for (const fileId of orderedFileIds) {
               const file = newAllFiles[fileId];
-              if (file) {
-                // Remove from old containers, add to target
-                const oldContainerIds = file.containerIds.filter((cid) => cid !== groupId);
-                newAllFiles[fileId] = {
-                  ...file,
-                  containerIds: [groupId],
-                  isNew: true,
-                };
-                movedFileIds.push(fileId);
-              }
+              if (!file) continue;
+              if (existingTargetFileIds.has(fileId)) continue; // already in target
+              newAllFiles[fileId] = {
+                ...file,
+                containerIds: [groupId],
+                isNew: true,
+              };
+              movedFileIds.push(fileId);
             }
 
-            // Update groups: add files to target, remove from sources
+            // Update groups: set target fileIds to full ordered list, remove moved files from sources
             const movedFileIdSet = new Set(movedFileIds);
             let updatedGroups = state.documentGroups.map((group) => {
               if (group.id === groupId) {
-                // Add moved files to target (avoid duplicates)
-                const existingIds = new Set(group.fileIds);
-                const newFileIds = movedFileIds.filter((id) => !existingIds.has(id));
                 return {
                   ...group,
-                  fileIds: [...group.fileIds, ...newFileIds],
+                  fileIds: orderedFileIds.filter((id) => newAllFiles[id]),
                   hasChanges: true,
                 };
               }
@@ -2005,6 +2003,8 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
       },
 
       // Copy multiple files to an existing container (copy semantics — source groups remain)
+      // orderedFileIds may include files already in the target — those are kept in place
+      // and the full list is used as the new fileIds order for the target group
       copyFilesToGroup: (groupId: string, orderedFileIds: string[]) => {
         set(
           (state) => {
@@ -2012,32 +2012,26 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
             if (!targetGroup) return state;
 
             const newAllFiles = { ...state.allFiles };
-            const copiedFileIds: string[] = [];
+            const existingTargetFileIds = new Set(targetGroup.fileIds);
 
-            // Copy each file: append groupId to containerIds (don't replace)
+            // Copy each file: append groupId to containerIds, skip files already in target
             for (const fileId of orderedFileIds) {
               const file = newAllFiles[fileId];
-              if (file) {
-                const hasTarget = file.containerIds.includes(groupId);
-                newAllFiles[fileId] = {
-                  ...file,
-                  containerIds: hasTarget
-                    ? file.containerIds
-                    : [...file.containerIds, groupId],
-                  isNew: true,
-                };
-                copiedFileIds.push(fileId);
-              }
+              if (!file) continue;
+              if (existingTargetFileIds.has(fileId)) continue; // already in target
+              newAllFiles[fileId] = {
+                ...file,
+                containerIds: [...file.containerIds, groupId],
+                isNew: true,
+              };
             }
 
-            // Add file IDs to target group (avoid duplicates)
-            const existingIds = new Set(targetGroup.fileIds);
-            const newFileIds = copiedFileIds.filter((id) => !existingIds.has(id));
+            // Set target fileIds to full ordered list
             const updatedGroups = state.documentGroups.map((group) => {
               if (group.id === groupId) {
                 return {
                   ...group,
-                  fileIds: [...group.fileIds, ...newFileIds],
+                  fileIds: orderedFileIds.filter((id) => newAllFiles[id]),
                   hasChanges: true,
                 };
               }

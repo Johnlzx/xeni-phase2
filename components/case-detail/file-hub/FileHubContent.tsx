@@ -1937,10 +1937,12 @@ const DraggableMergeDocumentItem = ({
   group,
   index,
   moveFile,
+  badge,
 }: {
   group: DocumentGroup;
   index: number;
   moveFile: (dragIndex: number, hoverIndex: number) => void;
+  badge?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const activeFiles = group.files.filter((f) => !f.isRemoved);
@@ -1994,6 +1996,11 @@ const DraggableMergeDocumentItem = ({
           {displayTag} &middot; {activeFiles.length} page{activeFiles.length !== 1 ? "s" : ""}
         </p>
       </div>
+      {badge && (
+        <span className="text-[10px] font-medium text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded shrink-0">
+          {badge}
+        </span>
+      )}
     </div>
   );
 };
@@ -2054,9 +2061,11 @@ const AddFromDocumentsModal = ({
     }
   };
 
+  const targetGroup = groups.find((g) => g.id === targetGroupId);
+
   const handleNextStep = () => {
     const selected = availableGroups.filter((g) => selectedGroupIds.has(g.id));
-    setOrderedGroups(selected);
+    setOrderedGroups(targetGroup ? [targetGroup, ...selected] : selected);
     setStep(2);
   };
 
@@ -2249,14 +2258,14 @@ const AddFromDocumentsModal = ({
                         group={g}
                         index={index}
                         moveFile={moveFile}
+                        badge={g.id === targetGroupId ? "Current" : undefined}
                       />
                     ))}
                   </div>
                 </div>
                 <p className="text-xs text-stone-500 mt-2">
                   {orderedGroups.length} document
-                  {orderedGroups.length !== 1 ? "s" : ""} will be added in this
-                  order
+                  {orderedGroups.length !== 1 ? "s" : ""} in final order
                 </p>
               </div>
             </div>
