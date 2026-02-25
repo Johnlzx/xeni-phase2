@@ -2635,7 +2635,7 @@ const CombineFromSelectionModal = ({
   const canCombine = name.trim() && orderedDocs.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
