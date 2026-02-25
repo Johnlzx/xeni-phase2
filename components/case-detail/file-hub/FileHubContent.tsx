@@ -1003,6 +1003,7 @@ const CategoryCard = ({
     (state) => state.renameDocumentGroup,
   );
   const addFilesToGroup = useCaseDetailStore((state) => state.addFilesToGroup);
+  const copyFilesToGroup = useCaseDetailStore((state) => state.copyFilesToGroup);
   const resetGroupTitle = useCaseDetailStore((state) => state.resetGroupTitle);
 
   // Handle native file drag and drop (only for files from OS, not react-dnd)
@@ -1590,8 +1591,12 @@ const CategoryCard = ({
           targetGroupId={group.id}
           targetGroupTitle={group.title}
           onClose={() => setShowAddFromDocsModal(false)}
-          onConfirm={(orderedFileIds) => {
-            addFilesToGroup(group.id, orderedFileIds);
+          onConfirm={(orderedFileIds, mode) => {
+            if (mode === "duplicate") {
+              copyFilesToGroup(group.id, orderedFileIds);
+            } else {
+              addFilesToGroup(group.id, orderedFileIds);
+            }
             setShowAddFromDocsModal(false);
             toast.success("Pages added", {
               description: `${orderedFileIds.length} page${orderedFileIds.length !== 1 ? "s" : ""} added to "${group.title}".`,
@@ -2007,11 +2012,12 @@ const AddFromDocumentsModal = ({
   targetGroupId: string;
   targetGroupTitle: string;
   onClose: () => void;
-  onConfirm: (orderedFileIds: string[]) => void;
+  onConfirm: (orderedFileIds: string[], mode: "move" | "duplicate") => void;
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [orderedGroups, setOrderedGroups] = useState<DocumentGroup[]>([]);
+  const [duplicate, setDuplicate] = useState(false);
 
   const availableGroups = groups.filter(
     (g) =>
@@ -2070,7 +2076,7 @@ const AddFromDocumentsModal = ({
       const allFileIds = orderedGroups.flatMap((g) =>
         g.files.filter((f) => !f.isRemoved).map((f) => f.id)
       );
-      onConfirm(allFileIds);
+      onConfirm(allFileIds, duplicate ? "duplicate" : "move");
     }
   };
 
@@ -2220,28 +2226,39 @@ const AddFromDocumentsModal = ({
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col min-h-0">
-              <label className="text-xs font-medium text-stone-600 mb-2 block">
-                Arrange Document Order{" "}
-                <span className="text-stone-400 font-normal">(drag to reorder)</span>
+            <div className="flex-1 flex flex-col min-h-0 space-y-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={duplicate}
+                  onChange={(e) => setDuplicate(e.target.checked)}
+                  className="size-4 rounded border-stone-300 text-[#0E4268] focus:ring-[#0E4268]/30 focus:ring-offset-0 accent-[#0E4268]"
+                />
+                <span className="text-xs text-stone-600">Keep source documents</span>
               </label>
-              <div className="border border-stone-200 rounded-xl flex-1 overflow-hidden bg-stone-50/30">
-                <div className="max-h-[340px] overflow-y-auto p-2 space-y-1.5">
-                  {orderedGroups.map((g, index) => (
-                    <DraggableMergeDocumentItem
-                      key={g.id}
-                      group={g}
-                      index={index}
-                      moveFile={moveFile}
-                    />
-                  ))}
+              <div className="flex-1 flex flex-col min-h-0">
+                <label className="text-xs font-medium text-stone-600 mb-2 block">
+                  Arrange Document Order{" "}
+                  <span className="text-stone-400 font-normal">(drag to reorder)</span>
+                </label>
+                <div className="border border-stone-200 rounded-xl flex-1 overflow-hidden bg-stone-50/30">
+                  <div className="max-h-[340px] overflow-y-auto p-2 space-y-1.5">
+                    {orderedGroups.map((g, index) => (
+                      <DraggableMergeDocumentItem
+                        key={g.id}
+                        group={g}
+                        index={index}
+                        moveFile={moveFile}
+                      />
+                    ))}
+                  </div>
                 </div>
+                <p className="text-xs text-stone-500 mt-2">
+                  {orderedGroups.length} document
+                  {orderedGroups.length !== 1 ? "s" : ""} will be added in this
+                  order
+                </p>
               </div>
-              <p className="text-xs text-stone-500 mt-2">
-                {orderedGroups.length} document
-                {orderedGroups.length !== 1 ? "s" : ""} will be added in this
-                order
-              </p>
             </div>
           )}
         </div>
@@ -2281,7 +2298,7 @@ const AddFromDocumentsModal = ({
                 className="px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg transition-colors flex items-center gap-1.5"
               >
                 <FilePlus size={16} />
-                Add to Document
+                Confirm
               </button>
             )}
           </div>
@@ -2528,39 +2545,15 @@ const MergeDocumentsModal = ({
           ) : (
             /* Step 2: Reorder documents */
             <div className="flex-1 flex flex-col min-h-0 space-y-4">
-              {/* Move / Duplicate toggle */}
-              <div>
-                <label className="text-xs font-medium text-stone-600 mb-1.5 block">
-                  Mode
-                </label>
-                <div className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
-                  <button
-                    onClick={() => setMode("move")}
-                    className={cn(
-                      "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                      mode === "move"
-                        ? "bg-white text-stone-800 shadow-sm"
-                        : "text-stone-500 hover:text-stone-700"
-                    )}
-                  >
-                    Move
-                  </button>
-                  <button
-                    onClick={() => setMode("duplicate")}
-                    className={cn(
-                      "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                      mode === "duplicate"
-                        ? "bg-white text-stone-800 shadow-sm"
-                        : "text-stone-500 hover:text-stone-700"
-                    )}
-                  >
-                    Duplicate
-                  </button>
-                </div>
-                <p className="text-[10px] text-stone-400 mt-1">
-                  {mode === "move" ? "Source documents will be removed" : "Source documents will be kept"}
-                </p>
-              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mode === "duplicate"}
+                  onChange={(e) => setMode(e.target.checked ? "duplicate" : "move")}
+                  className="size-4 rounded border-stone-300 text-[#0E4268] focus:ring-[#0E4268]/30 focus:ring-offset-0 accent-[#0E4268]"
+                />
+                <span className="text-xs text-stone-600">Keep source documents</span>
+              </label>
 
               <div className="flex-1 flex flex-col min-h-0">
                 <label className="text-xs font-medium text-stone-600 mb-2 block">
@@ -2620,8 +2613,8 @@ const MergeDocumentsModal = ({
                 onClick={handleMerge}
                 className="px-4 py-2 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg transition-colors flex items-center gap-1.5"
               >
-                {mode === "duplicate" ? <Copy size={16} /> : <Layers size={16} />}
-                {mode === "move" ? "Move & Combine" : "Duplicate & Combine"}
+                <Layers size={16} />
+                Confirm
               </button>
             )}
           </div>
@@ -2734,39 +2727,15 @@ const CombineFromSelectionModal = ({
             />
           </div>
 
-          {/* Move / Duplicate toggle */}
-          <div>
-            <label className="text-xs font-medium text-stone-600 mb-1.5 block">
-              Mode
-            </label>
-            <div className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
-              <button
-                onClick={() => setMode("move")}
-                className={cn(
-                  "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                  mode === "move"
-                    ? "bg-white text-stone-800 shadow-sm"
-                    : "text-stone-500 hover:text-stone-700"
-                )}
-              >
-                Move
-              </button>
-              <button
-                onClick={() => setMode("duplicate")}
-                className={cn(
-                  "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                  mode === "duplicate"
-                    ? "bg-white text-stone-800 shadow-sm"
-                    : "text-stone-500 hover:text-stone-700"
-                )}
-              >
-                Duplicate
-              </button>
-            </div>
-            <p className="text-[10px] text-stone-400 mt-1">
-              {mode === "move" ? "Source documents will be removed" : "Source documents will be kept"}
-            </p>
-          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={mode === "duplicate"}
+              onChange={(e) => setMode(e.target.checked ? "duplicate" : "move")}
+              className="size-4 rounded border-stone-300 text-[#0E4268] focus:ring-[#0E4268]/30 focus:ring-offset-0 accent-[#0E4268]"
+            />
+            <span className="text-xs text-stone-600">Keep source documents</span>
+          </label>
 
           {/* Document reorder list */}
           <div>
@@ -2804,8 +2773,8 @@ const CombineFromSelectionModal = ({
             disabled={!canCombine}
             className="px-4 py-1.5 text-sm font-medium text-white bg-[#0E4268] hover:bg-[#0E4268]/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
           >
-            {mode === "duplicate" ? <Copy size={14} /> : <Layers size={14} />}
-            {mode === "move" ? "Move & Combine" : "Duplicate & Combine"}
+            <Layers size={14} />
+            Confirm
           </button>
         </div>
       </motion.div>

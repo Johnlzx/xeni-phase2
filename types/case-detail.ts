@@ -521,6 +521,9 @@ export interface CaseDetailActions {
   // Add multiple files to a container (moves files from their current containers)
   addFilesToGroup: (groupId: string, orderedFileIds: string[]) => void;
 
+  // Copy multiple files to a container (copy semantics — files added to target, source groups remain)
+  copyFilesToGroup: (groupId: string, orderedFileIds: string[]) => void;
+
   // Legacy compatibility (redirects to new actions)
   duplicateFileToGroup: (fileId: string, targetGroupId: string) => void;
 

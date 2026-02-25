@@ -2004,6 +2004,59 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      // Copy multiple files to an existing container (copy semantics — source groups remain)
+      copyFilesToGroup: (groupId: string, orderedFileIds: string[]) => {
+        set(
+          (state) => {
+            const targetGroup = state.documentGroups.find((g) => g.id === groupId);
+            if (!targetGroup) return state;
+
+            const newAllFiles = { ...state.allFiles };
+            const copiedFileIds: string[] = [];
+
+            // Copy each file: append groupId to containerIds (don't replace)
+            for (const fileId of orderedFileIds) {
+              const file = newAllFiles[fileId];
+              if (file) {
+                const hasTarget = file.containerIds.includes(groupId);
+                newAllFiles[fileId] = {
+                  ...file,
+                  containerIds: hasTarget
+                    ? file.containerIds
+                    : [...file.containerIds, groupId],
+                  isNew: true,
+                };
+                copiedFileIds.push(fileId);
+              }
+            }
+
+            // Add file IDs to target group (avoid duplicates)
+            const existingIds = new Set(targetGroup.fileIds);
+            const newFileIds = copiedFileIds.filter((id) => !existingIds.has(id));
+            const updatedGroups = state.documentGroups.map((group) => {
+              if (group.id === groupId) {
+                return {
+                  ...group,
+                  fileIds: [...group.fileIds, ...newFileIds],
+                  hasChanges: true,
+                };
+              }
+              return group;
+            });
+
+            const previews = syncFilePreviewsFromState(newAllFiles, updatedGroups);
+
+            return {
+              allFiles: newAllFiles,
+              documentGroups: updatedGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "copyFilesToGroup"
+        );
+      },
+
       // Merge files into a new combined document group (move semantics)
       // Files are moved from source containers, not copied
       mergeDocumentsIntoGroup: (
