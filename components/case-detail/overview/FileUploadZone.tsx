@@ -207,7 +207,7 @@ function DocumentThumbnailCard({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         title={isSpecial ? `${group.title} (Auto-confirmed)` : group.title}
-        className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors hover:bg-stone-50"
+        className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors hover:bg-stone-50 relative"
       >
         {/* Mini PDF page thumbnail with status badge */}
         <div className="relative">
@@ -227,64 +227,63 @@ function DocumentThumbnailCard({
               <div className="h-[2px] rounded-full bg-stone-100 w-[90%]" />
               <div className="h-[2px] rounded-full bg-stone-100 w-[50%]" />
             </div>
-
-            {/* Hover overlay with action buttons */}
-            {showActions && (
-              <div className="absolute inset-0 bg-black/40 rounded-[3px] flex items-center justify-center gap-1">
-                {!isReviewed && (
-                  <div
-                    role="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      confirmGroupReview(group.id);
-                      toast.success("Review confirmed", {
-                        description: `"${group.title}" marked as reviewed.`,
-                      });
-                    }}
-                    title="Confirm review"
-                    className="size-5 rounded-full bg-white/90 hover:bg-white flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <Check className="size-2.5 text-emerald-600" strokeWidth={3} />
-                  </div>
-                )}
-                <div
-                  role="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(true);
-                  }}
-                  title="Delete"
-                  className="size-5 rounded-full bg-white/90 hover:bg-white flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  <Trash2 className="size-2.5 text-rose-600" strokeWidth={3} />
-                </div>
-              </div>
+          </div>
+          {/* Status badge - bottom right */}
+          <div className={cn(
+            "absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center transition-opacity",
+            showActions ? "opacity-0" : "opacity-100",
+            isSpecial
+              ? "bg-stone-500"
+              : isReviewed
+                ? "bg-emerald-500"
+                : "bg-amber-500",
+          )}>
+            {isSpecial ? (
+              <Check className="size-2.5 text-white" strokeWidth={3} />
+            ) : isReviewed ? (
+              <CheckCircle2 className="size-2.5 text-white" strokeWidth={3} />
+            ) : (
+              <Clock className="size-2.5 text-white" strokeWidth={3} />
             )}
           </div>
-          {/* Status badge - bottom right (hidden on hover) */}
-          {!showActions && (
-            <div className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center",
-              isSpecial
-                ? "bg-stone-500"
-                : isReviewed
-                  ? "bg-emerald-500"
-                  : "bg-amber-500",
-            )}>
-              {isSpecial ? (
-                <Check className="size-2.5 text-white" strokeWidth={3} />
-              ) : isReviewed ? (
-                <CheckCircle2 className="size-2.5 text-white" strokeWidth={3} />
-              ) : (
-                <Clock className="size-2.5 text-white" strokeWidth={3} />
-              )}
-            </div>
-          )}
         </div>
         {/* File name */}
         <span className="text-xs font-medium text-stone-600 truncate max-w-[72px] text-center">
           {group.title}
         </span>
+
+        {/* Full-card hover overlay with action buttons */}
+        {showActions && (
+          <div className="absolute inset-0 rounded-lg bg-stone-900/30 flex items-center justify-center gap-3">
+            {!isReviewed && (
+              <div
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  confirmGroupReview(group.id);
+                  toast.success("Review confirmed", {
+                    description: `"${group.title}" marked as reviewed.`,
+                  });
+                }}
+                title="Confirm review"
+                className="size-7 rounded-full bg-white shadow-sm hover:bg-emerald-50 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Check className="size-3.5 text-emerald-600" strokeWidth={2.5} />
+              </div>
+            )}
+            <div
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteConfirm(true);
+              }}
+              title="Delete"
+              className="size-7 rounded-full bg-white shadow-sm hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Trash2 className="size-3.5 text-rose-500" strokeWidth={2.5} />
+            </div>
+          </div>
+        )}
       </button>
 
       <DeleteDocumentConfirmDialog
