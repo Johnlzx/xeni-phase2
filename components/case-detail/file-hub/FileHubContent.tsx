@@ -1630,6 +1630,7 @@ const CategoryCard = ({
               .map((id) => allGroups.find((g) => g.id === id))
               .filter((g): g is DocumentGroup => g !== undefined),
           ]}
+          defaultName={group.title}
           onClose={() => setPendingMergeGroupIds(null)}
           onCombine={(name, orderedFileIds, mode) => {
             if (mode === "duplicate") {
@@ -2638,14 +2639,16 @@ const MergeDocumentsModal = ({
 // ============================================================================
 const CombineFromSelectionModal = ({
   selectedGroups,
+  defaultName,
   onClose,
   onCombine,
 }: {
   selectedGroups: DocumentGroup[];
+  defaultName?: string;
   onClose: () => void;
   onCombine: (name: string, orderedFileIds: string[], mode: "move" | "duplicate") => void;
 }) => {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(defaultName ?? "");
   const [orderedDocs, setOrderedDocs] = useState<DocumentGroup[]>([]);
   const [mode, setMode] = useState<"move" | "duplicate">("move");
 
