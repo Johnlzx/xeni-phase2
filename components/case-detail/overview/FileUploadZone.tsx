@@ -20,9 +20,10 @@ import {
   useDocumentGroups,
   useIsLoadingDocuments,
   useGroupChecklistBindings,
+  bindingsToSectionIds,
 } from "@/store/case-detail-store";
 import { cn } from "@/lib/utils";
-import { CategoryReviewModal, DeleteDocumentConfirmDialog } from "../shared";
+import { CategoryReviewModal, DeleteDocumentConfirmDialog, ReferencedDocWarningDialog } from "../shared";
 import type { DocumentGroup } from "@/types/case-detail";
 
 export function FileUploadZone() {
@@ -185,12 +186,16 @@ function DocumentThumbnailCard({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRefWarning, setShowRefWarning] = useState(false);
 
   const confirmGroupReview = useCaseDetailStore(
     (state) => state.confirmGroupReview,
   );
   const deleteDocumentGroup = useCaseDetailStore(
     (state) => state.deleteDocumentGroup,
+  );
+  const markSectionsForReanalysis = useCaseDetailStore(
+    (state) => state.markSectionsForReanalysis,
   );
   const checklistBindings = useGroupChecklistBindings(group.id);
 
@@ -260,6 +265,10 @@ function DocumentThumbnailCard({
                 role="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (checklistBindings.length > 0) {
+                    setShowRefWarning(true);
+                    return;
+                  }
                   confirmGroupReview(group.id);
                   toast.success("Review confirmed", {
                     description: `"${group.title}" marked as reviewed.`,
@@ -285,6 +294,22 @@ function DocumentThumbnailCard({
           </div>
         )}
       </button>
+
+      <ReferencedDocWarningDialog
+        open={showRefWarning}
+        action="confirm-review"
+        groupTitle={group.title}
+        checklistBindings={checklistBindings}
+        onConfirm={() => {
+          confirmGroupReview(group.id);
+          markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+          setShowRefWarning(false);
+          toast.success("Review confirmed", {
+            description: `"${group.title}" marked as reviewed. Affected sections flagged for re-analysis.`,
+          });
+        }}
+        onCancel={() => setShowRefWarning(false)}
+      />
 
       <DeleteDocumentConfirmDialog
         open={showDeleteConfirm}

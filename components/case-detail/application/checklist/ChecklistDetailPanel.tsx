@@ -132,6 +132,8 @@ export function ChecklistDetailPanel({
   const sectionReferenceDocIds = useCaseDetailStore((state) => state.sectionReferenceDocIds);
   const addSectionReferenceDoc = useCaseDetailStore((state) => state.addSectionReferenceDoc);
   const removeSectionReferenceDoc = useCaseDetailStore((state) => state.removeSectionReferenceDoc);
+  const sectionsPendingReanalysis = useCaseDetailStore((state) => state.sectionsPendingReanalysis);
+  const clearSectionReanalysis = useCaseDetailStore((state) => state.clearSectionReanalysis);
 
   const [showAddRefModal, setShowAddRefModal] = useState(false);
   const [previewGroup, setPreviewGroup] = useState<DocumentGroup | null>(null);
@@ -239,8 +241,10 @@ export function ChecklistDetailPanel({
     analyzedRefSnapshot.current = currentRefKey;
   }
 
-  // Determine if references changed since last analysis
-  const needsReanalysis = !isReanalyzing && analyzedRefSnapshot.current !== currentRefKey;
+  // Determine if references changed since last analysis or pending signal exists
+  const hasPendingSignal = sectionsPendingReanalysis.includes(sectionId);
+  const needsReanalysis = !isReanalyzing
+    && (analyzedRefSnapshot.current !== currentRefKey || hasPendingSignal);
 
   // Simulate re-analysis
   const handleReanalyze = useCallback(async () => {
@@ -265,13 +269,16 @@ export function ChecklistDetailPanel({
     setIsReanalyzing(false);
     setReanalysisProgress(0);
 
+    // Clear pending re-analysis signal for this section
+    clearSectionReanalysis(sectionId);
+
     // Clear ghost pills for this section — the new snapshot is now the source of truth
     setRemovedCommittedDocs((prev) => {
       const next = { ...prev };
       delete next[sectionId];
       return next;
     });
-  }, [currentRefKey, sectionId]);
+  }, [currentRefKey, sectionId, clearSectionReanalysis]);
 
   // Confirm-remove handler: ghost pill for committed docs, instant remove for uncommitted
   const handleConfirmRemoveDoc = useCallback(() => {

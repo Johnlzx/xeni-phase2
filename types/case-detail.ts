@@ -446,6 +446,9 @@ export interface CaseDetailState {
 
   // Section-level Reference Documents (per checklist section, e.g. "personal", "employment")
   sectionReferenceDocIds: Record<string, string[]>;
+
+  // Sections pending re-analysis (flagged when a referenced doc is edited/renamed)
+  sectionsPendingReanalysis: string[];
 }
 
 // Case Detail Store Actions
@@ -611,6 +614,10 @@ export interface CaseDetailActions {
   // Section-level Reference Documents
   addSectionReferenceDoc: (sectionId: string, groupId: string) => void;
   removeSectionReferenceDoc: (sectionId: string, groupId: string) => void;
+
+  // Re-analysis signals (flagged when a referenced doc's content changes)
+  markSectionsForReanalysis: (sectionIds: string[]) => void;
+  clearSectionReanalysis: (sectionId: string) => void;
 
   // Initialize case from CreateCaseModal
   // Case Notes and Passport are special documents - auto-confirmed

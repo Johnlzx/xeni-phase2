@@ -21,9 +21,10 @@ import {
   Copy,
   MoreVertical,
 } from "lucide-react";
-import { useCaseDetailStore, useGroupChecklistBindings } from "@/store/case-detail-store";
+import { useCaseDetailStore, useGroupChecklistBindings, bindingsToSectionIds } from "@/store/case-detail-store";
 import type { DocumentFile, DocumentGroup } from "@/types/case-detail";
 import { DeleteDocumentConfirmDialog } from "./DeleteDocumentConfirmDialog";
+import { ReferencedDocWarningDialog } from "./ReferencedDocWarningDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -405,6 +406,7 @@ export function CategoryReviewModal({
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
+  const [showRefWarningForConfirm, setShowRefWarningForConfirm] = useState(false);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(
     null,
   );
@@ -428,6 +430,9 @@ export function CategoryReviewModal({
   );
   const deleteDocumentGroup = useCaseDetailStore(
     (state) => state.deleteDocumentGroup,
+  );
+  const markSectionsForReanalysis = useCaseDetailStore(
+    (state) => state.markSectionsForReanalysis,
   );
   const checklistBindings = useGroupChecklistBindings(group.id);
 
@@ -458,7 +463,18 @@ export function CategoryReviewModal({
   };
 
   const handleConfirm = () => {
+    if (checklistBindings.length > 0) {
+      setShowRefWarningForConfirm(true);
+      return;
+    }
     confirmGroupReview(group.id);
+    onClose();
+  };
+
+  const handleRefWarningConfirm = () => {
+    confirmGroupReview(group.id);
+    markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+    setShowRefWarningForConfirm(false);
     onClose();
   };
 
@@ -1116,6 +1132,16 @@ export function CategoryReviewModal({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Referenced Doc Warning Dialog (confirm review) */}
+        <ReferencedDocWarningDialog
+          open={showRefWarningForConfirm}
+          action="confirm-review"
+          groupTitle={group.title}
+          checklistBindings={checklistBindings}
+          onConfirm={handleRefWarningConfirm}
+          onCancel={() => setShowRefWarningForConfirm(false)}
+        />
 
         {/* Delete Category Confirmation Dialog */}
         <DeleteDocumentConfirmDialog

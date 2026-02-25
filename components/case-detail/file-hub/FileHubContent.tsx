@@ -69,8 +69,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CategoryReviewModal, DocumentPreviewContent, DeleteDocumentConfirmDialog } from "../shared";
-import { useGroupChecklistBindings } from "@/store/case-detail-store";
+import { CategoryReviewModal, DocumentPreviewContent, DeleteDocumentConfirmDialog, ReferencedDocWarningDialog } from "../shared";
+import { useGroupChecklistBindings, bindingsToSectionIds } from "@/store/case-detail-store";
 import { CreateDocumentCategoryPopover } from "./CreateDocumentCategoryPopover";
 import {
   Command,
@@ -969,12 +969,16 @@ const CategoryCard = ({
   const [hoveredFileId, setHoveredFileId] = useState<string | null>(null);
   const [showAddFromDocsModal, setShowAddFromDocsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRefWarningForConfirm, setShowRefWarningForConfirm] = useState(false);
+  const [showRefWarningForRename, setShowRefWarningForRename] = useState(false);
+  const [pendingNewTitle, setPendingNewTitle] = useState<string | null>(null);
   const [pendingMergeGroupIds, setPendingMergeGroupIds] = useState<string[] | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const deleteDocumentGroup = useCaseDetailStore((state) => state.deleteDocumentGroup);
   const mergeDocumentsIntoGroup = useCaseDetailStore((state) => state.mergeDocumentsIntoGroup);
   const duplicateDocumentsIntoGroup = useCaseDetailStore((state) => state.duplicateDocumentsIntoGroup);
+  const markSectionsForReanalysis = useCaseDetailStore((state) => state.markSectionsForReanalysis);
   const checklistBindings = useGroupChecklistBindings(group.id);
 
   // Handle highlight animation and scroll into view
@@ -1080,9 +1084,22 @@ const CategoryCard = ({
 
   const handleConfirm = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (checklistBindings.length > 0) {
+      setShowRefWarningForConfirm(true);
+      return;
+    }
     confirmGroupReview(group.id);
     toast.success("Review confirmed", {
       description: `"${group.title}" marked as reviewed.`,
+    });
+  };
+
+  const handleRefWarningConfirmReview = () => {
+    confirmGroupReview(group.id);
+    markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+    setShowRefWarningForConfirm(false);
+    toast.success("Review confirmed", {
+      description: `"${group.title}" marked as reviewed. Affected sections flagged for re-analysis.`,
     });
   };
 
@@ -1091,6 +1108,11 @@ const CategoryCard = ({
 
   const handleRenameSubmit = () => {
     if (editedTitle.trim() && editedTitle !== group.title) {
+      if (checklistBindings.length > 0) {
+        setPendingNewTitle(editedTitle.trim());
+        setShowRefWarningForRename(true);
+        return;
+      }
       renameDocumentGroup(group.id, editedTitle.trim());
       toast.success("Document renamed", {
         description: `Renamed to "${editedTitle.trim()}".`,
@@ -1260,7 +1282,7 @@ const CategoryCard = ({
                 type="text"
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
-                onBlur={handleRenameSubmit}
+                onBlur={() => { if (!showRefWarningForRename) handleRenameSubmit(); }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleRenameSubmit();
                   if (e.key === "Escape") {
@@ -1604,6 +1626,43 @@ const CategoryCard = ({
           }}
         />
       )}
+
+      {/* Referenced Doc Warning Dialog (confirm review) */}
+      <ReferencedDocWarningDialog
+        open={showRefWarningForConfirm}
+        action="confirm-review"
+        groupTitle={group.title}
+        checklistBindings={checklistBindings}
+        onConfirm={handleRefWarningConfirmReview}
+        onCancel={() => setShowRefWarningForConfirm(false)}
+      />
+
+      {/* Referenced Doc Warning Dialog (rename) */}
+      <ReferencedDocWarningDialog
+        open={showRefWarningForRename}
+        action="rename"
+        groupTitle={group.title}
+        newTitle={pendingNewTitle || undefined}
+        checklistBindings={checklistBindings}
+        onConfirm={() => {
+          if (pendingNewTitle) {
+            renameDocumentGroup(group.id, pendingNewTitle);
+            markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+            toast.success("Document renamed", {
+              description: `Renamed to "${pendingNewTitle}". Affected sections flagged for re-analysis.`,
+            });
+          }
+          setShowRefWarningForRename(false);
+          setPendingNewTitle(null);
+          setIsRenamingTitle(false);
+        }}
+        onCancel={() => {
+          setEditedTitle(group.title);
+          setShowRefWarningForRename(false);
+          setPendingNewTitle(null);
+          setIsRenamingTitle(false);
+        }}
+      />
 
       {/* Delete Confirmation Dialog */}
       <DeleteDocumentConfirmDialog

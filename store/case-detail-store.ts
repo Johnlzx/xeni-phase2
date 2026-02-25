@@ -808,6 +808,7 @@ const initialState: CaseDetailState = {
   forwardModalIssueId: null,
   assessmentReferenceDocIds: [],
   sectionReferenceDocIds: {},
+  sectionsPendingReanalysis: [],
 };
 
 // ============================================================================
@@ -4753,6 +4754,29 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      markSectionsForReanalysis: (sectionIds: string[]) => {
+        set(
+          (state) => {
+            const merged = new Set([...state.sectionsPendingReanalysis, ...sectionIds]);
+            return { sectionsPendingReanalysis: Array.from(merged) };
+          },
+          false,
+          "markSectionsForReanalysis"
+        );
+      },
+
+      clearSectionReanalysis: (sectionId: string) => {
+        set(
+          (state) => ({
+            sectionsPendingReanalysis: state.sectionsPendingReanalysis.filter(
+              (id) => id !== sectionId
+            ),
+          }),
+          false,
+          "clearSectionReanalysis"
+        );
+      },
+
       // Reset
       reset: () => {
         sessionStorage.removeItem("xeni-case-detail");
@@ -4975,6 +4999,10 @@ export const useIsFileShared = (fileId: string) =>
 export type GroupChecklistBinding =
   | { type: 'assessment' }
   | { type: 'section'; sectionId: string };
+
+export function bindingsToSectionIds(bindings: GroupChecklistBinding[]): string[] {
+  return bindings.map(b => b.type === "assessment" ? "assessment" : b.sectionId);
+}
 
 export const useGroupChecklistBindings = (groupId: string): GroupChecklistBinding[] => {
   const assessmentRefIds = useCaseDetailStore((state) => state.assessmentReferenceDocIds);

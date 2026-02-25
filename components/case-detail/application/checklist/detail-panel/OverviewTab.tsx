@@ -935,6 +935,8 @@ export function OverviewTab(props: OverviewTabProps) {
   const sectionReferenceDocIds = useCaseDetailStore((state) => state.sectionReferenceDocIds);
   const addSectionReferenceDoc = useCaseDetailStore((state) => state.addSectionReferenceDoc);
   const removeSectionReferenceDoc = useCaseDetailStore((state) => state.removeSectionReferenceDoc);
+  const sectionsPendingReanalysis = useCaseDetailStore((state) => state.sectionsPendingReanalysis);
+  const clearSectionReanalysis = useCaseDetailStore((state) => state.clearSectionReanalysis);
   const [selectedEvidence, setSelectedEvidence] = useState<RequiredEvidence | null>(null);
   const [previewGroup, setPreviewGroup] = useState<DocumentGroup | null>(null);
   const [showAddRefModal, setShowAddRefModal] = useState(false);
@@ -1159,6 +1161,7 @@ export function OverviewTab(props: OverviewTabProps) {
 
       setIsAnalyzing(false);
       setNeedsReanalysis(false);
+      clearSectionReanalysis(sectionId);
     }, 1500); // 1.5 second analysis simulation
   };
 
@@ -1169,6 +1172,14 @@ export function OverviewTab(props: OverviewTabProps) {
     }
     prevRefCountRef.current = refCount;
   }, [refCount]);
+
+  // Flag re-analysis when a pending signal arrives for this section
+  const hasPendingSignal = sectionsPendingReanalysis.includes(sectionId);
+  useEffect(() => {
+    if (hasPendingSignal) {
+      setNeedsReanalysis(true);
+    }
+  }, [hasPendingSignal]);
 
   return (
     <>
