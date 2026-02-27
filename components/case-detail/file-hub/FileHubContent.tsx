@@ -379,30 +379,6 @@ const Sidebar = ({
             <FolderUp size={16} />
           </button>
 
-          {/* Divider */}
-          <div className="mx-2 h-px bg-stone-100" />
-
-          {/* Forward email button */}
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(forwardingAddress);
-                    toast.success("Copied", { description: "Forwarding address copied to clipboard." });
-                  }}
-                  className="size-11 flex items-center justify-center text-stone-400 hover:text-[#0E4268] hover:bg-stone-50 transition-colors"
-                  aria-label="Copy forwarding email address"
-                >
-                  <Mail size={16} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs">
-                {forwardingAddress}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
         {/* Hidden file inputs (needed for collapsed state too) */}
         <input
