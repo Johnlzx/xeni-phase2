@@ -3393,7 +3393,7 @@ export function FileHubContent() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "e") {
         e.preventDefault();
         simulateEmailForward();
-        toast.success("Email received", { description: "Simulated email forwarded into the case." });
+        toast.success("Email received", { description: "New email has been forwarded into the case." });
       }
     };
     window.addEventListener("keydown", handleKeyDown);
