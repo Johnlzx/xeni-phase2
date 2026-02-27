@@ -47,12 +47,14 @@ const SidebarThumbnail = ({
   groupId,
   isActive,
   onClick,
+  previewVariant = "default",
 }: {
   page: DocumentFile;
   pageIndex: number;
   groupId: string;
   isActive: boolean;
   onClick: () => void;
+  previewVariant?: "default" | "email";
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const reorderFileInGroup = useCaseDetailStore(
@@ -106,7 +108,7 @@ const SidebarThumbnail = ({
         <div className="w-full aspect-[1/1.414] rounded border border-dashed border-stone-300 overflow-hidden bg-stone-100">
           <div className="h-full flex flex-col">
             <div className="flex-1 p-2 relative">
-              <DocumentPreviewContent size="sm" />
+              <DocumentPreviewContent size="sm" variant={previewVariant} />
               {/* Diagonal line indicator */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div
@@ -154,7 +156,7 @@ const SidebarThumbnail = ({
       >
         <div className="h-full flex flex-col">
           <div className="flex-1 p-2">
-            <DocumentPreviewContent size="sm" />
+            <DocumentPreviewContent size="sm" variant={previewVariant} />
           </div>
 
           <div className="px-1.5 py-1 bg-stone-50 border-t border-stone-100 flex items-center justify-center">
@@ -178,6 +180,7 @@ const GridThumbnail = ({
   isSelected,
   onToggleSelect,
   selectedPageIds,
+  previewVariant = "default",
 }: {
   page: DocumentFile;
   pageIndex: number;
@@ -185,6 +188,7 @@ const GridThumbnail = ({
   isSelected: boolean;
   onToggleSelect: (pageId: string, shiftKey: boolean) => void;
   selectedPageIds: Set<string>;
+  previewVariant?: "default" | "email";
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const reorderFileInGroup = useCaseDetailStore(
@@ -245,7 +249,7 @@ const GridThumbnail = ({
         <div className="w-full aspect-[1/1.414] rounded border border-dashed border-stone-300 overflow-hidden bg-stone-100">
           <div className="h-full flex flex-col">
             <div className="flex-1 p-3 relative">
-              <DocumentPreviewContent size="md" />
+              <DocumentPreviewContent size="md" variant={previewVariant} />
               {/* Diagonal line indicator */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div
@@ -309,7 +313,7 @@ const GridThumbnail = ({
           </button>
 
           <div className="flex-1 p-3">
-            <DocumentPreviewContent size="md" />
+            <DocumentPreviewContent size="md" variant={previewVariant} />
           </div>
 
           <div className="px-2 py-1.5 bg-stone-50 border-t border-stone-100 flex items-center justify-center">
@@ -596,10 +600,18 @@ export function CategoryReviewModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, viewMode, currentPageIndex]);
 
-  const displayType = group.tag
-    .split("-")
-    .map((word) => word.toUpperCase())
-    .join(" ");
+  const isEmailGroup = group.tag === "email";
+
+  const displayType = isEmailGroup
+    ? "EMAIL"
+    : group.tag
+        .split("-")
+        .map((word) => word.toUpperCase())
+        .join(" ");
+
+  // Derive preview variant for a page based on group tag and file type
+  const getPageVariant = (page: DocumentFile): "default" | "email" =>
+    isEmailGroup && page.type === "email" ? "email" : "default";
 
   return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -740,6 +752,7 @@ export function CategoryReviewModal({
                     onClick={() => {
                       if (!page.isRemoved) setCurrentPageIndex(idx);
                     }}
+                    previewVariant={getPageVariant(page)}
                   />
                 ))}
               </div>
@@ -752,7 +765,7 @@ export function CategoryReviewModal({
                   {/* Preview Area - fits one full page */}
                   <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
                     <div className="h-full aspect-[1/1.414] rounded-lg border border-stone-300 shadow-lg p-8 bg-white">
-                      <DocumentPreviewContent size="lg" />
+                      <DocumentPreviewContent size="lg" variant={currentPage ? getPageVariant(currentPage) : "default"} />
                     </div>
 
                     {/* Navigation Arrows */}
@@ -900,6 +913,7 @@ export function CategoryReviewModal({
                       isSelected={selectedPageIds.has(page.id)}
                       onToggleSelect={handleToggleSelect}
                       selectedPageIds={selectedPageIds}
+                      previewVariant={getPageVariant(page)}
                     />
                   ))}
                 </div>

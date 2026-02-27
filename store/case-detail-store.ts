@@ -1932,6 +1932,95 @@ export const useCaseDetailStore = create<CaseDetailStore>()(
         );
       },
 
+      // Simulate forwarding an email into the case
+      simulateEmailForward: () => {
+        set(
+          (state) => {
+            const timestamp = Date.now();
+            const newAllFiles = { ...state.allFiles };
+
+            // Mock email pool
+            const mockEmails = [
+              { subject: "RE: Visa Application Supporting Docs", from: "john.applicant@gmail.com", attachments: 2 },
+              { subject: "FW: Bank Statement Confirmation", from: "sarah.client@yahoo.com", attachments: 1 },
+              { subject: "Updated Employment Letter", from: "hr@techcorp.co.uk", attachments: 1 },
+              { subject: "RE: Passport Scan Request", from: "maria.santos@outlook.com", attachments: 3 },
+              { subject: "FW: Tenancy Agreement", from: "landlord@lettings.co.uk", attachments: 1 },
+              { subject: "RE: English Language Certificate", from: "test.centre@ielts.org", attachments: 0 },
+            ];
+
+            const email = mockEmails[Math.floor(Math.random() * mockEmails.length)];
+            const caseId = state.caseId || "unknown";
+            const toAddress = `case-${caseId}@inbox.xeni.app`;
+            const groupId = `email_${timestamp}`;
+            const fileIds: string[] = [];
+
+            const emailMeta = {
+              from: email.from,
+              to: toAddress,
+              subject: email.subject,
+              date: new Date().toISOString(),
+              hasAttachments: email.attachments > 0,
+              isBody: true,
+            };
+
+            // Create body file
+            const bodyFileId = `email_body_${timestamp}`;
+            newAllFiles[bodyFileId] = {
+              id: bodyFileId,
+              name: `${email.subject.replace(/[^a-zA-Z0-9 ]/g, "").substring(0, 40)}_body.eml`,
+              size: "0.1 MB",
+              pages: 1,
+              date: "Just now",
+              type: "email",
+              isNew: true,
+              containerIds: [groupId],
+              emailMetadata: { ...emailMeta, isBody: true },
+            };
+            fileIds.push(bodyFileId);
+
+            // Create attachment files
+            for (let i = 0; i < email.attachments; i++) {
+              const attFileId = `email_att_${timestamp}_${i}`;
+              newAllFiles[attFileId] = {
+                id: attFileId,
+                name: `Attachment_${i + 1}.pdf`,
+                size: "0.5 MB",
+                pages: 1,
+                date: "Just now",
+                type: "pdf",
+                isNew: true,
+                containerIds: [groupId],
+                emailMetadata: { ...emailMeta, isBody: false },
+              };
+              fileIds.push(attFileId);
+            }
+
+            const newGroups = [
+              ...state.documentGroups,
+              {
+                id: groupId,
+                title: email.subject,
+                tag: "email",
+                status: "pending" as const,
+                hasChanges: true,
+                fileIds,
+                files: [],
+              },
+            ];
+
+            const previews = syncFilePreviewsFromState(newAllFiles, newGroups);
+            return {
+              allFiles: newAllFiles,
+              documentGroups: newGroups,
+              uploadedFilePreviews: previews,
+            };
+          },
+          false,
+          "simulateEmailForward",
+        );
+      },
+
       // Duplicate/Reuse a file to another group (one-to-many linking)
       // Now uses reference model - no physical duplication needed
       duplicateFileToGroup: (fileId: string, targetGroupId: string) => {

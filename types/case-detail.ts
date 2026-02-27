@@ -106,7 +106,7 @@ export interface DocumentFile {
   size: string;
   pages?: number;
   date?: string;
-  type: "pdf" | "doc";
+  type: "pdf" | "doc" | "email";
   isNew?: boolean;
   isRemoved?: boolean; // Soft delete for the entire file
   // Analysis tracking
@@ -118,6 +118,14 @@ export interface DocumentFile {
   // Folder upload metadata (for entity attribution)
   relativePath?: string; // Original path from folder upload (e.g., "Case_2024/Applicant_John/Identity/")
   entityType?: DocumentEntityType; // Detected entity type from path
+  emailMetadata?: {
+    from: string;
+    to: string;
+    subject: string;
+    date: string;
+    hasAttachments: boolean;
+    isBody: boolean; // true = email body page; false = attachment page
+  };
 }
 
 // Document Group (Container)
@@ -504,6 +512,7 @@ export interface CaseDetailActions {
   uploadToGroup: (groupId: string, fileCount?: number) => void;
   replaceGroupFiles: (groupId: string, fileCount?: number) => void;
   uploadAndAutoClassify: (totalPages?: number) => void;
+  simulateEmailForward: () => void;
 
   // ============================================
   // One-to-Many File-Container Actions

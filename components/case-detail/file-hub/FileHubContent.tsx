@@ -31,6 +31,7 @@ import {
   FolderUp,
   MoreVertical,
   RefreshCw,
+  Mail,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -153,6 +154,10 @@ const Sidebar = ({
   const moveFileToGroup = useCaseDetailStore((state) => state.moveFileToGroup);
   const uploadAndAutoClassify = useCaseDetailStore((state) => state.uploadAndAutoClassify);
   const uploadFolder = useCaseDetailStore((state) => state.uploadFolder);
+  const caseId = useCaseDetailStore((state) => state.caseId);
+  const simulateEmailForward = useCaseDetailStore((state) => state.simulateEmailForward);
+  const [emailCopied, setEmailCopied] = useState(false);
+  const forwardingAddress = `case-${caseId || "unknown"}@inbox.xeni.app`;
 
   const isProcessing = processingStage !== null;
 
@@ -373,6 +378,31 @@ const Sidebar = ({
           >
             <FolderUp size={16} />
           </button>
+
+          {/* Divider */}
+          <div className="mx-2 h-px bg-stone-100" />
+
+          {/* Forward email button */}
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(forwardingAddress);
+                    toast.success("Copied", { description: "Forwarding address copied to clipboard." });
+                  }}
+                  className="size-11 flex items-center justify-center text-stone-400 hover:text-[#0E4268] hover:bg-stone-50 transition-colors"
+                  aria-label="Copy forwarding email address"
+                >
+                  <Mail size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">
+                {forwardingAddress}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         {/* Hidden file inputs (needed for collapsed state too) */}
         <input
@@ -535,6 +565,44 @@ const Sidebar = ({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Forwarding email address section */}
+      <div className="shrink-0 px-3 pb-3 space-y-1.5">
+        <div className="border-t border-stone-100 pt-2.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Mail size={12} className="text-stone-400 shrink-0" />
+            <span className="text-[11px] font-medium text-stone-500">Forward emails to</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <code className="flex-1 min-w-0 text-[10px] font-mono text-stone-600 bg-stone-50 border border-stone-200 rounded px-2 py-1 truncate">
+              {forwardingAddress}
+            </code>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(forwardingAddress);
+                setEmailCopied(true);
+                setTimeout(() => setEmailCopied(false), 2000);
+                toast.success("Copied", { description: "Forwarding address copied to clipboard." });
+              }}
+              className="shrink-0 p-1 rounded text-stone-400 hover:text-[#0E4268] hover:bg-stone-100 transition-colors"
+              aria-label="Copy forwarding address"
+            >
+              {emailCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            </button>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              simulateEmailForward();
+              toast.success("Email received", { description: "Simulated email forwarded into the case." });
+            }}
+            className="mt-1.5 text-[11px] font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
+          >
+            Simulate Email Forward
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1215,11 +1283,16 @@ const CategoryCard = ({
     [group.id, moveFileToGroup],
   );
 
+  // Email detection
+  const isEmailGroup = group.tag === "email";
+
   // Display type from tag (uppercase with tracking)
-  const displayType = group.tag
-    .split("-")
-    .map((word) => word.toUpperCase())
-    .join(" ");
+  const displayType = isEmailGroup
+    ? "EMAIL"
+    : group.tag
+        .split("-")
+        .map((word) => word.toUpperCase())
+        .join(" ");
 
   // Combine refs for react-dnd drag + drop and native drag
   const setRefs = (el: HTMLDivElement | null) => {
@@ -1342,7 +1415,8 @@ const CategoryCard = ({
 
         {/* Row 2: File Type + Status badges */}
         <div className="flex items-center justify-between">
-          <div className="text-[9px] text-stone-400 uppercase tracking-wide font-medium">
+          <div className="text-[9px] text-stone-400 uppercase tracking-wide font-medium flex items-center gap-1">
+            {isEmailGroup && <Mail size={10} className="text-stone-400" />}
             {displayType}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -1366,7 +1440,7 @@ const CategoryCard = ({
           <>
             <div className="w-full h-full p-2 flex items-center justify-center">
               <div className="h-full aspect-[1/1.414] rounded border border-stone-200 shadow-sm p-2 relative bg-white">
-                <DocumentPreviewContent size="sm" />
+                <DocumentPreviewContent size="sm" variant={isEmailGroup && currentFile.type === "email" ? "email" : "default"} />
 
                 {/* New page indicator on current preview */}
                 {currentFile.isNew && (
@@ -3341,7 +3415,7 @@ export function FileHubContent() {
     file: DocumentFile;
     index: number;
   } | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Collapsed by default
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Expanded by default
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [showCombineModal, setShowCombineModal] = useState(false);

@@ -33,6 +33,7 @@ export const DOCUMENT_CATEGORY_SUGGESTIONS: DocumentCategorySuggestion[] = [
   { name: "Cover Letter", group: "Supporting" },
   { name: "Supporting Statement", group: "Supporting" },
   { name: "Case Notes", group: "Supporting" },
+  { name: "Email Correspondence", group: "Supporting" },
   { name: "Other Documents", group: "Supporting" },
 ];
 
