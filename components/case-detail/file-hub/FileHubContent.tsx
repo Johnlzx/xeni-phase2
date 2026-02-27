@@ -519,28 +519,27 @@ const Sidebar = ({
               )}>
                 {isAnyDragOver ? "Drop here" : "Drag & drop"}
               </span>
+              {/* Text button links for file / folder upload */}
+              {!isAnyDragOver && (
+                <div className="flex items-center justify-center gap-1 text-[11px] mt-0.5">
+                  <button
+                    onClick={handleFileUploadClick}
+                    className="font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
+                  >
+                    Upload Files
+                  </button>
+                  <span className="text-stone-300">|</span>
+                  <button
+                    onClick={handleFolderUploadClick}
+                    className="font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
+                  >
+                    Upload Folder
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {/* Text button links for file / folder upload */}
-        {!isProcessing && !isAnyDragOver && (
-          <div className="flex items-center justify-center gap-1 text-[11px]">
-            <button
-              onClick={handleFileUploadClick}
-              className="font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
-            >
-              Upload Files
-            </button>
-            <span className="text-stone-300">|</span>
-            <button
-              onClick={handleFolderUploadClick}
-              className="font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
-            >
-              Upload Folder
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Forwarding email address section */}
