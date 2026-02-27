@@ -568,16 +568,6 @@ const Sidebar = ({
               {emailCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
             </button>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              simulateEmailForward();
-              toast.success("Email received", { description: "Simulated email forwarded into the case." });
-            }}
-            className="mt-1.5 text-[11px] font-medium text-[#0E4268]/70 hover:text-[#0E4268] hover:underline transition-colors cursor-pointer"
-          >
-            Simulate Email Forward
-          </button>
         </div>
       </div>
     </div>
@@ -3395,6 +3385,20 @@ export function FileHubContent() {
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [showCombineModal, setShowCombineModal] = useState(false);
+  const simulateEmailForward = useCaseDetailStore((state) => state.simulateEmailForward);
+
+  // Keyboard shortcut: Cmd/Ctrl + Shift + E to simulate email forward
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "e") {
+        e.preventDefault();
+        simulateEmailForward();
+        toast.success("Email received", { description: "Simulated email forwarded into the case." });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [simulateEmailForward]);
 
   // Toggle group selection
   const toggleGroupSelection = (groupId: string) => {
