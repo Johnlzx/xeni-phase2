@@ -1734,6 +1734,9 @@ const CategoryCard = ({
         checklistBindings={checklistBindings}
         onConfirm={() => {
           deleteDocumentGroup(group.id);
+          if (checklistBindings.length > 0) {
+            markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+          }
           setShowDeleteConfirm(false);
           toast.success("Document deleted", {
             description: `"${group.title}" has been removed.`,

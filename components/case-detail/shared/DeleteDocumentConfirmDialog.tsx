@@ -62,7 +62,7 @@ export function DeleteDocumentConfirmDialog({
               <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-amber-800 mb-1">
-                  Checklist references will be removed
+                  Affected checklist sections
                 </p>
                 <ul className="text-amber-700 space-y-0.5">
                   {checklistBindings.map((binding, i) =>
@@ -76,7 +76,7 @@ export function DeleteDocumentConfirmDialog({
                   )}
                 </ul>
                 <p className="text-amber-600 mt-1.5 text-xs">
-                  Deleting will remove these references. You can re-analyze affected sections in the Application tab.
+                  Extracted data will be preserved but marked as disconnected. You can re-analyze affected sections in the Application tab.
                 </p>
               </div>
             </div>

@@ -13,6 +13,7 @@ import {
   PenLine,
   Loader2,
   X,
+  Unlink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -48,6 +49,7 @@ interface DisplayField {
   value: string | null;
   source: "extracted" | "questionnaire" | "manual" | null;
   sourceDocumentName?: string; // Name of the reference document this was extracted from
+  isDisconnected?: boolean; // Source document was deleted
   status: "complete" | "missing" | "low_confidence";
   fieldType?: "text" | "select" | "date";
   options?: { value: string; label: string }[];
@@ -209,6 +211,14 @@ function SummaryFieldsCard({
   // Get source badge
   const getSourceBadge = (field: DisplayField) => {
     if (field.source === "extracted") {
+      if (field.isDisconnected) {
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 rounded">
+            <Unlink className="size-2.5" />
+            {field.sourceDocumentName || "Extracted"}
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium text-blue-700 bg-blue-50 rounded">
           Extracted
@@ -1021,9 +1031,16 @@ export function OverviewTab(props: OverviewTabProps) {
           item.confidenceScore < 80;
 
         // Get source document name from linkedDocuments
-        const sourceDocName = item.source === "extracted" && item.linkedDocuments?.length > 0
-          ? item.linkedDocuments[0].groupTitle || item.linkedDocuments[0].fileName
+        const firstLinkedDoc = item.linkedDocuments?.length > 0 ? item.linkedDocuments[0] : undefined;
+        const sourceDocName = item.source === "extracted" && firstLinkedDoc
+          ? firstLinkedDoc.groupTitle || firstLinkedDoc.fileName
           : undefined;
+
+        // Check if the source document was deleted
+        const linkedGroup = firstLinkedDoc
+          ? documentGroups.find((g) => g.files.some((f) => f.id === firstLinkedDoc.fileId))
+          : undefined;
+        const isDisconnected = !!firstLinkedDoc && !linkedGroup;
 
         return {
           id: item.id,
@@ -1031,6 +1048,7 @@ export function OverviewTab(props: OverviewTabProps) {
           value: formValues[item.id] || item.value,
           source: item.source,
           sourceDocumentName: sourceDocName,
+          isDisconnected,
           status: isLowConfidence ? "low_confidence" : (hasValue ? "complete" : "missing"),
           fieldType: "text",
           confidenceScore: item.confidenceScore,
@@ -1048,7 +1066,7 @@ export function OverviewTab(props: OverviewTabProps) {
         options: field.options,
       }));
     }
-  }, [itemType, formValues, props]);
+  }, [itemType, formValues, props, documentGroups]);
 
   // Status helpers
   const getFieldStatus = () => {

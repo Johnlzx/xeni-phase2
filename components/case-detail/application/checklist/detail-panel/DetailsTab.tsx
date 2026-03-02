@@ -12,6 +12,7 @@ import {
   CircleDashed,
   Sparkles,
   CheckCircle2,
+  Unlink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -62,7 +63,18 @@ function SourceBadge({
     ? documentGroups.find((g) => g.files.some((f) => f.id === linkedDocument.fileId))
     : undefined;
 
+  const isDisconnected = !!linkedDocument && !linkedGroup;
+
   if (source === "extracted") {
+    if (isDisconnected) {
+      return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 rounded">
+          <Unlink className="size-2.5" />
+          {documentName || "Extracted"}
+        </span>
+      );
+    }
+
     const isLowConfidence = confidenceScore !== undefined && confidenceScore < 80;
 
     return (

@@ -1166,7 +1166,12 @@ export function CategoryReviewModal({
           onConfirm={() => {
             onClose();
             // Delay deletion to next frame so modal closes first
-            setTimeout(() => deleteDocumentGroup(group.id), 0);
+            setTimeout(() => {
+              deleteDocumentGroup(group.id);
+              if (checklistBindings.length > 0) {
+                markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+              }
+            }, 0);
           }}
           onCancel={() => setShowDeleteCategoryConfirm(false)}
         />

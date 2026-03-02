@@ -65,7 +65,18 @@ function SourceBadge({
     ? documentGroups.find((g) => g.files.some((f) => f.id === linkedDocument.fileId))
     : undefined;
 
+  const isDisconnected = !!linkedDocument && !linkedGroup;
+
   if (source === "extracted") {
+    if (isDisconnected) {
+      return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 rounded">
+          <Unlink className="size-2.5" />
+          {documentName || "Extracted"}
+        </span>
+      );
+    }
+
     return (
       <>
         <button
