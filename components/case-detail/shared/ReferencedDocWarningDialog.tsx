@@ -25,7 +25,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 interface ReferencedDocWarningDialogProps {
   open: boolean;
-  action: "confirm-review" | "rename";
+  action: "confirm-review" | "rename" | "replace";
   groupTitle: string;
   newTitle?: string;
   checklistBindings: GroupChecklistBinding[];
@@ -42,21 +42,32 @@ export function ReferencedDocWarningDialog({
   onConfirm,
   onCancel,
 }: ReferencedDocWarningDialogProps) {
-  const isRename = action === "rename";
+  const title =
+    action === "rename"
+      ? <>Rename &ldquo;{groupTitle}&rdquo; to &ldquo;{newTitle}&rdquo;?</>
+      : action === "replace"
+        ? <>Replace &ldquo;{groupTitle}&rdquo;?</>
+        : <>Confirm review of &ldquo;{groupTitle}&rdquo;?</>;
+
+  const description =
+    action === "rename"
+      ? "This document is referenced by the checklist. Renaming it may affect the analysis of related sections."
+      : action === "replace"
+        ? "This document is referenced by the checklist. Replacing it will require re-analysis of related sections."
+        : "This document is referenced by the checklist. Confirming the review may affect the analysis of related sections.";
+
+  const buttonLabel =
+    action === "rename" ? "Rename" : action === "replace" ? "Replace" : "Confirm Review";
 
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <AlertDialogContent onClick={(e) => e.stopPropagation()}>
         <AlertDialogHeader>
           <AlertDialogTitle className="text-balance">
-            {isRename
-              ? <>Rename &ldquo;{groupTitle}&rdquo; to &ldquo;{newTitle}&rdquo;?</>
-              : <>Confirm review of &ldquo;{groupTitle}&rdquo;?</>}
+            {title}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-pretty">
-            {isRename
-              ? "This document is referenced by the checklist. Renaming it may affect the analysis of related sections."
-              : "This document is referenced by the checklist. Confirming the review may affect the analysis of related sections."}
+            {description}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -91,7 +102,7 @@ export function ReferencedDocWarningDialog({
             onClick={onConfirm}
             className="bg-amber-600 hover:bg-amber-700 text-white"
           >
-            {isRename ? "Rename" : "Confirm Review"}
+            {buttonLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

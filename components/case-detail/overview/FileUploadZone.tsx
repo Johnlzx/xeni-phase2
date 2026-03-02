@@ -290,17 +290,19 @@ function DocumentThumbnailCard({
                 <Check className="size-3.5 text-emerald-600" strokeWidth={2.5} />
               </div>
             )}
-            <div
-              role="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDeleteConfirm(true);
-              }}
-              title="Delete"
-              className="size-7 rounded-full bg-white shadow-sm hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <Trash2 className="size-3.5 text-rose-500" strokeWidth={2.5} />
-            </div>
+            {group.id !== "passport" && (
+              <div
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteConfirm(true);
+                }}
+                title="Delete"
+                className="size-7 rounded-full bg-white shadow-sm hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Trash2 className="size-3.5 text-rose-500" strokeWidth={2.5} />
+              </div>
+            )}
           </div>
         )}
       </button>

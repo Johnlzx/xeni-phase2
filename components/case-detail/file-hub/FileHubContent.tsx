@@ -1004,6 +1004,7 @@ const CategoryCard = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRefWarningForConfirm, setShowRefWarningForConfirm] = useState(false);
   const [showRefWarningForRename, setShowRefWarningForRename] = useState(false);
+  const [showRefWarningForReplace, setShowRefWarningForReplace] = useState(false);
   const [pendingNewTitle, setPendingNewTitle] = useState<string | null>(null);
   const [pendingMergeGroupIds, setPendingMergeGroupIds] = useState<string[] | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -1602,6 +1603,10 @@ const CategoryCard = ({
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (checklistBindings.length > 0) {
+                      setShowRefWarningForReplace(true);
+                      return;
+                    }
                     const pageCount = Math.floor(Math.random() * 3) + 1;
                     replaceGroupFiles(group.id, pageCount);
                     toast.success("Document replaced", {
@@ -1629,7 +1634,7 @@ const CategoryCard = ({
             </DropdownMenuItem>
 
             {/* Delete */}
-            {!group.isSpecial && (
+            {!group.isSpecial && group.id !== "passport" && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -1701,6 +1706,24 @@ const CategoryCard = ({
           setPendingNewTitle(null);
           setIsRenamingTitle(false);
         }}
+      />
+
+      {/* Referenced Doc Warning Dialog (replace) */}
+      <ReferencedDocWarningDialog
+        open={showRefWarningForReplace}
+        action="replace"
+        groupTitle={group.title}
+        checklistBindings={checklistBindings}
+        onConfirm={() => {
+          const pageCount = Math.floor(Math.random() * 3) + 1;
+          replaceGroupFiles(group.id, pageCount);
+          markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
+          setShowRefWarningForReplace(false);
+          toast.success("Document replaced", {
+            description: `"${group.title}" replaced with ${pageCount} new page${pageCount !== 1 ? "s" : ""}.`,
+          });
+        }}
+        onCancel={() => setShowRefWarningForReplace(false)}
       />
 
       {/* Delete Confirmation Dialog */}

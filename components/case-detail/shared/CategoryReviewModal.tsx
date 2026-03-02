@@ -712,7 +712,7 @@ export function CategoryReviewModal({
               Add
             </button>
 
-            {!group.isSpecial && (
+            {!group.isSpecial && group.id !== "passport" && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -846,7 +846,7 @@ export function CategoryReviewModal({
                       className="mx-auto mb-4 text-stone-300"
                     />
                     <p className="text-sm text-stone-500 mb-4">No pages in this category</p>
-                    {!group.isSpecial && (
+                    {!group.isSpecial && group.id !== "passport" && (
                       <button
                         onClick={() => setShowDeleteCategoryConfirm(true)}
                         className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
