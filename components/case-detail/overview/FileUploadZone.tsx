@@ -315,7 +315,7 @@ function DocumentThumbnailCard({
           markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
           setShowRefWarning(false);
           toast.success("Review confirmed", {
-            description: `"${group.title}" marked as reviewed. Affected sections flagged for re-analysis.`,
+            description: `"${group.title}" marked as reviewed.`,
           });
         }}
         onCancel={() => setShowRefWarning(false)}

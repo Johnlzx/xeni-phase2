@@ -1132,7 +1132,7 @@ const CategoryCard = ({
     markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
     setShowRefWarningForConfirm(false);
     toast.success("Review confirmed", {
-      description: `"${group.title}" marked as reviewed. Affected sections flagged for re-analysis.`,
+      description: `"${group.title}" marked as reviewed.`,
     });
   };
 
@@ -1688,7 +1688,7 @@ const CategoryCard = ({
             renameDocumentGroup(group.id, pendingNewTitle);
             markSectionsForReanalysis(bindingsToSectionIds(checklistBindings));
             toast.success("Document renamed", {
-              description: `Renamed to "${pendingNewTitle}". Affected sections flagged for re-analysis.`,
+              description: `Renamed to "${pendingNewTitle}".`,
             });
           }
           setShowRefWarningForRename(false);

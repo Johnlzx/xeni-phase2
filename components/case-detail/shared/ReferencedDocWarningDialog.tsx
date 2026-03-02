@@ -55,8 +55,8 @@ export function ReferencedDocWarningDialog({
           </AlertDialogTitle>
           <AlertDialogDescription className="text-pretty">
             {isRename
-              ? "This document is referenced by the checklist. Renaming it will trigger re-analysis of affected sections."
-              : "This document is referenced by the checklist. Confirming the review will trigger re-analysis of affected sections."}
+              ? "This document is referenced by the checklist. Renaming it may affect the analysis of related sections."
+              : "This document is referenced by the checklist. Confirming the review may affect the analysis of related sections."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -79,7 +79,7 @@ export function ReferencedDocWarningDialog({
                 )}
               </ul>
               <p className="text-amber-600 mt-1.5 text-xs">
-                These sections will be flagged for re-analysis after this action.
+                You can re-analyze affected sections in the Application tab.
               </p>
             </div>
           </div>
@@ -91,7 +91,7 @@ export function ReferencedDocWarningDialog({
             onClick={onConfirm}
             className="bg-amber-600 hover:bg-amber-700 text-white"
           >
-            {isRename ? "Rename and Re-analyze" : "Confirm Review and Re-analyze"}
+            {isRename ? "Rename" : "Confirm Review"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

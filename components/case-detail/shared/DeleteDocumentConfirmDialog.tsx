@@ -76,7 +76,7 @@ export function DeleteDocumentConfirmDialog({
                   )}
                 </ul>
                 <p className="text-amber-600 mt-1.5 text-xs">
-                  Deleting will remove these references. Related information extraction may be affected.
+                  Deleting will remove these references. You can re-analyze affected sections in the Application tab.
                 </p>
               </div>
             </div>
