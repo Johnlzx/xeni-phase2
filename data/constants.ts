@@ -53,4 +53,6 @@ export const ROUTES = {
   HOME: '/',
   CASES: '/cases',
   CASE_DETAIL: (caseId: string) => `/cases/${caseId}`,
+  OPS: '/ops',
+  OPS_WORKSPACE: (workspaceId: string) => `/ops/${workspaceId}`,
 };
