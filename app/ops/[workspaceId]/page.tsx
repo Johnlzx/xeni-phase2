@@ -109,6 +109,13 @@ function WorkspaceDetailContent({ workspace }: { workspace: Workspace }) {
             <XeniLogo size="md" />
           </Link>
           <span className="text-stone-300 text-sm">/</span>
+          <Link
+            href={ROUTES.OPS}
+            className="text-sm font-medium text-stone-500 hover:text-stone-700 transition-colors"
+          >
+            Operation Dashboard
+          </Link>
+          <span className="text-stone-300 text-sm">/</span>
           <WorkspaceSelector
             currentWorkspace={workspace}
             onSelect={(id) => router.push(ROUTES.OPS_WORKSPACE(id))}
@@ -124,7 +131,6 @@ function WorkspaceDetailContent({ workspace }: { workspace: Workspace }) {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-5xl mx-auto px-8 py-6 flex-1 w-full">
         {/* Stat Cards */}
         <div className="grid grid-cols-3 gap-4 mb-6">

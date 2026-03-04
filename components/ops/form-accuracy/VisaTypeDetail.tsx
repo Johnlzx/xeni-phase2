@@ -1,0 +1,439 @@
+"use client";
+
+import { useState, useMemo, useCallback } from "react";
+import { ArrowLeft, Play, Loader2 } from "lucide-react";
+import { CircularProgress } from "@/components/ui/circular-progress";
+import { formatDate } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  getBatchRunsForVisaType,
+  getHeatmapData,
+} from "@/data/form-accuracy-mock";
+import type {
+  VisaTypeAccuracyMetrics,
+  TestRunResult,
+  TestPath,
+  BatchTestRun,
+  HeatmapDay,
+} from "@/types/form-accuracy";
+
+// ---------------------------------------------------------------------------
+// Refined color palette — desaturated, professional tones
+// ---------------------------------------------------------------------------
+
+const STATUS_COLORS = {
+  success: { text: "text-emerald-600", bg: "bg-emerald-500", ring: "#10B981" },
+  warning: { text: "text-[#B08D5B]", bg: "bg-[#D4A96A]", ring: "#D4A96A" },
+  danger:  { text: "text-rose-500", bg: "bg-rose-400", ring: "#F43F5E" },
+} as const;
+
+function getAccuracyColor(rate: number) {
+  if (rate >= 0.95) return STATUS_COLORS.success;
+  if (rate >= 0.90) return STATUS_COLORS.warning;
+  return STATUS_COLORS.danger;
+}
+
+export function VisaTypeDetail({
+  metrics,
+  paths,
+  runs,
+  onBack,
+  onSelectPath,
+}: {
+  metrics: VisaTypeAccuracyMetrics;
+  paths: TestPath[];
+  runs: TestRunResult[];
+  onBack: () => void;
+  onSelectPath: (pathId: string) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"paths" | "history">("paths");
+  const [isRunning, setIsRunning] = useState(false);
+
+  const color = getAccuracyColor(metrics.overallAccuracy);
+  const batchRuns = useMemo(() => getBatchRunsForVisaType(metrics.visaTypeId), [metrics.visaTypeId]);
+  const heatmapData = useMemo(() => getHeatmapData(metrics.visaTypeId), [metrics.visaTypeId]);
+  const sortedBatchRuns = useMemo(
+    () => [...batchRuns].sort((a, b) => b.executedAt.localeCompare(a.executedAt)),
+    [batchRuns]
+  );
+
+  const handleRunNow = useCallback(() => {
+    setIsRunning(true);
+    setTimeout(() => {
+      setIsRunning(false);
+      toast.success("Test run completed", {
+        description: `${metrics.totalPaths}/${metrics.totalPaths} paths passed`,
+      });
+    }, 3000);
+  }, [metrics.totalPaths]);
+
+  return (
+    <div className="max-w-5xl mx-auto px-8 py-6">
+      {/* Breadcrumb */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-700 transition-colors mb-4"
+      >
+        <ArrowLeft className="size-4" />
+        <span>Form Accuracy</span>
+        <span className="text-stone-300">/</span>
+        <span className="text-stone-700 font-medium">{metrics.visaTypeName}</span>
+      </button>
+
+      {/* Header card */}
+      <div className="bg-white rounded-xl border border-stone-200 p-6 mb-6">
+        <div className="flex items-center gap-6">
+          <CircularProgress
+            value={metrics.overallAccuracy * 100}
+            size={80}
+            strokeWidth={6}
+            color={color.ring}
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-stone-800">{metrics.visaTypeName}</h2>
+              <span className="px-2 py-0.5 text-xs font-bold rounded bg-stone-100 text-stone-500 border border-stone-200">
+                {metrics.visaTypeCode}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 mt-2 text-sm text-stone-500">
+              <span>{metrics.totalPaths} paths</span>
+              <span>{metrics.totalFields} total fields</span>
+              <span>{batchRuns.length} runs</span>
+              {metrics.lastTestDate && (
+                <span>Last tested: {formatDate(metrics.lastTestDate, "short")}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-2 text-xs">
+              <span className="text-emerald-600">{metrics.totalMatches} matches</span>
+              <span className="text-rose-500">{metrics.totalMismatches} mismatches</span>
+              <span className="text-[#B08D5B]">{metrics.totalMissing} missing</span>
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleRunNow}
+              disabled={isRunning}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[#0E4268] text-white hover:bg-[#0B3554] disabled:opacity-60 transition-colors cursor-pointer"
+            >
+              {isRunning ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Play className="size-4" />
+                  Run Now
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Uptime Bar */}
+      <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6">
+        <h3 className="text-sm font-medium text-stone-700 mb-3">Daily Run History</h3>
+        <UptimeBar data={heatmapData} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-4">
+        <button
+          onClick={() => setActiveTab("paths")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
+            activeTab === "paths"
+              ? "bg-[#0E4268] text-white"
+              : "text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          Paths
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
+            activeTab === "history"
+              ? "bg-[#0E4268] text-white"
+              : "text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          Run History
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        {activeTab === "paths" ? (
+          <PathsTable paths={paths} metrics={metrics} runs={runs} onSelect={onSelectPath} />
+        ) : (
+          <BatchRunHistoryTable runs={sortedBatchRuns} isRunning={isRunning} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// UPTIME BAR (Status-page style — thin vertical bars in a single row)
+// =============================================================================
+
+function getBarColor(run: BatchTestRun | null): string {
+  if (!run) return "bg-stone-200";
+  if (run.status === "success") return "bg-emerald-400";
+  if (run.status === "partial") {
+    if (run.overallAccuracy >= 0.95) return "bg-emerald-300";
+    return "bg-[#D4A96A]";
+  }
+  return "bg-rose-400";
+}
+
+function UptimeBar({ data }: { data: HeatmapDay[] }) {
+  const [tooltip, setTooltip] = useState<{ x: number; day: HeatmapDay } | null>(null);
+
+  // Compute overall uptime across days with actual runs
+  const daysWithRuns = data.filter((d) => d.batchRun !== null);
+  const uptimePercent =
+    daysWithRuns.length > 0
+      ? daysWithRuns.reduce((sum, d) => sum + (d.batchRun?.overallAccuracy ?? 0), 0) /
+        daysWithRuns.length
+      : 0;
+
+  return (
+    <div className="relative">
+      {/* Bar row */}
+      <div className="flex items-end gap-[1.5px] h-8">
+        {data.map((day) => {
+          const barColor = getBarColor(day.batchRun);
+          return (
+            <div
+              key={day.date}
+              className={`flex-1 h-full rounded-[2px] ${barColor} cursor-pointer transition-opacity hover:opacity-80`}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const parentRect = e.currentTarget.closest(".relative")!.getBoundingClientRect();
+                setTooltip({
+                  x: rect.left - parentRect.left + rect.width / 2,
+                  day,
+                });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            />
+          );
+        })}
+      </div>
+
+      {/* Labels row */}
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[11px] text-stone-400">{data.length} days ago</span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
+            <span className="inline-block size-2 rounded-sm bg-emerald-400" />
+            Pass
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
+            <span className="inline-block size-2 rounded-sm bg-[#D4A96A]" />
+            Partial
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
+            <span className="inline-block size-2 rounded-sm bg-rose-400" />
+            Fail
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
+            <span className="inline-block size-2 rounded-sm bg-stone-200" />
+            No run
+          </span>
+        </div>
+        <span className="text-[11px] text-stone-400">Today</span>
+      </div>
+
+      {/* Overall uptime */}
+      {daysWithRuns.length > 0 && (
+        <p className="text-xs text-stone-500 mt-1.5">
+          <span className="font-semibold text-emerald-600 tabular-nums">
+            {(uptimePercent * 100).toFixed(1)}%
+          </span>{" "}
+          average accuracy over {daysWithRuns.length} runs
+        </p>
+      )}
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div
+          className="absolute z-50 bg-stone-800 text-white text-[11px] px-3 py-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap -top-2"
+          style={{
+            left: tooltip.x,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <p className="font-medium">{formatDate(tooltip.day.date, "short")}</p>
+          {tooltip.day.batchRun ? (
+            <p className="text-stone-300 mt-0.5">
+              {(tooltip.day.batchRun.overallAccuracy * 100).toFixed(1)}% &middot; {tooltip.day.batchRun.passedPaths}/{tooltip.day.batchRun.totalPaths} paths
+            </p>
+          ) : (
+            <p className="text-stone-400 mt-0.5">No run</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// PATHS TABLE
+// =============================================================================
+
+function getPathAccuracyColor(rate: number) {
+  if (rate >= 0.95) return { text: "text-emerald-600", bg: "bg-emerald-500" };
+  if (rate >= 0.90) return { text: "text-[#B08D5B]", bg: "bg-[#D4A96A]" };
+  return { text: "text-rose-500", bg: "bg-rose-400" };
+}
+
+function PathsTable({
+  paths,
+  metrics,
+  onSelect,
+}: {
+  paths: TestPath[];
+  metrics: VisaTypeAccuracyMetrics;
+  runs: TestRunResult[];
+  onSelect: (pathId: string) => void;
+}) {
+  return (
+    <table className="w-full">
+      <thead>
+        <tr className="border-b border-stone-100">
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Path</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Fields</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Weight</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Hit Rate</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Runs</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Last Tested</th>
+        </tr>
+      </thead>
+      <tbody>
+        {paths.map((path) => {
+          const pm = metrics.pathMetrics.find((m) => m.testPathId === path.id);
+          const color = getPathAccuracyColor(pm?.latestHitRate ?? 0);
+          return (
+            <tr
+              key={path.id}
+              onClick={() => onSelect(path.id)}
+              className="border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer transition-colors"
+            >
+              <td className="px-4 py-3">
+                <span className="text-sm font-medium text-stone-700">{path.name}</span>
+                <span className="block text-xs text-stone-400 mt-0.5 line-clamp-1">{path.description}</span>
+              </td>
+              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{path.totalFieldCount}</td>
+              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{(path.weight * 100).toFixed(0)}%</td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${color.bg}`}
+                      style={{ width: `${(pm?.latestHitRate ?? 0) * 100}%` }}
+                    />
+                  </div>
+                  <span className={`text-xs font-medium tabular-nums ${color.text}`}>
+                    {((pm?.latestHitRate ?? 0) * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">{pm?.totalRuns ?? 0}</td>
+              <td className="px-4 py-3 text-xs text-stone-400">
+                {pm?.latestRunDate ? formatDate(pm.latestRunDate, "short") : "\u2014"}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// =============================================================================
+// BATCH RUN HISTORY TABLE
+// =============================================================================
+
+function getBatchStatusBadge(status: BatchTestRun["status"]) {
+  if (status === "success") return { label: "Passed", className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  if (status === "partial") return { label: "Partial", className: "bg-[#FDF6EF] text-[#9A7650] border-[#E8D5C0]" };
+  return { label: "Failed", className: "bg-rose-50 text-rose-600 border-rose-200" };
+}
+
+function BatchRunHistoryTable({
+  runs,
+  isRunning,
+}: {
+  runs: BatchTestRun[];
+  isRunning: boolean;
+}) {
+  return (
+    <table className="w-full">
+      <thead>
+        <tr className="border-b border-stone-100">
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Date</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Trigger</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Paths</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Accuracy</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Duration</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {isRunning && (
+          <tr className="border-b border-stone-50 bg-blue-50/30 animate-pulse">
+            <td className="px-4 py-3 text-sm text-stone-500">Running...</td>
+            <td className="px-4 py-3 text-xs text-stone-400">manual</td>
+            <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
+            <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
+            <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
+            <td className="px-4 py-3">
+              <span className="inline-flex px-2 py-0.5 text-[10px] font-medium rounded border bg-blue-50 text-blue-600 border-blue-200">
+                In Progress
+              </span>
+            </td>
+          </tr>
+        )}
+        {runs.map((run) => {
+          const badge = getBatchStatusBadge(run.status);
+          const color = getPathAccuracyColor(run.overallAccuracy);
+          return (
+            <tr key={run.id} className="border-b border-stone-50 hover:bg-stone-50/50 transition-colors">
+              <td className="px-4 py-3 text-sm text-stone-700">{formatDate(run.executedAt, "short")}</td>
+              <td className="px-4 py-3">
+                <span className="text-xs text-stone-500 capitalize">{run.trigger}</span>
+              </td>
+              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">
+                {run.passedPaths}/{run.totalPaths} passed
+              </td>
+              <td className="px-4 py-3">
+                <span className={`text-sm font-medium tabular-nums ${color.text}`}>
+                  {(run.overallAccuracy * 100).toFixed(1)}%
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">
+                {(run.durationMs / 1000).toFixed(1)}s
+              </td>
+              <td className="px-4 py-3">
+                <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded border ${badge.className}`}>
+                  {badge.label}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+        {runs.length === 0 && !isRunning && (
+          <tr>
+            <td colSpan={6} className="py-12 text-center text-sm text-stone-400">
+              No runs yet. Click &ldquo;Run Now&rdquo; to start a test.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
