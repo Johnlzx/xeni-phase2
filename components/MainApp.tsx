@@ -1114,7 +1114,7 @@ const GroupContainer = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Group?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{group.title}"? This action
+              Are you sure you want to delete &quot;{group.title}&quot;? This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

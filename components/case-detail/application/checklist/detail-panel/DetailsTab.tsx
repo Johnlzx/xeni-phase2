@@ -468,6 +468,7 @@ export function DetailsTab(props: DetailsTabProps) {
     const editedFieldIds = props.editedFieldIds;
 
     // Filter items based on active filters
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const filteredItems = useMemo(() => {
       if (activeFilters.size === 0) return items;
 

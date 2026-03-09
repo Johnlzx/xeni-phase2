@@ -233,7 +233,7 @@ function ReadyForAnalysisStep({
 
           {/* Info text */}
           <p className="text-xs text-stone-500 mt-4 text-center text-pretty">
-            After upload, you'll need to review and confirm documents in the Documents section
+            After upload, you&apos;ll need to review and confirm documents in the Documents section
           </p>
         </div>
 

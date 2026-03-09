@@ -371,7 +371,7 @@ function TriageStep({ questions, answers, onAnswer }: TriageStepProps) {
           <Sparkles className="w-8 h-8 mx-auto mb-3 text-[#0E4369]" />
           <p className="text-sm">No additional questions needed for this route.</p>
           <p className="text-xs text-gray-400 mt-1">
-            Click "Generate Checklist" to continue.
+            Click &quot;Generate Checklist&quot; to continue.
           </p>
         </div>
       )}
