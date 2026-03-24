@@ -11,8 +11,7 @@ import {
 } from "@/data/form-accuracy-mock";
 import type {
   VisaTypeAccuracyMetrics,
-  TestRunResult,
-  TestPath,
+  TestCase,
   BatchTestRun,
   HeatmapDay,
 } from "@/types/form-accuracy";
@@ -35,18 +34,16 @@ function getAccuracyColor(rate: number) {
 
 export function VisaTypeDetail({
   metrics,
-  paths,
-  runs,
+  cases,
   onBack,
-  onSelectPath,
+  onSelectCase,
 }: {
   metrics: VisaTypeAccuracyMetrics;
-  paths: TestPath[];
-  runs: TestRunResult[];
+  cases: TestCase[];
   onBack: () => void;
-  onSelectPath: (pathId: string) => void;
+  onSelectCase: (caseId: string) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"paths" | "history">("paths");
+  const [activeTab, setActiveTab] = useState<"cases" | "history">("cases");
   const [isRunning, setIsRunning] = useState(false);
 
   const color = getAccuracyColor(metrics.overallAccuracy);
@@ -62,17 +59,17 @@ export function VisaTypeDetail({
     setTimeout(() => {
       setIsRunning(false);
       toast.success("Test run completed", {
-        description: `${metrics.totalPaths}/${metrics.totalPaths} paths passed`,
+        description: `${metrics.totalCases}/${metrics.totalCases} cases passed`,
       });
     }, 3000);
-  }, [metrics.totalPaths]);
+  }, [metrics.totalCases]);
 
   return (
     <div className="max-w-5xl mx-auto px-8 py-6">
       {/* Breadcrumb */}
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-700 transition-colors mb-4"
+        className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-700 transition-colors mb-4 cursor-pointer"
       >
         <ArrowLeft className="size-4" />
         <span>Form Accuracy</span>
@@ -97,7 +94,7 @@ export function VisaTypeDetail({
               </span>
             </div>
             <div className="flex items-center gap-4 mt-2 text-sm text-stone-500">
-              <span>{metrics.totalPaths} paths</span>
+              <span>{metrics.totalCases} cases</span>
               <span>{metrics.totalFields} total fields</span>
               <span>{batchRuns.length} runs</span>
               {metrics.lastTestDate && (
@@ -142,14 +139,14 @@ export function VisaTypeDetail({
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-4">
         <button
-          onClick={() => setActiveTab("paths")}
+          onClick={() => setActiveTab("cases")}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
-            activeTab === "paths"
+            activeTab === "cases"
               ? "bg-[#0E4268] text-white"
               : "text-stone-600 hover:bg-stone-100"
           }`}
         >
-          Paths
+          Cases
         </button>
         <button
           onClick={() => setActiveTab("history")}
@@ -165,8 +162,8 @@ export function VisaTypeDetail({
 
       {/* Content */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-        {activeTab === "paths" ? (
-          <PathsTable paths={paths} metrics={metrics} runs={runs} onSelect={onSelectPath} />
+        {activeTab === "cases" ? (
+          <CasesTable cases={cases} onSelect={onSelectCase} />
         ) : (
           <BatchRunHistoryTable runs={sortedBatchRuns} isRunning={isRunning} />
         )}
@@ -230,15 +227,15 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
             <span className="inline-block size-2 rounded-sm bg-emerald-400" />
-            Pass
+            &ge; 95%
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
             <span className="inline-block size-2 rounded-sm bg-[#D4A96A]" />
-            Partial
+            90&ndash;95%
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
             <span className="inline-block size-2 rounded-sm bg-rose-400" />
-            Fail
+            &lt; 90%
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-stone-400">
             <span className="inline-block size-2 rounded-sm bg-stone-200" />
@@ -270,7 +267,7 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
           <p className="font-medium">{formatDate(tooltip.day.date, "short")}</p>
           {tooltip.day.batchRun ? (
             <p className="text-stone-300 mt-0.5">
-              {(tooltip.day.batchRun.overallAccuracy * 100).toFixed(1)}% &middot; {tooltip.day.batchRun.passedPaths}/{tooltip.day.batchRun.totalPaths} paths
+              {(tooltip.day.batchRun.overallAccuracy * 100).toFixed(1)}% &middot; {tooltip.day.batchRun.passedCases}/{tooltip.day.batchRun.totalCases} cases
             </p>
           ) : (
             <p className="text-stone-400 mt-0.5">No run</p>
@@ -282,69 +279,65 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
 }
 
 // =============================================================================
-// PATHS TABLE
+// CASES TABLE
 // =============================================================================
 
-function getPathAccuracyColor(rate: number) {
+function getCaseAccuracyColor(rate: number) {
   if (rate >= 0.95) return { text: "text-emerald-600", bg: "bg-emerald-500" };
   if (rate >= 0.90) return { text: "text-[#B08D5B]", bg: "bg-[#D4A96A]" };
   return { text: "text-rose-500", bg: "bg-rose-400" };
 }
 
-function PathsTable({
-  paths,
-  metrics,
+function CasesTable({
+  cases,
   onSelect,
 }: {
-  paths: TestPath[];
-  metrics: VisaTypeAccuracyMetrics;
-  runs: TestRunResult[];
-  onSelect: (pathId: string) => void;
+  cases: TestCase[];
+  onSelect: (caseId: string) => void;
 }) {
   return (
     <table className="w-full">
       <thead>
         <tr className="border-b border-stone-100">
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Path</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Case</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Fields</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Weight</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Hit Rate</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Runs</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Accuracy</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Runs</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Last Tested</th>
         </tr>
       </thead>
       <tbody>
-        {paths.map((path) => {
-          const pm = metrics.pathMetrics.find((m) => m.testPathId === path.id);
-          const color = getPathAccuracyColor(pm?.latestHitRate ?? 0);
+        {cases.map((tc) => {
+          const color = getCaseAccuracyColor(tc.accuracy);
           return (
             <tr
-              key={path.id}
-              onClick={() => onSelect(path.id)}
+              key={tc.id}
+              onClick={() => onSelect(tc.id)}
               className="border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer transition-colors"
             >
               <td className="px-4 py-3">
-                <span className="text-sm font-medium text-stone-700">{path.name}</span>
-                <span className="block text-xs text-stone-400 mt-0.5 line-clamp-1">{path.description}</span>
+                <span className="text-sm font-medium text-stone-700">{tc.name}</span>
+                <span className="block text-xs text-stone-400 mt-0.5 line-clamp-1">{tc.description}</span>
               </td>
-              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{path.totalFieldCount}</td>
-              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{(path.weight * 100).toFixed(0)}%</td>
+              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{tc.totalFieldCount}</td>
+              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{(tc.weight * 100).toFixed(0)}%</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${color.bg}`}
-                      style={{ width: `${(pm?.latestHitRate ?? 0) * 100}%` }}
+                      style={{ width: `${tc.accuracy * 100}%` }}
                     />
                   </div>
                   <span className={`text-xs font-medium tabular-nums ${color.text}`}>
-                    {((pm?.latestHitRate ?? 0) * 100).toFixed(0)}%
+                    {(tc.accuracy * 100).toFixed(0)}%
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">{pm?.totalRuns ?? 0}</td>
+              <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">{tc.totalRuns}</td>
               <td className="px-4 py-3 text-xs text-stone-400">
-                {pm?.latestRunDate ? formatDate(pm.latestRunDate, "short") : "\u2014"}
+                {tc.lastTestedAt ? formatDate(tc.lastTestedAt, "short") : "\u2014"}
               </td>
             </tr>
           );
@@ -364,6 +357,12 @@ function getBatchStatusBadge(status: BatchTestRun["status"]) {
   return { label: "Failed", className: "bg-rose-50 text-rose-600 border-rose-200" };
 }
 
+function getRunAccuracyColor(rate: number) {
+  if (rate >= 0.95) return { text: "text-emerald-600" };
+  if (rate >= 0.90) return { text: "text-[#B08D5B]" };
+  return { text: "text-rose-500" };
+}
+
 function BatchRunHistoryTable({
   runs,
   isRunning,
@@ -377,7 +376,7 @@ function BatchRunHistoryTable({
         <tr className="border-b border-stone-100">
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Date</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Trigger</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Paths</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Cases</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Accuracy</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Duration</th>
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Status</th>
@@ -400,7 +399,7 @@ function BatchRunHistoryTable({
         )}
         {runs.map((run) => {
           const badge = getBatchStatusBadge(run.status);
-          const color = getPathAccuracyColor(run.overallAccuracy);
+          const color = getRunAccuracyColor(run.overallAccuracy);
           return (
             <tr key={run.id} className="border-b border-stone-50 hover:bg-stone-50/50 transition-colors">
               <td className="px-4 py-3 text-sm text-stone-700">{formatDate(run.executedAt, "short")}</td>
@@ -408,7 +407,7 @@ function BatchRunHistoryTable({
                 <span className="text-xs text-stone-500 capitalize">{run.trigger}</span>
               </td>
               <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">
-                {run.passedPaths}/{run.totalPaths} passed
+                {run.passedCases}/{run.totalCases} passed
               </td>
               <td className="px-4 py-3">
                 <span className={`text-sm font-medium tabular-nums ${color.text}`}>

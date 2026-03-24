@@ -7,7 +7,6 @@ export type OpsMenuItem = "workspaces" | "visa-types" | "form-accuracy";
 
 const MENU_ITEMS: { id: OpsMenuItem; label: string; icon: React.ElementType }[] = [
   { id: "workspaces", label: "Workspaces", icon: LayoutGrid },
-  { id: "visa-types", label: "Visa Types", icon: FileText },
   { id: "form-accuracy", label: "Form Accuracy", icon: ClipboardCheck },
 ];
 

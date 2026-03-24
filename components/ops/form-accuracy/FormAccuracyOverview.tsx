@@ -26,23 +26,22 @@ import { Button } from "@/components/ui/button";
 import {
   MOCK_DASHBOARD_STATS,
   MOCK_VISA_TYPE_METRICS,
-  getTestPathsForVisaType,
-  getLatestRunForPath,
+  getTestCasesForVisaType,
   getMetricsForVisaType,
   getLastNBatchAccuracies,
   getCoverageTimelineData,
 } from "@/data/form-accuracy-mock";
 import type { CoverageTimelineRow } from "@/data/form-accuracy-mock";
-import { MOCK_TEST_RUNS } from "@/data/form-accuracy-mock";
 import type {
   FormAccuracyVisaTypeId,
+  FormAccuracyDashboardStats,
   VisaTypeAccuracyMetrics,
   RunSchedule,
   FormAccuracySortOption,
   FormAccuracyFilterOption,
 } from "@/types/form-accuracy";
 import { VisaTypeDetail } from "./VisaTypeDetail";
-import { PathDetail } from "./PathDetail";
+import { CaseDetail } from "./CaseDetail";
 
 function getAccuracyColor(rate: number) {
   if (rate >= 0.95) return { text: "text-emerald-600", bg: "bg-emerald-50", ring: "#10B981", border: "border-emerald-200" };
@@ -50,9 +49,45 @@ function getAccuracyColor(rate: number) {
   return { text: "text-rose-500", bg: "bg-rose-50", ring: "#F43F5E", border: "border-rose-200" };
 }
 
+// ---------------------------------------------------------------------------
+// Simulate a fresh run: bump accuracy slightly and update timestamps to now
+// ---------------------------------------------------------------------------
+
+function simulateRefreshedMetrics(
+  metrics: VisaTypeAccuracyMetrics[]
+): VisaTypeAccuracyMetrics[] {
+  const now = new Date().toISOString();
+  return metrics.map((m) => {
+    const newCaseMetrics = m.caseMetrics.map((cm) => {
+      // Small random bump: +0.5% to +2%
+      const bump = 0.005 + Math.random() * 0.015;
+      const newRate = Math.min(1, cm.latestHitRate + bump);
+      return { ...cm, latestHitRate: newRate, latestRunDate: now, totalRuns: cm.totalRuns + 1 };
+    });
+    const newOverall = newCaseMetrics.reduce((s, c) => s + c.latestHitRate, 0) / newCaseMetrics.length;
+    return {
+      ...m,
+      overallAccuracy: newOverall,
+      lastTestDate: now,
+      totalRuns: m.totalRuns + m.totalCases,
+      caseMetrics: newCaseMetrics,
+    };
+  });
+}
+
+function buildDashboardStats(metrics: VisaTypeAccuracyMetrics[]): FormAccuracyDashboardStats {
+  const avg = metrics.reduce((s, m) => s + m.overallAccuracy, 0) / metrics.length;
+  const lowest = metrics.reduce(
+    (lo, m) => (m.overallAccuracy < lo.accuracy ? { visaTypeId: m.visaTypeId, visaTypeName: m.visaTypeName, accuracy: m.overallAccuracy } : lo),
+    { visaTypeId: metrics[0].visaTypeId, visaTypeName: metrics[0].visaTypeName, accuracy: metrics[0].overallAccuracy }
+  );
+  const lastRunTime = metrics.reduce((l, m) => (m.lastTestDate > l ? m.lastTestDate : l), metrics[0].lastTestDate);
+  return { averageAccuracy: avg, totalVisaTypes: metrics.length, lowestVisaType: lowest, lastRunTime };
+}
+
 export function FormAccuracyOverview() {
   const [selectedVisaType, setSelectedVisaType] = useState<FormAccuracyVisaTypeId | null>(null);
-  const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<RunSchedule>("daily");
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
@@ -60,11 +95,13 @@ export function FormAccuracyOverview() {
   const [sortBy, setSortBy] = useState<FormAccuracySortOption>("accuracy");
   const [filterBy, setFilterBy] = useState<FormAccuracyFilterOption>("all");
 
-  const stats = MOCK_DASHBOARD_STATS;
-  const timelineData = useMemo(() => getCoverageTimelineData(14), []);
+  // Reactive data — updated after test runs
+  const [visaTypeMetrics, setVisaTypeMetrics] = useState(() => [...MOCK_VISA_TYPE_METRICS]);
+  const [stats, setStats] = useState(() => ({ ...MOCK_DASHBOARD_STATS }));
+  const [timelineData, setTimelineData] = useState(() => getCoverageTimelineData(14));
 
   const sortedFilteredMetrics = useMemo(() => {
-    let list = [...MOCK_VISA_TYPE_METRICS];
+    let list = [...visaTypeMetrics];
 
     // Filter
     if (filterBy === "below90") {
@@ -85,27 +122,52 @@ export function FormAccuracyOverview() {
     }
 
     return list;
-  }, [sortBy, filterBy]);
+  }, [sortBy, filterBy, visaTypeMetrics]);
+
+  // Refresh all data after a successful run
+  const refreshAfterRun = useCallback((updatedMetrics: VisaTypeAccuracyMetrics[]) => {
+    setVisaTypeMetrics(updatedMetrics);
+    setStats(buildDashboardStats(updatedMetrics));
+    // Update timeline: mark today as having a run with the new accuracy
+    setTimelineData((prev) =>
+      prev.map((row) => {
+        const m = updatedMetrics.find((u) => u.visaTypeId === row.visaTypeId);
+        if (!m) return row;
+        const newDays = row.days.map((d, i) =>
+          i === row.days.length - 1 ? { ...d, hasRun: true, accuracy: m.overallAccuracy } : d
+        );
+        return { ...row, accuracy: m.overallAccuracy, days: newDays, daysSinceLastRun: 0 };
+      })
+    );
+  }, []);
 
   const handleRunAll = useCallback(() => {
     setIsRunningAll(true);
     setTimeout(() => {
+      const updated = simulateRefreshedMetrics(visaTypeMetrics);
+      refreshAfterRun(updated);
       setIsRunningAll(false);
       toast.success("All tests completed", {
-        description: `${MOCK_VISA_TYPE_METRICS.length} visa types tested successfully`,
+        description: `${updated.length} visa types tested — average accuracy ${(buildDashboardStats(updated).averageAccuracy * 100).toFixed(1)}%`,
       });
     }, 4000);
-  }, []);
+  }, [visaTypeMetrics, refreshAfterRun]);
 
   const handleRunSingle = useCallback((visaTypeId: FormAccuracyVisaTypeId, visaTypeName: string) => {
     setRunningVisaTypeId(visaTypeId);
     setTimeout(() => {
+      const updated = visaTypeMetrics.map((m) => {
+        if (m.visaTypeId !== visaTypeId) return m;
+        return simulateRefreshedMetrics([m])[0];
+      });
+      refreshAfterRun(updated);
       setRunningVisaTypeId(null);
+      const updatedM = updated.find((m) => m.visaTypeId === visaTypeId)!;
       toast.success(`${visaTypeName} test completed`, {
-        description: "All paths passed successfully",
+        description: `Accuracy: ${(updatedM.overallAccuracy * 100).toFixed(1)}%`,
       });
     }, 3000);
-  }, []);
+  }, [visaTypeMetrics, refreshAfterRun]);
 
   const handleExport = useCallback(() => {
     toast.success("Report exported", {
@@ -120,21 +182,19 @@ export function FormAccuracyOverview() {
     toast.success("Schedule updated", { description: `Runs set to: ${labels[value]}` });
   }, []);
 
-  // Level 3: Path Detail
-  if (selectedVisaType && selectedPathId) {
-    const paths = getTestPathsForVisaType(selectedVisaType);
-    const path = paths.find((p) => p.id === selectedPathId);
-    const run = getLatestRunForPath(selectedPathId);
+  // Level 3: Case Detail
+  if (selectedVisaType && selectedCaseId) {
+    const cases = getTestCasesForVisaType(selectedVisaType);
+    const testCase = cases.find((c) => c.id === selectedCaseId);
     const metrics = getMetricsForVisaType(selectedVisaType);
 
-    if (path && run && metrics) {
+    if (testCase && metrics) {
       return (
         <div className="flex-1 overflow-y-auto">
-          <PathDetail
-            path={path}
-            run={run}
+          <CaseDetail
+            testCase={testCase}
             visaTypeName={metrics.visaTypeName}
-            onBack={() => setSelectedPathId(null)}
+            onBack={() => setSelectedCaseId(null)}
           />
         </div>
       );
@@ -144,18 +204,16 @@ export function FormAccuracyOverview() {
   // Level 2: Visa Type Detail
   if (selectedVisaType) {
     const metrics = getMetricsForVisaType(selectedVisaType);
-    const paths = getTestPathsForVisaType(selectedVisaType);
-    const runs = MOCK_TEST_RUNS.filter((r) => r.visaTypeId === selectedVisaType);
+    const cases = getTestCasesForVisaType(selectedVisaType);
 
     if (metrics) {
       return (
         <div className="flex-1 overflow-y-auto">
           <VisaTypeDetail
             metrics={metrics}
-            paths={paths}
-            runs={runs}
+            cases={cases}
             onBack={() => setSelectedVisaType(null)}
-            onSelectPath={(pathId) => setSelectedPathId(pathId)}
+            onSelectCase={(caseId) => setSelectedCaseId(caseId)}
           />
         </div>
       );
@@ -209,9 +267,6 @@ export function FormAccuracyOverview() {
             </Button>
           </div>
         </div>
-
-        {/* Threshold Legend */}
-        <ThresholdLegend />
 
         {/* Stat Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
@@ -341,11 +396,12 @@ const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
   const STALE_DAYS = 7;
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; date: string; accuracy: number } | null>(null);
 
-  // Precompute date labels from first row (all rows share the same days)
+  // Precompute date labels from first row, reversed so newest is on the left
   const dayDates = useMemo(() => {
     if (data.length === 0) return [];
-    return data[0].days.map((d) => {
+    return [...data[0].days].reverse().map((d) => {
       const dt = new Date(d.date + "T00:00:00");
       return { date: d.date, day: dt.getDate(), month: dt.getMonth(), monthLabel: MONTH_SHORT[dt.getMonth()] };
     });
@@ -366,7 +422,7 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
   }, [dayDates]);
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6">
+    <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6 relative">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-stone-700">Test Coverage Timeline</h3>
         <span className="text-xs text-stone-400">Past 14 days</span>
@@ -376,7 +432,9 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
       <div className="flex items-end gap-0 mb-1.5">
         {/* Left gutter (matches name + accuracy columns) */}
         <div className="w-[88px] shrink-0 mr-3" />
-        <div className="w-10 shrink-0 mr-3" />
+        <div className="w-10 shrink-0 mr-3 text-right">
+          <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wide">Latest</span>
+        </div>
         {/* Grid header */}
         <div className="flex-1 min-w-0">
           {/* Month labels */}
@@ -402,16 +460,16 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
             ))}
           </div>
         </div>
-        {/* Right gutter (matches staleness + warning columns) */}
-        <div className="w-8 shrink-0 ml-3" />
-        <div className="w-4 shrink-0" />
       </div>
 
       {/* Data rows */}
       <div className="space-y-[3px]">
         {data.map((row) => {
-          const color = getAccuracyColor(row.accuracy);
-          const isStale = row.daysSinceLastRun >= STALE_DAYS;
+          // Show today's accuracy (last day with a run), fallback to overall
+          const todayDay = row.days[row.days.length - 1];
+          const todayAccuracy = todayDay?.hasRun && todayDay.accuracy !== null ? todayDay.accuracy : row.accuracy;
+          const color = getAccuracyColor(todayAccuracy);
+          const reversedDays = [...row.days].reverse();
 
           return (
             <div key={row.visaTypeId} className="flex items-center gap-0">
@@ -419,13 +477,13 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
               <span className="text-xs text-stone-600 w-[88px] truncate shrink-0 font-medium mr-3">
                 {row.visaTypeName}
               </span>
-              {/* Accuracy */}
+              {/* Today's accuracy */}
               <span className={`text-xs font-medium tabular-nums w-10 shrink-0 text-right mr-3 ${color.text}`}>
-                {(row.accuracy * 100).toFixed(0)}%
+                {(todayAccuracy * 100).toFixed(0)}%
               </span>
-              {/* Day cells — square grid */}
+              {/* Day cells — square grid (newest first) */}
               <div className="flex-1 flex items-center gap-[3px]">
-                {row.days.map((day) => {
+                {reversedDays.map((day) => {
                   const cellColor = day.hasRun
                     ? getAccuracyColor(day.accuracy ?? 0).ring
                     : undefined;
@@ -438,22 +496,23 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
                             : "bg-stone-100"
                         }`}
                         style={day.hasRun ? { backgroundColor: cellColor } : undefined}
-                        title={`${day.date}${day.hasRun ? ` — ${((day.accuracy ?? 0) * 100).toFixed(1)}%` : " — no run"}`}
+                        onMouseEnter={(e) => {
+                          if (!day.hasRun || day.accuracy === null) return;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const containerRect = e.currentTarget.closest(".relative")!.getBoundingClientRect();
+                          setTooltip({
+                            x: rect.left - containerRect.left + rect.width / 2,
+                            y: rect.top - containerRect.top,
+                            date: day.date,
+                            accuracy: day.accuracy,
+                          });
+                        }}
+                        onMouseLeave={() => setTooltip(null)}
                       />
                     </div>
                   );
                 })}
               </div>
-              {/* Days since last run */}
-              <span className={`text-xs tabular-nums w-8 text-right shrink-0 ml-3 ${isStale ? "text-rose-500 font-semibold" : "text-stone-400"}`}>
-                {row.daysSinceLastRun}d
-              </span>
-              {/* Stale warning */}
-              <span className="w-4 shrink-0 flex justify-center">
-                {isStale && (
-                  <AlertTriangle className="size-3.5 text-amber-500" />
-                )}
-              </span>
             </div>
           );
         })}
@@ -463,25 +522,36 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
       <div className="flex items-center gap-4 mt-4 pt-3 border-t border-stone-100">
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-[2px] bg-emerald-500" />
-          <span className="text-[11px] text-stone-400">pass</span>
+          <span className="text-[11px] text-stone-400">&ge; 95%</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-[2px] bg-[#D4A96A]" />
-          <span className="text-[11px] text-stone-400">partial</span>
+          <span className="text-[11px] text-stone-400">90&ndash;95%</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-[2px] bg-rose-400" />
-          <span className="text-[11px] text-stone-400">fail</span>
+          <span className="text-[11px] text-stone-400">&lt; 90%</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-[2px] bg-stone-100 border border-stone-200" />
           <span className="text-[11px] text-stone-400">no run</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <AlertTriangle className="size-3 text-amber-500" />
-          <span className="text-[11px] text-stone-400">stale (&gt; 7d)</span>
-        </div>
       </div>
+
+      {/* Hover tooltip */}
+      {tooltip && (
+        <div
+          className="absolute z-50 bg-stone-800 text-white text-[11px] px-3 py-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y - 4,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <p className="font-medium">{formatDate(tooltip.date, "short")}</p>
+          <p className="text-stone-300 mt-0.5">{(tooltip.accuracy * 100).toFixed(1)}%</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -495,15 +565,15 @@ function ThresholdLegend() {
     <div className="flex items-center gap-5 mb-5 px-1">
       <div className="flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-emerald-500" />
-        <span className="text-xs text-stone-500">&ge; 95% Production Ready</span>
+        <span className="text-xs text-stone-500">&ge; 95%</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-amber-400" />
-        <span className="text-xs text-stone-500">90&ndash;94% Needs Attention</span>
+        <span className="text-xs text-stone-500">90&ndash;95%</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-rose-400" />
-        <span className="text-xs text-stone-500">&lt; 90% Needs Fixing</span>
+        <span className="text-xs text-stone-500">&lt; 90%</span>
       </div>
     </div>
   );
@@ -699,7 +769,7 @@ function VisaTypeCard({
               </span>
             </div>
             <div className="flex items-center gap-3 mt-1.5 text-xs text-stone-500">
-              <span>{metrics.totalPaths} paths</span>
+              <span>{metrics.totalCases} cases</span>
               <span>{metrics.totalFields} fields</span>
               <span>{metrics.totalRuns} runs</span>
             </div>
@@ -716,21 +786,21 @@ function VisaTypeCard({
             color={color.ring}
           />
         </div>
-        {/* Path hit rates mini bar */}
+        {/* Case hit rates mini bar */}
         <div className="mt-3 space-y-1">
-          {metrics.pathMetrics.map((pm) => {
-            const pmColor = getAccuracyColor(pm.latestHitRate);
+          {metrics.caseMetrics.map((cm) => {
+            const cmColor = getAccuracyColor(cm.latestHitRate);
             return (
-              <div key={pm.testPathId} className="flex items-center gap-2">
-                <span className="text-[10px] text-stone-400 w-20 truncate">{pm.testPathName}</span>
+              <div key={cm.testCaseId} className="flex items-center gap-2">
+                <span className="text-[10px] text-stone-400 w-20 truncate">{cm.testCaseName}</span>
                 <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${pmColor.ring === "#10B981" ? "bg-emerald-500" : pmColor.ring === "#D4A96A" ? "bg-[#D4A96A]" : "bg-rose-400"}`}
-                    style={{ width: `${pm.latestHitRate * 100}%` }}
+                    className={`h-full rounded-full ${cmColor.ring === "#10B981" ? "bg-emerald-500" : cmColor.ring === "#D4A96A" ? "bg-[#D4A96A]" : "bg-rose-400"}`}
+                    style={{ width: `${cm.latestHitRate * 100}%` }}
                   />
                 </div>
-                <span className={`text-[10px] font-medium tabular-nums ${pmColor.text}`}>
-                  {(pm.latestHitRate * 100).toFixed(0)}%
+                <span className={`text-[10px] font-medium tabular-nums ${cmColor.text}`}>
+                  {(cm.latestHitRate * 100).toFixed(0)}%
                 </span>
               </div>
             );

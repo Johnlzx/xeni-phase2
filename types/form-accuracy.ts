@@ -10,56 +10,66 @@ export type FormAccuracyVisaTypeId =
   | "ilr";
 
 // -----------------------------------------------------------------------------
-// Baseline Data Layer
+// Test Case Document Layer
 // -----------------------------------------------------------------------------
 
-export interface BaselineFieldValue {
-  fieldId: string;
-  fieldLabel: string;
-  expectedValue: string;
-  fieldType: "text" | "date" | "select" | "radio" | "email" | "tel";
-  formSection: string;
-}
+export type TestCaseDocumentType =
+  | "passport"
+  | "national-id"
+  | "bank-statement"
+  | "employment-letter"
+  | "proof-of-address"
+  | "english-test"
+  | "tb-certificate"
+  | "marriage-certificate"
+  | "cos-letter"
+  | "cas-letter"
+  | "endorsement-letter"
+  | "life-in-uk-certificate"
+  | "other";
 
-export interface BaselineDataSet {
+export interface TestCaseDocument {
   id: string;
-  visaTypeId: FormAccuracyVisaTypeId;
-  visaTypeName: string;
-  version: string;
-  createdAt: string;
-  updatedAt: string;
-  fields: BaselineFieldValue[];
-  totalFieldCount: number;
+  fileName: string;
+  fileType: TestCaseDocumentType;
+  fileSize: number; // bytes
+  mimeType: string;
+  uploadedAt: string; // ISO datetime
+  uploadedBy: string;
 }
 
 // -----------------------------------------------------------------------------
-// Path Enumeration Layer
+// Extracted Data Layer
 // -----------------------------------------------------------------------------
 
-export interface PathCondition {
+export interface ExtractedField {
   fieldId: string;
   fieldLabel: string;
-  selectedValue: string;
-}
-
-export interface PathField {
-  fieldId: string;
-  fieldLabel: string;
-  expectedValue: string;
+  value: string;
   fieldType: "text" | "date" | "select" | "radio" | "email" | "tel";
-  formSection: string;
-  isConditional: boolean;
 }
 
-export interface TestPath {
+export interface ExtractedDataSection {
+  sectionName: string;
+  fields: ExtractedField[];
+}
+
+// -----------------------------------------------------------------------------
+// Test Case (replaces TestPath)
+// -----------------------------------------------------------------------------
+
+export interface TestCase {
   id: string;
   visaTypeId: FormAccuracyVisaTypeId;
   name: string;
   description: string;
-  conditions: PathCondition[];
-  fields: PathField[];
+  documents: TestCaseDocument[];
+  extractedData: ExtractedDataSection[];
   totalFieldCount: number;
-  weight: number;
+  weight: number; // 0-1, proportion of this case in the visa type
+  accuracy: number; // 0-1
+  totalRuns: number;
+  lastTestedAt: string; // ISO datetime
 }
 
 // -----------------------------------------------------------------------------
@@ -81,7 +91,7 @@ export interface FieldComparisonResult {
 
 export interface TestRunResult {
   id: string;
-  testPathId: string;
+  testCaseId: string;
   visaTypeId: FormAccuracyVisaTypeId;
   executedAt: string;
   executedBy: string;
@@ -99,10 +109,10 @@ export interface TestRunResult {
 // Aggregation Metrics Layer
 // -----------------------------------------------------------------------------
 
-export interface PathAccuracyMetric {
-  testPathId: string;
-  testPathName: string;
-  weight: number;
+export interface CaseAccuracyMetric {
+  testCaseId: string;
+  testCaseName: string;
+  accuracy: number;
   latestHitRate: number;
   latestRunDate: string;
   totalRuns: number;
@@ -114,11 +124,11 @@ export interface VisaTypeAccuracyMetrics {
   visaTypeName: string;
   visaTypeCode: string;
   overallAccuracy: number;
-  totalPaths: number;
+  totalCases: number;
   totalFields: number;
   lastTestDate: string;
   totalRuns: number;
-  pathMetrics: PathAccuracyMetric[];
+  caseMetrics: CaseAccuracyMetric[];
   totalMatches: number;
   totalMismatches: number;
   totalMissing: number;
@@ -132,16 +142,16 @@ export interface FormAccuracyDashboardStats {
 }
 
 // -----------------------------------------------------------------------------
-// Batch Run (one run covers all paths for a visa type)
+// Batch Run (one run covers all cases for a visa type)
 // -----------------------------------------------------------------------------
 
-export interface BatchPathResult {
-  testPathId: string;
-  testPathName: string;
+export interface BatchCaseResult {
+  testCaseId: string;
+  testCaseName: string;
   hitRate: number;
   totalFields: number;
   matchedFields: number;
-  passed: boolean; // hitRate >= threshold (e.g. 0.8)
+  passed: boolean;
 }
 
 export interface BatchTestRun {
@@ -151,9 +161,9 @@ export interface BatchTestRun {
   executedBy: string;
   trigger: "scheduled" | "manual";
   durationMs: number;
-  pathResults: BatchPathResult[];
-  totalPaths: number;
-  passedPaths: number;
+  caseResults: BatchCaseResult[];
+  totalCases: number;
+  passedCases: number;
   overallAccuracy: number;
   status: "success" | "partial" | "failed";
 }
