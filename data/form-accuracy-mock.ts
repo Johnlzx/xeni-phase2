@@ -2,6 +2,9 @@ import type {
   FormAccuracyVisaTypeId,
   TestCase,
   TestCaseDocument,
+  ApplicationPdfs,
+  ExtractionRunResult,
+  PluginFilledPdfRun,
   ExtractedDataSection,
   TestRunResult,
   FieldComparisonResult,
@@ -88,6 +91,42 @@ function buildDocs(
     uploadedAt: "2026-03-15T09:00:00Z",
     uploadedBy: "Admin",
   }));
+}
+
+function buildAppPdfs(caseName: string, caseId: string, baseAccuracy: number): ApplicationPdfs {
+  const pluginRuns: PluginFilledPdfRun[] = [
+    { id: `${caseId}-pfr-1`, executedAt: "2026-03-24T10:30:00Z", accuracy: Math.min(1, baseAccuracy + 0.005), fileName: `${caseName}_Application_Extension_v5.pdf`, fileSize: 2_920_000 },
+    { id: `${caseId}-pfr-2`, executedAt: "2026-03-21T02:00:00Z", accuracy: baseAccuracy, fileName: `${caseName}_Application_Extension_v4.pdf`, fileSize: 2_890_000 },
+    { id: `${caseId}-pfr-3`, executedAt: "2026-03-18T02:00:00Z", accuracy: Math.max(0.8, baseAccuracy - 0.012), fileName: `${caseName}_Application_Extension_v3.pdf`, fileSize: 2_910_000 },
+    { id: `${caseId}-pfr-4`, executedAt: "2026-03-15T02:00:00Z", accuracy: Math.max(0.8, baseAccuracy - 0.025), fileName: `${caseName}_Application_Extension_v2.pdf`, fileSize: 2_870_000 },
+  ];
+  return {
+    humanFilled: {
+      id: `${caseId}-pdf-human`,
+      fileName: `${caseName}_Application_Human.pdf`,
+      fileType: "other",
+      fileSize: 2_850_000,
+      mimeType: "application/pdf",
+      uploadedAt: "2026-03-10T09:00:00Z",
+      uploadedBy: "Admin",
+    },
+    extensionRuns: pluginRuns,
+  };
+}
+
+function buildExtractionRuns(
+  caseId: string,
+  groundTruthSections: ExtractedDataSection[],
+  baseAccuracy: number,
+  totalFields: number
+): ExtractionRunResult[] {
+  // Generate 4 runs with slight accuracy variation, newest first
+  return [
+    { id: `${caseId}-ext-1`, executedAt: "2026-03-24T10:30:00Z", accuracy: Math.min(1, baseAccuracy + 0.003), totalFields, matchedFields: Math.round(Math.min(1, baseAccuracy + 0.003) * totalFields), extractedData: groundTruthSections },
+    { id: `${caseId}-ext-2`, executedAt: "2026-03-21T02:00:00Z", accuracy: baseAccuracy, totalFields, matchedFields: Math.round(baseAccuracy * totalFields), extractedData: groundTruthSections },
+    { id: `${caseId}-ext-3`, executedAt: "2026-03-18T02:00:00Z", accuracy: Math.max(0.8, baseAccuracy - 0.008), totalFields, matchedFields: Math.round(Math.max(0.8, baseAccuracy - 0.008) * totalFields), extractedData: groundTruthSections },
+    { id: `${caseId}-ext-4`, executedAt: "2026-03-15T02:00:00Z", accuracy: Math.max(0.8, baseAccuracy - 0.02), totalFields, matchedFields: Math.round(Math.max(0.8, baseAccuracy - 0.02) * totalFields), extractedData: groundTruthSections },
+  ];
 }
 
 // =============================================================================
@@ -512,9 +551,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Council_Tax_Bill_2025.pdf", fileType: "proof-of-address", fileSize: 1_102_000 },
     ], "sw-case-1"),
     extractedData: buildExtractedData(SW_CASE_1_FIELDS),
+    extractionRuns: buildExtractionRuns("sw-case-1", buildExtractedData(SW_CASE_1_FIELDS), 0.982, SW_CASE_1_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Zhang_Wei", "sw-case-1", 0.964),
     totalFieldCount: SW_CASE_1_FIELDS.length,
     weight: 0.40,
     accuracy: 0.982,
+    formFillAccuracy: 0.975,
     totalRuns: 14,
     lastTestedAt: "2026-03-24T10:30:00Z",
   },
@@ -532,9 +574,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Li_Na_TB_Certificate.pdf", fileType: "tb-certificate", fileSize: 520_000 },
     ], "sw-case-2"),
     extractedData: buildExtractedData(SW_CASE_2_FIELDS),
+    extractionRuns: buildExtractionRuns("sw-case-2", buildExtractedData(SW_CASE_2_FIELDS), 0.958, SW_CASE_2_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Li_Na", "sw-case-2", 0.941),
     totalFieldCount: SW_CASE_2_FIELDS.length,
     weight: 0.35,
     accuracy: 0.958,
+    formFillAccuracy: 0.960,
     totalRuns: 12,
     lastTestedAt: "2026-03-24T10:35:00Z",
   },
@@ -551,9 +596,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Utility_Bill_Manchester.pdf", fileType: "proof-of-address", fileSize: 890_000 },
     ], "sw-case-3"),
     extractedData: buildExtractedData(SW_CASE_3_FIELDS),
+    extractionRuns: buildExtractionRuns("sw-case-3", buildExtractedData(SW_CASE_3_FIELDS), 0.951, SW_CASE_3_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Wang_Jun", "sw-case-3", 0.935),
     totalFieldCount: SW_CASE_3_FIELDS.length,
     weight: 0.25,
     accuracy: 0.951,
+    formFillAccuracy: 0.955,
     totalRuns: 11,
     lastTestedAt: "2026-03-24T10:40:00Z",
   },
@@ -572,9 +620,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "TB_Test_Certificate_Garcia.pdf", fileType: "tb-certificate", fileSize: 480_000 },
     ], "fm-case-1"),
     extractedData: buildExtractedData(FM_CASE_1_FIELDS),
+    extractionRuns: buildExtractionRuns("fm-case-1", buildExtractedData(FM_CASE_1_FIELDS), 0.975, FM_CASE_1_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Maria_Garcia", "fm-case-1", 0.958),
     totalFieldCount: FM_CASE_1_FIELDS.length,
     weight: 0.45,
     accuracy: 0.975,
+    formFillAccuracy: 0.970,
     totalRuns: 10,
     lastTestedAt: "2026-03-23T14:00:00Z",
   },
@@ -591,9 +642,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "David_Jones_BRP_Copy.pdf", fileType: "national-id", fileSize: 420_000 },
     ], "fm-case-2"),
     extractedData: buildExtractedData(FM_CASE_2_FIELDS),
+    extractionRuns: buildExtractionRuns("fm-case-2", buildExtractedData(FM_CASE_2_FIELDS), 0.955, FM_CASE_2_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Anna_Kowalski", "fm-case-2", 0.930),
     totalFieldCount: FM_CASE_2_FIELDS.length,
     weight: 0.30,
     accuracy: 0.955,
+    formFillAccuracy: 0.958,
     totalRuns: 9,
     lastTestedAt: "2026-03-23T14:10:00Z",
   },
@@ -611,9 +665,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "TB_Test_Certificate_Patel.pdf", fileType: "tb-certificate", fileSize: 490_000 },
     ], "fm-case-3"),
     extractedData: buildExtractedData(FM_CASE_3_FIELDS),
+    extractionRuns: buildExtractionRuns("fm-case-3", buildExtractedData(FM_CASE_3_FIELDS), 0.960, FM_CASE_3_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Priya_Patel", "fm-case-3", 0.945),
     totalFieldCount: FM_CASE_3_FIELDS.length,
     weight: 0.25,
     accuracy: 0.960,
+    formFillAccuracy: 0.962,
     totalRuns: 8,
     lastTestedAt: "2026-03-23T14:20:00Z",
   },
@@ -630,9 +687,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Council_Tax_Bill_London.pdf", fileType: "proof-of-address", fileSize: 1_050_000 },
     ], "gt-case-1"),
     extractedData: buildExtractedData(GT_CASE_1_FIELDS),
+    extractionRuns: buildExtractionRuns("gt-case-1", buildExtractedData(GT_CASE_1_FIELDS), 0.985, GT_CASE_1_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Alex_Johnson", "gt-case-1", 0.970),
     totalFieldCount: GT_CASE_1_FIELDS.length,
     weight: 0.60,
     accuracy: 0.985,
+    formFillAccuracy: 0.978,
     totalRuns: 7,
     lastTestedAt: "2026-03-22T09:00:00Z",
   },
@@ -648,9 +708,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Kenji_Tanaka_Passport.pdf", fileType: "passport", fileSize: 1_180_000 },
     ], "gt-case-2"),
     extractedData: buildExtractedData(GT_CASE_2_FIELDS),
+    extractionRuns: buildExtractionRuns("gt-case-2", buildExtractedData(GT_CASE_2_FIELDS), 0.968, GT_CASE_2_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Yuki_Tanaka", "gt-case-2", 0.950),
     totalFieldCount: GT_CASE_2_FIELDS.length,
     weight: 0.40,
     accuracy: 0.968,
+    formFillAccuracy: 0.965,
     totalRuns: 6,
     lastTestedAt: "2026-03-22T09:08:00Z",
   },
@@ -667,9 +730,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "TB_Test_Certificate_Khan.pdf", fileType: "tb-certificate", fileSize: 470_000 },
     ], "st-case-1"),
     extractedData: buildExtractedData(ST_CASE_1_FIELDS),
+    extractionRuns: buildExtractionRuns("st-case-1", buildExtractedData(ST_CASE_1_FIELDS), 0.978, ST_CASE_1_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Aisha_Khan", "st-case-1", 0.960),
     totalFieldCount: ST_CASE_1_FIELDS.length,
     weight: 0.60,
     accuracy: 0.978,
+    formFillAccuracy: 0.972,
     totalRuns: 9,
     lastTestedAt: "2026-03-22T16:00:00Z",
   },
@@ -685,9 +751,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "IELTS_UKVI_Certificate_Mendez.pdf", fileType: "english-test", fileSize: 590_000 },
     ], "st-case-2"),
     extractedData: buildExtractedData(ST_CASE_2_FIELDS),
+    extractionRuns: buildExtractionRuns("st-case-2", buildExtractedData(ST_CASE_2_FIELDS), 0.952, ST_CASE_2_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Carlos_Mendez", "st-case-2", 0.925),
     totalFieldCount: ST_CASE_2_FIELDS.length,
     weight: 0.40,
     accuracy: 0.952,
+    formFillAccuracy: 0.955,
     totalRuns: 7,
     lastTestedAt: "2026-03-22T16:10:00Z",
   },
@@ -706,9 +775,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Council_Tax_Bill_Westminster.pdf", fileType: "proof-of-address", fileSize: 980_000 },
     ], "ilr-case-1"),
     extractedData: buildExtractedData(ILR_CASE_1_FIELDS),
+    extractionRuns: buildExtractionRuns("ilr-case-1", buildExtractedData(ILR_CASE_1_FIELDS), 0.990, ILR_CASE_1_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Rahul_Sharma", "ilr-case-1", 0.975),
     totalFieldCount: ILR_CASE_1_FIELDS.length,
     weight: 0.60,
     accuracy: 0.990,
+    formFillAccuracy: 0.980,
     totalRuns: 11,
     lastTestedAt: "2026-03-21T11:00:00Z",
   },
@@ -725,9 +797,12 @@ export const MOCK_TEST_CASES: TestCase[] = [
       { fileName: "Life_in_UK_Test_Certificate_SJ.pdf", fileType: "life-in-uk-certificate", fileSize: 540_000 },
     ], "ilr-case-2"),
     extractedData: buildExtractedData(ILR_CASE_2_FIELDS),
+    extractionRuns: buildExtractionRuns("ilr-case-2", buildExtractedData(ILR_CASE_2_FIELDS), 0.972, ILR_CASE_2_FIELDS.length),
+    applicationPdfs: buildAppPdfs("Sarah_Johnson", "ilr-case-2", 0.955),
     totalFieldCount: ILR_CASE_2_FIELDS.length,
     weight: 0.40,
     accuracy: 0.972,
+    formFillAccuracy: 0.968,
     totalRuns: 8,
     lastTestedAt: "2026-03-21T11:10:00Z",
   },
@@ -800,7 +875,9 @@ function buildVisaTypeMetrics(
       testCaseId: tc.id,
       testCaseName: tc.name,
       accuracy: tc.accuracy,
+      formFillAccuracy: tc.formFillAccuracy,
       latestHitRate: latestRun?.hitRate ?? 0,
+      formFillLatestHitRate: latestRun ? (latestRun.hitRate * 0.97) : 0, // approximate from OCR
       latestRunDate: latestRun?.executedAt ?? "",
       totalRuns: tc.totalRuns,
       trend: 0,
@@ -812,10 +889,22 @@ function buildVisaTypeMetrics(
       ? cases.reduce((sum, c) => sum + c.accuracy, 0) / cases.length
       : 0;
 
+  const formFillOverallAccuracy =
+    cases.length > 0
+      ? cases.reduce((sum, c) => sum + c.formFillAccuracy, 0) / cases.length
+      : 0;
+
   const totalMatches = runs.reduce((s, r) => s + r.matchedFields, 0);
   const totalMismatches = runs.reduce((s, r) => s + r.mismatchedFields, 0);
   const totalMissing = runs.reduce((s, r) => s + r.missingFields, 0);
   const totalFields = runs.reduce((s, r) => s + r.totalFields, 0);
+
+  // Approximate form-fill match/mismatch counts from OCR counts with a ratio
+  const ffRatio = formFillOverallAccuracy / (overallAccuracy || 1);
+  const formFillTotalMatches = Math.round(totalMatches * ffRatio);
+  const formFillTotalMismatches = totalMismatches + Math.round((totalMatches - formFillTotalMatches) * 0.7);
+  const formFillTotalMissing = totalMissing + Math.round((totalMatches - formFillTotalMatches) * 0.3);
+
   const lastTestDate = runs.length
     ? runs.sort((a, b) => b.executedAt.localeCompare(a.executedAt))[0].executedAt
     : "";
@@ -825,6 +914,7 @@ function buildVisaTypeMetrics(
     visaTypeName,
     visaTypeCode,
     overallAccuracy,
+    formFillOverallAccuracy,
     totalCases: cases.length,
     totalFields,
     lastTestDate,
@@ -833,6 +923,9 @@ function buildVisaTypeMetrics(
     totalMatches,
     totalMismatches,
     totalMissing,
+    formFillTotalMatches,
+    formFillTotalMismatches,
+    formFillTotalMissing,
   };
 }
 
@@ -895,13 +988,22 @@ function seededRandom(seed: number) {
   };
 }
 
-// Base hit rates per case (used as center for daily variation)
+// Base hit rates per case — OCR benchmark (used as center for daily variation)
 const CASE_BASE_RATES: Record<string, number> = {
   "sw-case-1": 0.982, "sw-case-2": 0.958, "sw-case-3": 0.951,
   "fm-case-1": 0.975, "fm-case-2": 0.955, "fm-case-3": 0.960,
   "gt-case-1": 0.985, "gt-case-2": 0.968,
   "st-case-1": 0.978, "st-case-2": 0.952,
   "ilr-case-1": 0.990, "ilr-case-2": 0.972,
+};
+
+// Base hit rates per case — Form Fill benchmark (slightly lower than OCR)
+const FORM_FILL_BASE_RATES: Record<string, number> = {
+  "sw-case-1": 0.975, "sw-case-2": 0.960, "sw-case-3": 0.955,
+  "fm-case-1": 0.970, "fm-case-2": 0.958, "fm-case-3": 0.962,
+  "gt-case-1": 0.978, "gt-case-2": 0.965,
+  "st-case-1": 0.972, "st-case-2": 0.955,
+  "ilr-case-1": 0.980, "ilr-case-2": 0.968,
 };
 
 function generateBatchRuns(
@@ -924,33 +1026,52 @@ function generateBatchRuns(
     if (rand() < 0.05) continue;
 
     const caseResults: BatchCaseResult[] = cases.map((tc) => {
-      let base = CASE_BASE_RATES[tc.id] ?? 0.9;
+      let ocrBase = CASE_BASE_RATES[tc.id] ?? 0.9;
+      let ffBase = FORM_FILL_BASE_RATES[tc.id] ?? 0.88;
 
       // Site change: drop accuracy for a few days, then recover
+      // Form fill is hit harder by site changes than OCR
       if (siteChangeDay > 0 && d <= siteChangeDay && d > siteChangeDay - 8) {
         const severity = (siteChangeDay - d) / 8; // 0..1 recovery
-        base = base * (0.6 + 0.4 * severity);
+        ocrBase = ocrBase * (0.75 + 0.25 * severity);
+        ffBase = ffBase * (0.70 + 0.30 * severity);
       }
 
       // Daily variation: ±3%
-      const variation = (rand() - 0.5) * 0.06;
-      const hitRate = Math.max(0.5, Math.min(1, base + variation));
+      const ocrVariation = (rand() - 0.5) * 0.06;
+      const ffVariation = (rand() - 0.5) * 0.06;
+      const ocrHitRate = Math.max(0.5, Math.min(1, ocrBase + ocrVariation));
+      const ffHitRate = Math.max(0.5, Math.min(1, ffBase + ffVariation));
       const totalFields = tc.totalFieldCount;
-      const matched = Math.round(hitRate * totalFields);
+      const ocrMatched = Math.round(ocrHitRate * totalFields);
+      const ffMatched = Math.round(ffHitRate * totalFields);
 
       return {
         testCaseId: tc.id,
         testCaseName: tc.name,
-        hitRate: matched / totalFields,
+        // OCR
+        hitRate: ocrMatched / totalFields,
         totalFields,
-        matchedFields: matched,
-        passed: matched / totalFields >= 0.8,
+        matchedFields: ocrMatched,
+        passed: ocrMatched / totalFields >= 0.8,
+        // Form Fill
+        formFillHitRate: ffMatched / totalFields,
+        formFillTotalFields: totalFields,
+        formFillMatchedFields: ffMatched,
+        formFillPassed: ffMatched / totalFields >= 0.8,
       };
     });
 
     const passedCases = caseResults.filter((c) => c.passed).length;
+    const ffPassedCases = caseResults.filter((c) => c.formFillPassed).length;
     const overallAccuracy =
       caseResults.reduce((s, c) => s + c.hitRate, 0) / caseResults.length;
+    const ffOverallAccuracy =
+      caseResults.reduce((s, c) => s + c.formFillHitRate, 0) / caseResults.length;
+
+    // Status based on worst of the two benchmarks
+    const allPassed = passedCases === cases.length && ffPassedCases === cases.length;
+    const nonePassed = passedCases === 0 && ffPassedCases === 0;
 
     runs.push({
       id: `batch-${visaTypeId}-${date.toISOString().slice(0, 10)}`,
@@ -963,7 +1084,9 @@ function generateBatchRuns(
       totalCases: cases.length,
       passedCases,
       overallAccuracy,
-      status: passedCases === cases.length ? "success" : passedCases === 0 ? "failed" : "partial",
+      formFillPassedCases: ffPassedCases,
+      formFillOverallAccuracy: ffOverallAccuracy,
+      status: allPassed ? "success" : nonePassed ? "failed" : "partial",
     });
   }
 
@@ -993,7 +1116,8 @@ export interface CoverageTimelineRow {
   visaTypeId: FormAccuracyVisaTypeId;
   visaTypeName: string;
   accuracy: number;
-  days: { date: string; hasRun: boolean; accuracy: number | null }[];
+  formFillAccuracy: number;
+  days: { date: string; hasRun: boolean; accuracy: number | null; formFillAccuracy: number | null }[];
   daysSinceLastRun: number;
 }
 
@@ -1018,6 +1142,7 @@ export function getCoverageTimelineData(numDays = 14): CoverageTimelineRow[] {
         date: dateKey,
         hasRun: !!run,
         accuracy: run ? run.overallAccuracy : null,
+        formFillAccuracy: run ? run.formFillOverallAccuracy : null,
       });
       if (run && d < daysSinceLastRun) {
         daysSinceLastRun = d;
@@ -1028,6 +1153,7 @@ export function getCoverageTimelineData(numDays = 14): CoverageTimelineRow[] {
       visaTypeId: m.visaTypeId,
       visaTypeName: m.visaTypeName,
       accuracy: m.overallAccuracy,
+      formFillAccuracy: m.formFillOverallAccuracy,
       days,
       daysSinceLastRun,
     };

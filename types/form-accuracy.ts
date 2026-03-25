@@ -55,8 +55,32 @@ export interface ExtractedDataSection {
 }
 
 // -----------------------------------------------------------------------------
-// Test Case (replaces TestPath)
+// Test Case
 // -----------------------------------------------------------------------------
+
+// Each OCR extraction run result
+export interface ExtractionRunResult {
+  id: string;
+  executedAt: string;
+  accuracy: number; // 0-1
+  totalFields: number;
+  matchedFields: number;
+  extractedData: ExtractedDataSection[];
+}
+
+// Each plugin form-fill run producing a PDF
+export interface PluginFilledPdfRun {
+  id: string;
+  executedAt: string;
+  accuracy: number; // 0-1 vs human-filled PDF
+  fileName: string;
+  fileSize: number;
+}
+
+export interface ApplicationPdfs {
+  humanFilled: TestCaseDocument; // static verified baseline
+  extensionRuns: PluginFilledPdfRun[]; // history of extension form-fill runs
+}
 
 export interface TestCase {
   id: string;
@@ -64,10 +88,13 @@ export interface TestCase {
   name: string;
   description: string;
   documents: TestCaseDocument[];
-  extractedData: ExtractedDataSection[];
+  extractedData: ExtractedDataSection[]; // ground truth (human-verified)
+  extractionRuns: ExtractionRunResult[]; // OCR run history
+  applicationPdfs: ApplicationPdfs;
   totalFieldCount: number;
   weight: number; // 0-1, proportion of this case in the visa type
-  accuracy: number; // 0-1
+  accuracy: number; // 0-1, OCR benchmark accuracy
+  formFillAccuracy: number; // 0-1, Form Fill benchmark accuracy
   totalRuns: number;
   lastTestedAt: string; // ISO datetime
 }
@@ -112,8 +139,10 @@ export interface TestRunResult {
 export interface CaseAccuracyMetric {
   testCaseId: string;
   testCaseName: string;
-  accuracy: number;
-  latestHitRate: number;
+  accuracy: number; // OCR
+  formFillAccuracy: number; // Form Fill
+  latestHitRate: number; // OCR latest
+  formFillLatestHitRate: number; // Form Fill latest
   latestRunDate: string;
   totalRuns: number;
   trend: number;
@@ -123,15 +152,19 @@ export interface VisaTypeAccuracyMetrics {
   visaTypeId: FormAccuracyVisaTypeId;
   visaTypeName: string;
   visaTypeCode: string;
-  overallAccuracy: number;
+  overallAccuracy: number; // OCR
+  formFillOverallAccuracy: number; // Form Fill
   totalCases: number;
   totalFields: number;
   lastTestDate: string;
   totalRuns: number;
   caseMetrics: CaseAccuracyMetric[];
-  totalMatches: number;
-  totalMismatches: number;
-  totalMissing: number;
+  totalMatches: number; // OCR
+  totalMismatches: number; // OCR
+  totalMissing: number; // OCR
+  formFillTotalMatches: number;
+  formFillTotalMismatches: number;
+  formFillTotalMissing: number;
 }
 
 export interface FormAccuracyDashboardStats {
@@ -148,10 +181,16 @@ export interface FormAccuracyDashboardStats {
 export interface BatchCaseResult {
   testCaseId: string;
   testCaseName: string;
+  // OCR benchmark
   hitRate: number;
   totalFields: number;
   matchedFields: number;
   passed: boolean;
+  // Form Fill benchmark
+  formFillHitRate: number;
+  formFillTotalFields: number;
+  formFillMatchedFields: number;
+  formFillPassed: boolean;
 }
 
 export interface BatchTestRun {
@@ -163,8 +202,12 @@ export interface BatchTestRun {
   durationMs: number;
   caseResults: BatchCaseResult[];
   totalCases: number;
+  // OCR benchmark
   passedCases: number;
   overallAccuracy: number;
+  // Form Fill benchmark
+  formFillPassedCases: number;
+  formFillOverallAccuracy: number;
   status: "success" | "partial" | "failed";
 }
 

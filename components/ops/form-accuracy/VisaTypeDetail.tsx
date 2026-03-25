@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { ArrowLeft, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Loader2, ScanText, FileCheck } from "lucide-react";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -46,7 +46,8 @@ export function VisaTypeDetail({
   const [activeTab, setActiveTab] = useState<"cases" | "history">("cases");
   const [isRunning, setIsRunning] = useState(false);
 
-  const color = getAccuracyColor(metrics.overallAccuracy);
+  const ocrColor = getAccuracyColor(metrics.overallAccuracy);
+  const ffColor = getAccuracyColor(metrics.formFillOverallAccuracy);
   const batchRuns = useMemo(() => getBatchRunsForVisaType(metrics.visaTypeId), [metrics.visaTypeId]);
   const heatmapData = useMemo(() => getHeatmapData(metrics.visaTypeId), [metrics.visaTypeId]);
   const sortedBatchRuns = useMemo(
@@ -59,7 +60,7 @@ export function VisaTypeDetail({
     setTimeout(() => {
       setIsRunning(false);
       toast.success("Test run completed", {
-        description: `${metrics.totalCases}/${metrics.totalCases} cases passed`,
+        description: `OCR: ${metrics.totalCases}/${metrics.totalCases} passed · Form Fill: ${metrics.totalCases}/${metrics.totalCases} passed`,
       });
     }, 3000);
   }, [metrics.totalCases]);
@@ -77,15 +78,37 @@ export function VisaTypeDetail({
         <span className="text-stone-700 font-medium">{metrics.visaTypeName}</span>
       </button>
 
-      {/* Header card */}
+      {/* Header card — dual gauges */}
       <div className="bg-white rounded-xl border border-stone-200 p-6 mb-6">
         <div className="flex items-center gap-6">
-          <CircularProgress
-            value={metrics.overallAccuracy * 100}
-            size={80}
-            strokeWidth={6}
-            color={color.ring}
-          />
+          {/* Dual gauges */}
+          <div className="flex items-center gap-5 shrink-0">
+            <div className="flex flex-col items-center gap-1">
+              <CircularProgress
+                value={metrics.overallAccuracy * 100}
+                size={64}
+                strokeWidth={5}
+                color={ocrColor.ring}
+              />
+              <span className="text-[10px] font-medium text-stone-500 flex items-center gap-1">
+                <ScanText className="size-3" />
+                OCR
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <CircularProgress
+                value={metrics.formFillOverallAccuracy * 100}
+                size={64}
+                strokeWidth={5}
+                color={ffColor.ring}
+              />
+              <span className="text-[10px] font-medium text-stone-500 flex items-center gap-1">
+                <FileCheck className="size-3" />
+                Form Fill
+              </span>
+            </div>
+          </div>
+
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-stone-800">{metrics.visaTypeName}</h2>
@@ -101,12 +124,23 @@ export function VisaTypeDetail({
                 <span>Last tested: {formatDate(metrics.lastTestDate, "short")}</span>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-2 text-xs">
-              <span className="text-emerald-600">{metrics.totalMatches} matches</span>
-              <span className="text-rose-500">{metrics.totalMismatches} mismatches</span>
-              <span className="text-[#B08D5B]">{metrics.totalMissing} missing</span>
+            {/* Dual benchmark stats */}
+            <div className="grid grid-cols-2 gap-x-6 mt-2">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-stone-400 font-medium w-14">OCR</span>
+                <span className="text-emerald-600">{metrics.totalMatches} matches</span>
+                <span className="text-rose-500">{metrics.totalMismatches} mismatches</span>
+                <span className="text-[#B08D5B]">{metrics.totalMissing} missing</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-stone-400 font-medium w-14">Form Fill</span>
+                <span className="text-emerald-600">{metrics.formFillTotalMatches} matches</span>
+                <span className="text-rose-500">{metrics.formFillTotalMismatches} mismatches</span>
+                <span className="text-[#B08D5B]">{metrics.formFillTotalMissing} missing</span>
+              </div>
             </div>
           </div>
+
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
             <button
@@ -130,11 +164,8 @@ export function VisaTypeDetail({
         </div>
       </div>
 
-      {/* Uptime Bar */}
-      <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6">
-        <h3 className="text-sm font-medium text-stone-700 mb-3">Daily Run History</h3>
-        <UptimeBar data={heatmapData} />
-      </div>
+      {/* Uptime Bar — tab-switched benchmark */}
+      <BenchmarkUptimeSection data={heatmapData} />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-4">
@@ -176,25 +207,24 @@ export function VisaTypeDetail({
 // UPTIME BAR (Status-page style — thin vertical bars in a single row)
 // =============================================================================
 
-function getBarColor(run: BatchTestRun | null): string {
+function getBarColorForBenchmark(run: BatchTestRun | null, benchmark: "ocr" | "formFill"): string {
   if (!run) return "bg-stone-200";
-  if (run.status === "success") return "bg-emerald-400";
-  if (run.status === "partial") {
-    if (run.overallAccuracy >= 0.95) return "bg-emerald-300";
-    return "bg-[#D4A96A]";
-  }
+  const accuracy = benchmark === "ocr" ? run.overallAccuracy : run.formFillOverallAccuracy;
+  if (accuracy >= 0.95) return "bg-emerald-400";
+  if (accuracy >= 0.90) return "bg-[#D4A96A]";
   return "bg-rose-400";
 }
 
-function UptimeBar({ data }: { data: HeatmapDay[] }) {
+function UptimeBar({ data, benchmark }: { data: HeatmapDay[]; benchmark: "ocr" | "formFill" }) {
   const [tooltip, setTooltip] = useState<{ x: number; day: HeatmapDay } | null>(null);
 
-  // Compute overall uptime across days with actual runs
   const daysWithRuns = data.filter((d) => d.batchRun !== null);
-  const uptimePercent =
+  const avg =
     daysWithRuns.length > 0
-      ? daysWithRuns.reduce((sum, d) => sum + (d.batchRun?.overallAccuracy ?? 0), 0) /
-        daysWithRuns.length
+      ? daysWithRuns.reduce((sum, d) => {
+          const acc = benchmark === "ocr" ? (d.batchRun?.overallAccuracy ?? 0) : (d.batchRun?.formFillOverallAccuracy ?? 0);
+          return sum + acc;
+        }, 0) / daysWithRuns.length
       : 0;
 
   return (
@@ -202,7 +232,7 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
       {/* Bar row */}
       <div className="flex items-end gap-[1.5px] h-8">
         {data.map((day) => {
-          const barColor = getBarColor(day.batchRun);
+          const barColor = getBarColorForBenchmark(day.batchRun, benchmark);
           return (
             <div
               key={day.date}
@@ -245,13 +275,13 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
         <span className="text-[11px] text-stone-400">Today</span>
       </div>
 
-      {/* Overall uptime */}
+      {/* Overall average */}
       {daysWithRuns.length > 0 && (
         <p className="text-xs text-stone-500 mt-1.5">
-          <span className="font-semibold text-emerald-600 tabular-nums">
-            {(uptimePercent * 100).toFixed(1)}%
+          <span className="font-semibold tabular-nums" style={{ color: getAccuracyColor(avg).ring }}>
+            {(avg * 100).toFixed(1)}%
           </span>{" "}
-          average accuracy over {daysWithRuns.length} runs
+          average over {daysWithRuns.length} runs
         </p>
       )}
 
@@ -267,7 +297,9 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
           <p className="font-medium">{formatDate(tooltip.day.date, "short")}</p>
           {tooltip.day.batchRun ? (
             <p className="text-stone-300 mt-0.5">
-              {(tooltip.day.batchRun.overallAccuracy * 100).toFixed(1)}% &middot; {tooltip.day.batchRun.passedCases}/{tooltip.day.batchRun.totalCases} cases
+              {((benchmark === "ocr" ? tooltip.day.batchRun.overallAccuracy : tooltip.day.batchRun.formFillOverallAccuracy) * 100).toFixed(1)}%
+              {" · "}
+              {benchmark === "ocr" ? tooltip.day.batchRun.passedCases : tooltip.day.batchRun.formFillPassedCases}/{tooltip.day.batchRun.totalCases} cases
             </p>
           ) : (
             <p className="text-stone-400 mt-0.5">No run</p>
@@ -279,13 +311,71 @@ function UptimeBar({ data }: { data: HeatmapDay[] }) {
 }
 
 // =============================================================================
-// CASES TABLE
+// BENCHMARK UPTIME SECTION — tab-switched OCR / Form Fill
+// =============================================================================
+
+function BenchmarkUptimeSection({ data }: { data: HeatmapDay[] }) {
+  const [activeBenchmark, setActiveBenchmark] = useState<"ocr" | "formFill">("ocr");
+
+  return (
+    <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-stone-700">Accuracy History</h3>
+        <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
+          <button
+            onClick={() => setActiveBenchmark("ocr")}
+            className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+              activeBenchmark === "ocr"
+                ? "bg-white text-stone-800 shadow-sm"
+                : "text-stone-500 hover:text-stone-700"
+            }`}
+          >
+            <ScanText className="size-3" />
+            OCR
+          </button>
+          <button
+            onClick={() => setActiveBenchmark("formFill")}
+            className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+              activeBenchmark === "formFill"
+                ? "bg-white text-stone-800 shadow-sm"
+                : "text-stone-500 hover:text-stone-700"
+            }`}
+          >
+            <FileCheck className="size-3" />
+            Form Fill
+          </button>
+        </div>
+      </div>
+      <UptimeBar data={data} benchmark={activeBenchmark} />
+    </div>
+  );
+}
+
+// =============================================================================
+// CASES TABLE — dual accuracy columns
 // =============================================================================
 
 function getCaseAccuracyColor(rate: number) {
   if (rate >= 0.95) return { text: "text-emerald-600", bg: "bg-emerald-500" };
   if (rate >= 0.90) return { text: "text-[#B08D5B]", bg: "bg-[#D4A96A]" };
   return { text: "text-rose-500", bg: "bg-rose-400" };
+}
+
+function AccuracyCell({ value }: { value: number }) {
+  const color = getCaseAccuracyColor(value);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${color.bg}`}
+          style={{ width: `${value * 100}%` }}
+        />
+      </div>
+      <span className={`text-xs font-medium tabular-nums ${color.text}`}>
+        {(value * 100).toFixed(0)}%
+      </span>
+    </div>
+  );
 }
 
 function CasesTable({
@@ -300,55 +390,46 @@ function CasesTable({
       <thead>
         <tr className="border-b border-stone-100">
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Case</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Fields</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Weight</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Accuracy</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Runs</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Last Tested</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-16">Fields</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-16">Weight</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">
+            <span className="flex items-center gap-1"><ScanText className="size-3" />OCR</span>
+          </th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">
+            <span className="flex items-center gap-1"><FileCheck className="size-3" />Form Fill</span>
+          </th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-16">Runs</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Last Tested</th>
         </tr>
       </thead>
       <tbody>
-        {cases.map((tc) => {
-          const color = getCaseAccuracyColor(tc.accuracy);
-          return (
-            <tr
-              key={tc.id}
-              onClick={() => onSelect(tc.id)}
-              className="border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer transition-colors"
-            >
-              <td className="px-4 py-3">
-                <span className="text-sm font-medium text-stone-700">{tc.name}</span>
-                <span className="block text-xs text-stone-400 mt-0.5 line-clamp-1">{tc.description}</span>
-              </td>
-              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{tc.totalFieldCount}</td>
-              <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{(tc.weight * 100).toFixed(0)}%</td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${color.bg}`}
-                      style={{ width: `${tc.accuracy * 100}%` }}
-                    />
-                  </div>
-                  <span className={`text-xs font-medium tabular-nums ${color.text}`}>
-                    {(tc.accuracy * 100).toFixed(0)}%
-                  </span>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">{tc.totalRuns}</td>
-              <td className="px-4 py-3 text-xs text-stone-400">
-                {tc.lastTestedAt ? formatDate(tc.lastTestedAt, "short") : "\u2014"}
-              </td>
-            </tr>
-          );
-        })}
+        {cases.map((tc) => (
+          <tr
+            key={tc.id}
+            onClick={() => onSelect(tc.id)}
+            className="border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer transition-colors"
+          >
+            <td className="px-4 py-3">
+              <span className="text-sm font-medium text-stone-700">{tc.name}</span>
+              <span className="block text-xs text-stone-400 mt-0.5 line-clamp-1">{tc.description}</span>
+            </td>
+            <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{tc.totalFieldCount}</td>
+            <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">{(tc.weight * 100).toFixed(0)}%</td>
+            <td className="px-4 py-3"><AccuracyCell value={tc.accuracy} /></td>
+            <td className="px-4 py-3"><AccuracyCell value={tc.formFillAccuracy} /></td>
+            <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">{tc.totalRuns}</td>
+            <td className="px-4 py-3 text-xs text-stone-400">
+              {tc.lastTestedAt ? formatDate(tc.lastTestedAt, "short") : "\u2014"}
+            </td>
+          </tr>
+        ))}
       </tbody>
     </table>
   );
 }
 
 // =============================================================================
-// BATCH RUN HISTORY TABLE
+// BATCH RUN HISTORY TABLE — dual accuracy columns
 // =============================================================================
 
 function getBatchStatusBadge(status: BatchTestRun["status"]) {
@@ -375,11 +456,16 @@ function BatchRunHistoryTable({
       <thead>
         <tr className="border-b border-stone-100">
           <th className="text-left text-xs font-medium text-stone-500 px-4 py-3">Date</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Trigger</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Cases</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-28">Accuracy</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Duration</th>
-          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Status</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Trigger</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">Cases</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">
+            <span className="flex items-center gap-1"><ScanText className="size-3" />OCR</span>
+          </th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-24">
+            <span className="flex items-center gap-1"><FileCheck className="size-3" />Form Fill</span>
+          </th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Duration</th>
+          <th className="text-left text-xs font-medium text-stone-500 px-4 py-3 w-20">Status</th>
         </tr>
       </thead>
       <tbody>
@@ -387,6 +473,7 @@ function BatchRunHistoryTable({
           <tr className="border-b border-stone-50 bg-blue-50/30 animate-pulse">
             <td className="px-4 py-3 text-sm text-stone-500">Running...</td>
             <td className="px-4 py-3 text-xs text-stone-400">manual</td>
+            <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
             <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
             <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
             <td className="px-4 py-3 text-sm text-stone-400">&mdash;</td>
@@ -399,7 +486,8 @@ function BatchRunHistoryTable({
         )}
         {runs.map((run) => {
           const badge = getBatchStatusBadge(run.status);
-          const color = getRunAccuracyColor(run.overallAccuracy);
+          const ocrColor = getRunAccuracyColor(run.overallAccuracy);
+          const ffColor = getRunAccuracyColor(run.formFillOverallAccuracy);
           return (
             <tr key={run.id} className="border-b border-stone-50 hover:bg-stone-50/50 transition-colors">
               <td className="px-4 py-3 text-sm text-stone-700">{formatDate(run.executedAt, "short")}</td>
@@ -407,11 +495,16 @@ function BatchRunHistoryTable({
                 <span className="text-xs text-stone-500 capitalize">{run.trigger}</span>
               </td>
               <td className="px-4 py-3 text-sm text-stone-600 tabular-nums">
-                {run.passedCases}/{run.totalCases} passed
+                {run.passedCases}/{run.totalCases}
               </td>
               <td className="px-4 py-3">
-                <span className={`text-sm font-medium tabular-nums ${color.text}`}>
+                <span className={`text-sm font-medium tabular-nums ${ocrColor.text}`}>
                   {(run.overallAccuracy * 100).toFixed(1)}%
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <span className={`text-sm font-medium tabular-nums ${ffColor.text}`}>
+                  {(run.formFillOverallAccuracy * 100).toFixed(1)}%
                 </span>
               </td>
               <td className="px-4 py-3 text-sm text-stone-500 tabular-nums">
@@ -427,7 +520,7 @@ function BatchRunHistoryTable({
         })}
         {runs.length === 0 && !isRunning && (
           <tr>
-            <td colSpan={6} className="py-12 text-center text-sm text-stone-400">
+            <td colSpan={7} className="py-12 text-center text-sm text-stone-400">
               No runs yet. Click &ldquo;Run Now&rdquo; to start a test.
             </td>
           </tr>

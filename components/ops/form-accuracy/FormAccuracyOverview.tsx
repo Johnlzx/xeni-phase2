@@ -60,14 +60,24 @@ function simulateRefreshedMetrics(
   return metrics.map((m) => {
     const newCaseMetrics = m.caseMetrics.map((cm) => {
       // Small random bump: +0.5% to +2%
-      const bump = 0.005 + Math.random() * 0.015;
-      const newRate = Math.min(1, cm.latestHitRate + bump);
-      return { ...cm, latestHitRate: newRate, latestRunDate: now, totalRuns: cm.totalRuns + 1 };
+      const ocrBump = 0.005 + Math.random() * 0.015;
+      const ffBump = 0.005 + Math.random() * 0.015;
+      const newRate = Math.min(1, cm.latestHitRate + ocrBump);
+      const newFfRate = Math.min(1, cm.formFillLatestHitRate + ffBump);
+      return {
+        ...cm,
+        latestHitRate: newRate,
+        formFillLatestHitRate: newFfRate,
+        latestRunDate: now,
+        totalRuns: cm.totalRuns + 1,
+      };
     });
     const newOverall = newCaseMetrics.reduce((s, c) => s + c.latestHitRate, 0) / newCaseMetrics.length;
+    const newFfOverall = newCaseMetrics.reduce((s, c) => s + c.formFillLatestHitRate, 0) / newCaseMetrics.length;
     return {
       ...m,
       overallAccuracy: newOverall,
+      formFillOverallAccuracy: newFfOverall,
       lastTestDate: now,
       totalRuns: m.totalRuns + m.totalCases,
       caseMetrics: newCaseMetrics,
@@ -134,9 +144,9 @@ export function FormAccuracyOverview() {
         const m = updatedMetrics.find((u) => u.visaTypeId === row.visaTypeId);
         if (!m) return row;
         const newDays = row.days.map((d, i) =>
-          i === row.days.length - 1 ? { ...d, hasRun: true, accuracy: m.overallAccuracy } : d
+          i === row.days.length - 1 ? { ...d, hasRun: true, accuracy: m.overallAccuracy, formFillAccuracy: m.formFillOverallAccuracy } : d
         );
-        return { ...row, accuracy: m.overallAccuracy, days: newDays, daysSinceLastRun: 0 };
+        return { ...row, accuracy: m.overallAccuracy, formFillAccuracy: m.formFillOverallAccuracy, days: newDays, daysSinceLastRun: 0 };
       })
     );
   }, []);
@@ -395,7 +405,7 @@ export function FormAccuracyOverview() {
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
-  const STALE_DAYS = 7;
+  const [activeBenchmark, setActiveBenchmark] = useState<"ocr" | "formFill">("ocr");
   const [tooltip, setTooltip] = useState<{ x: number; y: number; date: string; accuracy: number } | null>(null);
 
   // Precompute date labels from first row, reversed so newest is on the left
@@ -425,7 +435,31 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
     <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6 relative">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-stone-700">Test Coverage Timeline</h3>
-        <span className="text-xs text-stone-400">Past 14 days</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setActiveBenchmark("ocr")}
+              className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+                activeBenchmark === "ocr"
+                  ? "bg-white text-stone-800 shadow-sm"
+                  : "text-stone-500 hover:text-stone-700"
+              }`}
+            >
+              OCR
+            </button>
+            <button
+              onClick={() => setActiveBenchmark("formFill")}
+              className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+                activeBenchmark === "formFill"
+                  ? "bg-white text-stone-800 shadow-sm"
+                  : "text-stone-500 hover:text-stone-700"
+              }`}
+            >
+              Form Fill
+            </button>
+          </div>
+          <span className="text-xs text-stone-400">Past 14 days</span>
+        </div>
       </div>
 
       {/* Date header — month row + day-number row */}
@@ -465,10 +499,13 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
       {/* Data rows */}
       <div className="space-y-[3px]">
         {data.map((row) => {
-          // Show today's accuracy (last day with a run), fallback to overall
+          // Show today's accuracy for the active benchmark
           const todayDay = row.days[row.days.length - 1];
-          const todayAccuracy = todayDay?.hasRun && todayDay.accuracy !== null ? todayDay.accuracy : row.accuracy;
-          const color = getAccuracyColor(todayAccuracy);
+          const rowAccuracy = activeBenchmark === "ocr" ? row.accuracy : row.formFillAccuracy;
+          const todayAcc = activeBenchmark === "ocr"
+            ? (todayDay?.hasRun && todayDay.accuracy !== null ? todayDay.accuracy : rowAccuracy)
+            : (todayDay?.hasRun && todayDay.formFillAccuracy !== null ? todayDay.formFillAccuracy : rowAccuracy);
+          const color = getAccuracyColor(todayAcc);
           const reversedDays = [...row.days].reverse();
 
           return (
@@ -479,13 +516,14 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
               </span>
               {/* Today's accuracy */}
               <span className={`text-xs font-medium tabular-nums w-10 shrink-0 text-right mr-3 ${color.text}`}>
-                {(todayAccuracy * 100).toFixed(0)}%
+                {(todayAcc * 100).toFixed(0)}%
               </span>
               {/* Day cells — square grid (newest first) */}
               <div className="flex-1 flex items-center gap-[3px]">
                 {reversedDays.map((day) => {
+                  const dayAcc = activeBenchmark === "ocr" ? day.accuracy : day.formFillAccuracy;
                   const cellColor = day.hasRun
-                    ? getAccuracyColor(day.accuracy ?? 0).ring
+                    ? getAccuracyColor(dayAcc ?? 0).ring
                     : undefined;
                   return (
                     <div key={day.date} className="flex-1 flex justify-center">
@@ -497,14 +535,14 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
                         }`}
                         style={day.hasRun ? { backgroundColor: cellColor } : undefined}
                         onMouseEnter={(e) => {
-                          if (!day.hasRun || day.accuracy === null) return;
+                          if (!day.hasRun || dayAcc === null) return;
                           const rect = e.currentTarget.getBoundingClientRect();
                           const containerRect = e.currentTarget.closest(".relative")!.getBoundingClientRect();
                           setTooltip({
                             x: rect.left - containerRect.left + rect.width / 2,
                             y: rect.top - containerRect.top,
                             date: day.date,
-                            accuracy: day.accuracy,
+                            accuracy: dayAcc!,
                           });
                         }}
                         onMouseLeave={() => setTooltip(null)}
@@ -740,11 +778,11 @@ function VisaTypeCard({
   onRun: () => void;
   onClick: () => void;
 }) {
-  const color = getAccuracyColor(metrics.overallAccuracy);
-  const sparklineValues = getLastNBatchAccuracies(metrics.visaTypeId, 5);
+  const ocrColor = getAccuracyColor(metrics.overallAccuracy);
+  const ffColor = getAccuracyColor(metrics.formFillOverallAccuracy);
 
   return (
-    <div className="relative bg-white rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-sm transition-all text-left w-full flex flex-col">
+    <div className="relative bg-white rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-sm transition-all text-left w-full">
       {/* Loading overlay */}
       {isRunning && (
         <div className="absolute inset-0 z-10 bg-white/60 rounded-xl flex items-center justify-center backdrop-blur-[1px]">
@@ -755,11 +793,11 @@ function VisaTypeCard({
         </div>
       )}
 
-      {/* Main clickable area */}
       <button
         onClick={onClick}
-        className="w-full text-left px-4 pt-4 pb-3 cursor-pointer flex-1"
+        className="w-full text-left px-4 pt-4 pb-4 cursor-pointer"
       >
+        {/* Top row: title + run button */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -779,51 +817,37 @@ function VisaTypeCard({
               </p>
             )}
           </div>
-          <CircularProgress
-            value={metrics.overallAccuracy * 100}
-            size={48}
-            strokeWidth={4}
-            color={color.ring}
-          />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRun();
+            }}
+            disabled={disableRun}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 hover:border-stone-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+            title={`Run tests for ${metrics.visaTypeName}`}
+          >
+            <Play className="size-3" />
+            Run
+          </button>
         </div>
-        {/* Case hit rates mini bar */}
-        <div className="mt-3 space-y-1">
-          {metrics.caseMetrics.map((cm) => {
-            const cmColor = getAccuracyColor(cm.latestHitRate);
-            return (
-              <div key={cm.testCaseId} className="flex items-center gap-2">
-                <span className="text-[10px] text-stone-400 w-20 truncate">{cm.testCaseName}</span>
-                <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${cmColor.ring === "#10B981" ? "bg-emerald-500" : cmColor.ring === "#D4A96A" ? "bg-[#D4A96A]" : "bg-rose-400"}`}
-                    style={{ width: `${cm.latestHitRate * 100}%` }}
-                  />
-                </div>
-                <span className={`text-[10px] font-medium tabular-nums ${cmColor.text}`}>
-                  {(cm.latestHitRate * 100).toFixed(0)}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </button>
 
-      {/* Footer: sparkline + run button */}
-      <div className="flex items-center justify-between px-4 pb-3 pt-0">
-        <Sparkline values={sparklineValues} color={color.ring} />
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRun();
-          }}
-          disabled={disableRun}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 hover:border-stone-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          title={`Run tests for ${metrics.visaTypeName}`}
-        >
-          <Play className="size-3" />
-          Run
-        </button>
-      </div>
+        {/* Dual accuracy stats */}
+        <div className="flex items-center gap-6 mt-3 pt-3 border-t border-stone-100">
+          <div className="flex-1">
+            <p className="text-[10px] text-stone-400 uppercase tracking-wide">OCR</p>
+            <p className={`text-lg font-bold tabular-nums ${ocrColor.text}`}>
+              {(metrics.overallAccuracy * 100).toFixed(1)}%
+            </p>
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] text-stone-400 uppercase tracking-wide">Form Fill</p>
+            <p className={`text-lg font-bold tabular-nums ${ffColor.text}`}>
+              {(metrics.formFillOverallAccuracy * 100).toFixed(1)}%
+            </p>
+          </div>
+        </div>
+
+      </button>
     </div>
   );
 }
