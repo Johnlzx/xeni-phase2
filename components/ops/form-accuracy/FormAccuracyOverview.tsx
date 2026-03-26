@@ -1,7 +1,20 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Target, FlaskConical, Play, Loader2, Download, Settings2, ArrowUpDown, Filter, AlertTriangle, Clock } from "lucide-react";
+import { Target, FlaskConical, Play, Loader2, Download, Settings2, ArrowUpDown, Filter, AlertTriangle, Clock, Crosshair } from "lucide-react";
+import {
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ReferenceLine,
+  ReferenceArea,
+  Tooltip as RechartsTooltip,
+  Cell,
+  Customized,
+  ResponsiveContainer,
+} from "recharts";
 import { toast } from "sonner";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { formatDate } from "@/lib/utils";
@@ -319,6 +332,12 @@ export function FormAccuracyOverview() {
         {/* Coverage Timeline */}
         <CoverageTimeline data={timelineData} />
 
+        {/* Accuracy Scatter Plot */}
+        <AccuracyScatterPlot
+          data={visaTypeMetrics}
+          onSelectVisaType={setSelectedVisaType}
+        />
+
         {/* Sort/Filter Row */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-stone-500">
@@ -590,6 +609,212 @@ function CoverageTimeline({ data }: { data: CoverageTimelineRow[] }) {
           <p className="text-stone-300 mt-0.5">{(tooltip.accuracy * 100).toFixed(1)}%</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// =============================================================================
+// ACCURACY SCATTER PLOT
+// =============================================================================
+
+interface ScatterPoint {
+  visaTypeId: FormAccuracyVisaTypeId;
+  visaTypeName: string;
+  visaTypeCode: string;
+  ocrAccuracy: number;
+  formFillAccuracy: number;
+  totalCases: number;
+  fill: string;
+}
+
+function CustomScatterTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: ScatterPoint }> }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-stone-800 text-white text-[11px] px-3 py-2 rounded-lg shadow-lg">
+      <p className="font-medium">{d.visaTypeName}</p>
+      <p className="text-stone-300 mt-1">OCR: {(d.ocrAccuracy * 100).toFixed(1)}%</p>
+      <p className="text-stone-300">Form Fill: {(d.formFillAccuracy * 100).toFixed(1)}%</p>
+      <p className="text-stone-300">{d.totalCases} test cases</p>
+    </div>
+  );
+}
+
+function DiagonalParityLine(props: Record<string, unknown>) {
+  const xAxisMap = props.xAxisMap as Record<string, { scale?: (v: number) => number; domain?: number[] }> | undefined;
+  const yAxisMap = props.yAxisMap as Record<string, { scale?: (v: number) => number; domain?: number[] }> | undefined;
+  if (!xAxisMap || !yAxisMap) return null;
+  const xAxis = xAxisMap[Object.keys(xAxisMap)[0]];
+  const yAxis = yAxisMap[Object.keys(yAxisMap)[0]];
+  if (!xAxis?.scale || !yAxis?.scale) return null;
+  const xScale = xAxis.scale;
+  const yScale = yAxis.scale;
+  const domainMin = Math.max(xAxis.domain?.[0] ?? 0.80, yAxis.domain?.[0] ?? 0.80);
+  const domainMax = Math.min(xAxis.domain?.[1] ?? 1.0, yAxis.domain?.[1] ?? 1.0);
+  return (
+    <line
+      x1={xScale(domainMin)}
+      y1={yScale(domainMin)}
+      x2={xScale(domainMax)}
+      y2={yScale(domainMax)}
+      stroke="#d6d3d1"
+      strokeDasharray="4 4"
+      strokeWidth={1}
+    />
+  );
+}
+
+function AccuracyScatterPlot({
+  data,
+  onSelectVisaType,
+}: {
+  data: VisaTypeAccuracyMetrics[];
+  onSelectVisaType: (id: FormAccuracyVisaTypeId) => void;
+}) {
+  const { scatterData, domainMin } = useMemo(() => {
+    const points: ScatterPoint[] = data.map((m) => {
+      const worse = Math.min(m.overallAccuracy, m.formFillOverallAccuracy);
+      return {
+        visaTypeId: m.visaTypeId,
+        visaTypeName: m.visaTypeName,
+        visaTypeCode: m.visaTypeCode,
+        ocrAccuracy: m.overallAccuracy,
+        formFillAccuracy: m.formFillOverallAccuracy,
+        totalCases: m.totalCases,
+        fill: getAccuracyColor(worse).ring,
+      };
+    });
+    const allVals = points.flatMap((p) => [p.ocrAccuracy, p.formFillAccuracy]);
+    const lowest = Math.min(...allVals);
+    const domainMin = Math.min(0.80, Math.floor(lowest * 20) / 20); // round down to nearest 5%
+    return { scatterData: points, domainMin };
+  }, [data]);
+
+  const ticks = useMemo(() => {
+    const t: number[] = [];
+    for (let v = domainMin; v <= 1.001; v += 0.05) {
+      t.push(Math.round(v * 100) / 100);
+    }
+    return t;
+  }, [domainMin]);
+
+  return (
+    <div className="bg-white rounded-xl border border-stone-200 p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Crosshair className="size-4 text-stone-400" />
+          <h3 className="text-sm font-medium text-stone-700">OCR vs Form Fill Accuracy</h3>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-emerald-500" />
+            <span className="text-[11px] text-stone-400">&ge; 95%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-[#D4A96A]" />
+            <span className="text-[11px] text-stone-400">90&ndash;95%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-rose-400" />
+            <span className="text-[11px] text-stone-400">&lt; 90%</span>
+          </div>
+          <div className="flex items-center gap-1.5 ml-1">
+            <svg width={16} height={8}><line x1={0} y1={4} x2={16} y2={4} stroke="#d6d3d1" strokeDasharray="3 2" strokeWidth={1.5} /></svg>
+            <span className="text-[11px] text-stone-400">parity</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 20, right: 24, bottom: 32, left: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+
+            {/* Quadrant shading */}
+            <ReferenceArea x1={0.90} x2={1.00} y1={0.90} y2={1.00} fill="#10B981" fillOpacity={0.04} />
+            <ReferenceArea x1={domainMin} x2={0.90} y1={domainMin} y2={0.90} fill="#F43F5E" fillOpacity={0.04} />
+
+            <XAxis
+              type="number"
+              dataKey="ocrAccuracy"
+              domain={[domainMin, 1.00]}
+              ticks={ticks}
+              tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+              fontSize={11}
+              stroke="#a8a29e"
+              tickLine={false}
+              label={{ value: "OCR Accuracy →", position: "insideBottom", offset: -16, fontSize: 11, fill: "#78716c" }}
+            />
+            <YAxis
+              type="number"
+              dataKey="formFillAccuracy"
+              domain={[domainMin, 1.00]}
+              ticks={ticks}
+              tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+              fontSize={11}
+              stroke="#a8a29e"
+              tickLine={false}
+              label={{ value: "Form Fill Accuracy →", angle: -90, position: "insideLeft", offset: 4, fontSize: 11, fill: "#78716c" }}
+            />
+
+            {/* 90% threshold lines */}
+            <ReferenceLine
+              x={0.90}
+              stroke="#D4A96A"
+              strokeDasharray="6 4"
+              strokeWidth={1}
+            />
+            <ReferenceLine
+              y={0.90}
+              stroke="#D4A96A"
+              strokeDasharray="6 4"
+              strokeWidth={1}
+            />
+
+            {/* Diagonal parity line (y=x) */}
+            <Customized component={DiagonalParityLine} />
+
+            <RechartsTooltip
+              content={<CustomScatterTooltip />}
+              cursor={false}
+            />
+
+            <Scatter
+              data={scatterData}
+              onClick={(data: { payload?: ScatterPoint }) => {
+                if (data?.payload?.visaTypeId) {
+                  onSelectVisaType(data.payload.visaTypeId);
+                }
+              }}
+              cursor="pointer"
+              shape={(props: { cx?: number; cy?: number; payload?: ScatterPoint }) => {
+                const { cx, cy, payload } = props;
+                if (cx == null || cy == null || !payload) return <g />;
+                return (
+                  <g>
+                    <circle cx={cx} cy={cy} r={10} fill={payload.fill} fillOpacity={0.15} />
+                    <circle cx={cx} cy={cy} r={6} fill={payload.fill} stroke="white" strokeWidth={2} />
+                    <text
+                      x={cx}
+                      y={cy - 15}
+                      textAnchor="middle"
+                      fontSize={10}
+                      fontWeight={600}
+                      fill="#57534e"
+                    >
+                      {payload.visaTypeCode}
+                    </text>
+                  </g>
+                );
+              }}
+            >
+              {scatterData.map((entry, index) => (
+                <Cell key={index} fill={entry.fill} />
+              ))}
+            </Scatter>
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
